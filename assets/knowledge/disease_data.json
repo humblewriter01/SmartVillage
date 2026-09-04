@@ -1,0 +1,816 @@
+{
+  "rice_blast": {
+    "disease_id": "rice_blast",
+    "common_name": "Rice Blast",
+    "odia_name": "ଧାନ ଝଳସ ରୋଗ",
+    "hindi_name": "धान का ब्लास्ट रोग",
+    "pathogen_type": "Fungal",
+    "pathogen_scientific": "Magnaporthe oryzae",
+    "affected_crops": [
+      "rice"
+    ],
+    "causes": "Caused by the fungus Magnaporthe oryzae. Spreads through airborne spores. Favoured by high humidity (>90%), temperatures 25-28°C, heavy nitrogen fertilization, and cloudy weather. Common in Odisha's Kharif season.",
+    "symptoms": "Diamond-shaped grey lesions with brown margins on leaves. In severe cases, the neck of the panicle turns brown and breaks (neck blast), causing white empty panicles — a total yield loss situation.",
+    "severity_levels": {
+      "mild": {
+        "description": "Few scattered lesions on lower leaves, less than 5% leaf area affected",
+        "treatment": "Remove and destroy infected leaves. Improve field drainage. Avoid excess urea. Apply wood ash around plants.",
+        "pesticide_name": "Tricyclazole 75% WP (Beam / Baan)",
+        "dosage": "6g per 10 liters of water",
+        "frequency": "Once at first sign, repeat after 10 days if needed",
+        "spray_time": "Early morning or evening, avoid midday",
+        "cost_per_acre_inr": 350,
+        "organic_alternative": "Spray 1kg fermented buttermilk + 1kg neem leaf extract in 10L water"
+      },
+      "moderate": {
+        "description": "Lesions on 5-25% leaf area, some neck infection visible",
+        "treatment": "Immediate fungicide application. Drain excess water from field. Do not apply nitrogen fertilizer until disease is controlled.",
+        "pesticide_name": "Isoprothiolane 40% EC (Fuji-One / Oryza)",
+        "dosage": "1.5 ml per liter of water (15ml in 10L)",
+        "frequency": "Spray 2-3 times at 10-day intervals",
+        "spray_time": "Early morning",
+        "cost_per_acre_inr": 650,
+        "organic_alternative": "Pseudomonas fluorescens @ 2.5 kg/ha as soil drench + foliar spray"
+      },
+      "severe": {
+        "description": "More than 25% leaf area affected, widespread neck blast, panicle death",
+        "treatment": "Emergency chemical treatment. Spray within 24 hours. If neck blast is widespread, protect remaining panicles. Consider partial harvest of mature panicles.",
+        "pesticide_name": "Tricyclazole 75% WP + Propiconazole 25% EC mixture",
+        "dosage": "Tricyclazole 6g + Propiconazole 1ml per 10L water",
+        "frequency": "3 sprays at 7-day intervals",
+        "spray_time": "Early morning, calm wind conditions",
+        "cost_per_acre_inr": 1200,
+        "emergency_action": "Alert the local KVK immediately. Document damage for crop insurance claim."
+      }
+    },
+    "organic_alternative": "Trichoderma viride 4g/kg seed treatment before sowing. Spray Pseudomonas fluorescens 0.5% WP at 2.5 kg/ha.",
+    "prevention_tips": [
+      "Use blast-resistant varieties: Improved Samba Mahsuri, MTU 1010, Swarna Sub1",
+      "Seed treatment with Carbendazim 2g/kg before sowing",
+      "Balanced fertilization — do not over-apply urea",
+      "Maintain proper spacing for air circulation",
+      "Drain field when blast appears — drought stress reduces blast"
+    ],
+    "ipm_notes": "Source: ICAR-NRRI Cuttack (Odisha) blast management protocol 2023"
+  },
+  "rice_brown_spot": {
+    "disease_id": "rice_brown_spot",
+    "common_name": "Rice Brown Spot",
+    "odia_name": "ଧାନ ବାଦାମୀ ଦାଗ ରୋଗ",
+    "hindi_name": "धान का भूरा धब्बा रोग",
+    "pathogen_type": "Fungal",
+    "pathogen_scientific": "Helminthosporium oryzae (Cochliobolus miyabeanus)",
+    "affected_crops": [
+      "rice"
+    ],
+    "causes": "Fungal disease worsened by potassium and silicon deficiency. Thrives in poor soils and waterlogged conditions. The 1943 Bengal Famine was partly caused by this disease — showing its devastating historical potential.",
+    "symptoms": "Oval to circular brown spots with a yellow halo on leaves and glumes. Spots have a light grey or white center. Infected seeds produce brown discolored grain (stackburn).",
+    "severity_levels": {
+      "mild": {
+        "description": "A few spots on lower leaves, less than 5% infection",
+        "treatment": "Apply potash fertilizer (MOP) 20 kg/acre. Improve drainage. Spray neem oil solution.",
+        "pesticide_name": "Mancozeb 75% WP (Dithane M-45 / Indofil M-45)",
+        "dosage": "25g per 10 liters of water",
+        "frequency": "One spray, repeat if needed after 15 days",
+        "spray_time": "Morning",
+        "cost_per_acre_inr": 280,
+        "organic_alternative": "Spray 10% neem leaf extract or garlic-chili extract solution"
+      },
+      "moderate": {
+        "description": "Spots on 5-20% of leaf area, grain infection starting",
+        "treatment": "Fungicide spray + potassium fertilization. Check soil pH and correct if needed.",
+        "pesticide_name": "Propiconazole 25% EC (Tilt / Bumper)",
+        "dosage": "1ml per liter of water",
+        "frequency": "2 sprays at 15-day intervals",
+        "spray_time": "Early morning",
+        "cost_per_acre_inr": 520,
+        "organic_alternative": "Trichoderma harzianum foliar spray"
+      },
+      "severe": {
+        "description": "More than 20% leaf area, grain discoloration, yield loss certain",
+        "treatment": "Immediate chemical treatment. Apply silicon @ 25 kg/acre. Ensure proper drainage.",
+        "pesticide_name": "Iprobenfos 48% EC (Kitazin) + Mancozeb mixture",
+        "dosage": "1ml Iprobenfos + 25g Mancozeb per 10L water",
+        "frequency": "3 sprays at 10-day intervals",
+        "spray_time": "Early morning",
+        "cost_per_acre_inr": 900,
+        "emergency_action": "Apply potash fertilizer immediately. Contact agriculture department."
+      }
+    },
+    "organic_alternative": "Seed treatment with Trichoderma viride 4g/kg. Foliar spray of 3% wood ash extract.",
+    "prevention_tips": [
+      "Use balanced NPK + potash fertilization",
+      "Use certified disease-free seeds",
+      "Seed treatment with fungicide before sowing",
+      "Maintain proper plant spacing",
+      "Improve soil health with organic compost"
+    ],
+    "ipm_notes": "Source: NIPHM IPM guidelines for Kharif rice"
+  },
+  "rice_leaf_blight": {
+    "disease_id": "rice_leaf_blight",
+    "common_name": "Rice Bacterial Leaf Blight",
+    "odia_name": "ଧାନ ପ୍ରବ୍ୟାକ୍ଟେରିଆ ଝଳସ",
+    "hindi_name": "धान का जीवाणु पत्ती झुलसा",
+    "pathogen_type": "Bacterial",
+    "pathogen_scientific": "Xanthomonas oryzae pv. oryzae",
+    "affected_crops": [
+      "rice"
+    ],
+    "causes": "Bacterial disease spread by wind and rain splash. Enters through water pores (hydathodes) at leaf tips. Explosive spread after storms and cyclones — very relevant in coastal Odisha.",
+    "symptoms": "Water-soaked lesions starting at leaf tips and margins, turning yellow then brown-grey. Leaves appear dried. Milky bacterial ooze visible in early morning (Kresek phase in seedlings = rapid wilting).",
+    "severity_levels": {
+      "mild": {
+        "description": "Tip burning on few leaves, less than 10% plants affected",
+        "treatment": "Remove infected plant material. Avoid field operations when leaves are wet. Stop nitrogen application.",
+        "pesticide_name": "Copper Oxychloride 50% WP (Blitox / Fytolan)",
+        "dosage": "30g per 10 liters of water",
+        "frequency": "2 sprays at 10-day intervals",
+        "spray_time": "Morning after dew dries",
+        "cost_per_acre_inr": 320,
+        "organic_alternative": "Spray 5% Panchagavya or copper sulfate solution 0.2%"
+      },
+      "moderate": {
+        "description": "10-30% plants showing leaf blight symptoms",
+        "treatment": "Bactericide spray. Drain standing water. Apply potash to strengthen plant resistance.",
+        "pesticide_name": "Streptomycin Sulfate 90% + Tetracycline Hydrochloride 10% (Plantomycin)",
+        "dosage": "6g per 10 liters of water",
+        "frequency": "2-3 sprays at 10-day intervals",
+        "spray_time": "Early morning",
+        "cost_per_acre_inr": 580,
+        "organic_alternative": "Pseudomonas fluorescens 0.5% WP @ 2.5 kg/ha"
+      },
+      "severe": {
+        "description": "More than 30% plants affected, kresek phase visible in nursery/young crops",
+        "treatment": "Emergency bactericide treatment. Drain and reflood with fresh water. Do not apply nitrogen.",
+        "pesticide_name": "Streptomycin + Copper Oxychloride combination",
+        "dosage": "Streptomycin 6g + Copper Oxychloride 30g per 10L",
+        "frequency": "3 sprays at 7-day intervals",
+        "spray_time": "Morning",
+        "cost_per_acre_inr": 950,
+        "emergency_action": "Drain field. Stop all nitrogen fertilizer. File crop insurance claim if damage exceeds 33%."
+      }
+    },
+    "organic_alternative": "PGPR seed treatment. Spray BSO (Bacillus subtilis) biocontrol agent.",
+    "prevention_tips": [
+      "Plant resistant varieties: IR64, Swarna, Tapaswini (Odisha)",
+      "Avoid excess urea — makes plants susceptible",
+      "Drain fields after heavy rain/cyclone",
+      "Seed treatment with Streptomycin 1g per liter for 12 hours",
+      "Do not transplant from infected nurseries"
+    ],
+    "ipm_notes": "Source: ICAR-NRRI Cuttack BLB management protocol"
+  },
+  "wheat_rust": {
+    "disease_id": "wheat_rust",
+    "common_name": "Wheat Stem Rust (Black Rust)",
+    "odia_name": "ଗହମ ମାଞ୍ଜ ରୋଗ",
+    "hindi_name": "गेहूं का तना किट्ट",
+    "pathogen_type": "Fungal",
+    "pathogen_scientific": "Puccinia graminis f. sp. tritici",
+    "affected_crops": [
+      "wheat"
+    ],
+    "causes": "Highly contagious airborne fungal disease. Uredospores travel hundreds of kilometers on wind. The Ug99 strain is a global emergency threat. Favors temperatures 15-25°C with dew.",
+    "symptoms": "Orange-brown oval pustules (uredinia) on stems, leaves, and leaf sheaths. Pustules break open releasing rust-colored powder (spores). Black teliospores form later in season. Severely weakens stems causing lodging.",
+    "severity_levels": {
+      "mild": {
+        "description": "Scattered pustules on lower leaves only, less than 5% infection",
+        "treatment": "Monitor closely. Apply protective fungicide. Remove severely infected plants.",
+        "pesticide_name": "Mancozeb 75% WP (Dithane M-45)",
+        "dosage": "25g per 10 liters",
+        "frequency": "One spray, monitor weekly",
+        "spray_time": "Morning",
+        "cost_per_acre_inr": 300,
+        "organic_alternative": "Spray sulfur dust 20 kg/acre or potassium bicarbonate solution"
+      },
+      "moderate": {
+        "description": "Pustules on multiple leaves and some stems, 5-25% infection",
+        "treatment": "Systemic fungicide immediately. Two rounds of treatment.",
+        "pesticide_name": "Propiconazole 25% EC (Tilt)",
+        "dosage": "1ml per liter (10ml per 10L water)",
+        "frequency": "2 sprays at 12-day intervals",
+        "spray_time": "Early morning",
+        "cost_per_acre_inr": 600,
+        "organic_alternative": "Trichoderma asperellum biocontrol spray"
+      },
+      "severe": {
+        "description": "Widespread stem infection, lodging risk, more than 25% affected",
+        "treatment": "Emergency systemic fungicide. Stems compromised — act immediately before lodging.",
+        "pesticide_name": "Tebuconazole 25.9% EC (Folicur / Rexona)",
+        "dosage": "1ml per liter of water",
+        "frequency": "3 sprays at 7-10 day intervals",
+        "spray_time": "Early morning, calm wind",
+        "cost_per_acre_inr": 1100,
+        "emergency_action": "Immediate harvest if crop is near maturity. Alert district agriculture officer."
+      }
+    },
+    "organic_alternative": "Use rust-resistant varieties. Bioagent Trichoderma seed treatment.",
+    "prevention_tips": [
+      "Plant rust-resistant varieties: GW 322, HD 2781, K 307",
+      "Timely sowing (November in North India)",
+      "Avoid excess nitrogen — lush growth favors rust",
+      "Monitor fields weekly from tillering stage",
+      "Remove volunteer wheat and barberry plants nearby"
+    ],
+    "ipm_notes": "Source: ICAR-IIWBR Karnal wheat protection guidelines"
+  },
+  "wheat_powdery_mildew": {
+    "disease_id": "wheat_powdery_mildew",
+    "common_name": "Wheat Powdery Mildew",
+    "odia_name": "ଗହମ ଗୁଣ୍ଡ ଫିମ୍ପି ରୋଗ",
+    "hindi_name": "गेहूं की चूर्णिल फफूंदी",
+    "pathogen_type": "Fungal",
+    "pathogen_scientific": "Blumeria graminis f. sp. tritici",
+    "affected_crops": [
+      "wheat"
+    ],
+    "causes": "Obligate fungal parasite — can only grow on living wheat tissue. Spreads via airborne conidia. Favors cool temperatures (15-20°C) with high humidity. Dense crop canopy accelerates spread.",
+    "symptoms": "White to grey powdery fungal growth (mycelium + conidia) on upper leaf surface. Affected leaves turn yellow and die. Primarily attacks upper leaves and spikes in severe cases.",
+    "severity_levels": {
+      "mild": {
+        "description": "Powdery patches on lower leaves only",
+        "treatment": "Improve air circulation. Remove severely infected tillers. Sulfur-based fungicide.",
+        "pesticide_name": "Wettable Sulfur 80% WP (Thiovit Jet / Sulfex)",
+        "dosage": "25g per 10 liters",
+        "frequency": "One spray, repeat after 15 days",
+        "spray_time": "Morning (avoid hot hours — sulfur can burn in heat)",
+        "cost_per_acre_inr": 200,
+        "organic_alternative": "Spray 1% baking soda solution (sodium bicarbonate)"
+      },
+      "moderate": {
+        "description": "Upper leaves affected, 5-20% of crop showing mildew",
+        "treatment": "Systemic fungicide application. Remove excess tillers for better air circulation.",
+        "pesticide_name": "Propiconazole 25% EC (Tilt) or Hexaconazole 5% SC",
+        "dosage": "1ml propiconazole per liter water",
+        "frequency": "2 sprays at 10-day intervals",
+        "spray_time": "Early morning",
+        "cost_per_acre_inr": 500,
+        "organic_alternative": "Neem oil 3ml + mild soap 1ml per liter spray"
+      },
+      "severe": {
+        "description": "Flag leaf and spike infection, more than 20% crop affected",
+        "treatment": "Immediate systemic treatment. Flag leaf infection directly reduces grain fill.",
+        "pesticide_name": "Tebuconazole 25.9% EC (Folicur)",
+        "dosage": "1ml per liter",
+        "frequency": "2-3 sprays at 7-10 days",
+        "spray_time": "Morning",
+        "cost_per_acre_inr": 900,
+        "emergency_action": "Treat flag leaf emergence as absolute priority. Document for insurance."
+      }
+    },
+    "organic_alternative": "Trichoderma seed treatment. Spray milk dilution (1:9 milk:water) as preventive.",
+    "prevention_tips": [
+      "Plant resistant varieties: PBW 343, WH 1105, DBW 88",
+      "Avoid dense planting — maintain 20cm row spacing",
+      "Balanced fertilization — avoid excess nitrogen",
+      "Timely fungicide spray at first sign",
+      "Crop rotation to break disease cycle"
+    ],
+    "ipm_notes": "Source: ICAR wheat crop protection guidelines 2023"
+  },
+  "tomato_early_blight": {
+    "disease_id": "tomato_early_blight",
+    "common_name": "Tomato Early Blight",
+    "odia_name": "ଟମାଟୋ ଆଗୁ ଝଳସ",
+    "hindi_name": "टमाटर का अगेती झुलसा",
+    "pathogen_type": "Fungal",
+    "pathogen_scientific": "Alternaria solani",
+    "affected_crops": [
+      "tomato",
+      "potato"
+    ],
+    "causes": "Soilborne fungus that survives in plant debris for years. Spreads through water splash. Favors warm temperatures (24-29°C) with alternating wet-dry cycles. Older leaves attacked first — classic pattern.",
+    "symptoms": "Dark brown to black circular spots with concentric rings (target board pattern) on older lower leaves. Yellow halo around spots. Spots on stem cause collar rot in seedlings.",
+    "severity_levels": {
+      "mild": {
+        "description": "Spots on 2-3 lower leaves only",
+        "treatment": "Remove infected lower leaves. Mulch soil to prevent splash. Stake plants for better air flow.",
+        "pesticide_name": "Mancozeb 75% WP (Dithane M-45)",
+        "dosage": "25g per 10 liters",
+        "frequency": "One spray preventively",
+        "spray_time": "Morning",
+        "cost_per_acre_inr": 280,
+        "organic_alternative": "Spray compost tea or Bacillus subtilis solution"
+      },
+      "moderate": {
+        "description": "Multiple leaves infected, spots coalescing, 10-30% defoliation",
+        "treatment": "Fungicide spray. Remove and destroy fallen leaves. Improve drainage.",
+        "pesticide_name": "Chlorothalonil 75% WP (Kavach / Daconil)",
+        "dosage": "20g per 10 liters",
+        "frequency": "3 sprays at 7-10 day intervals",
+        "spray_time": "Early morning or late evening",
+        "cost_per_acre_inr": 580,
+        "organic_alternative": "Trichoderma viride spray 2g per liter"
+      },
+      "severe": {
+        "description": "More than 30% defoliation, stem cankers, fruit infection",
+        "treatment": "Systemic + contact fungicide mix. Severe defoliation threatens photosynthesis and yield.",
+        "pesticide_name": "Azoxystrobin 18.2% + Difenoconazole 11.4% SC (Amistar Top)",
+        "dosage": "1ml per liter of water",
+        "frequency": "2-3 sprays at 7-day intervals",
+        "spray_time": "Morning",
+        "cost_per_acre_inr": 1400,
+        "emergency_action": "Remove severely infected plants. Avoid overhead irrigation."
+      }
+    },
+    "organic_alternative": "Spray 1% Bordeaux mixture (copper sulfate + lime). Trichoderma soil drench.",
+    "prevention_tips": [
+      "Use resistant varieties: Arka Rakshak, Arka Samrat",
+      "Avoid overhead irrigation — use drip irrigation",
+      "Mulch with straw or plastic to prevent soil splash",
+      "Remove and destroy crop debris after harvest",
+      "2-3 year crop rotation with non-solanaceous crops"
+    ],
+    "ipm_notes": "Source: ICAR-IIVR Varanasi tomato disease management"
+  },
+  "tomato_late_blight": {
+    "disease_id": "tomato_late_blight",
+    "common_name": "Tomato Late Blight",
+    "odia_name": "ଟମାଟୋ ଗୋଡ଼ ଝଳସ",
+    "hindi_name": "टमाटर का पछेती झुलसा",
+    "pathogen_type": "Oomycete (Water Mold)",
+    "pathogen_scientific": "Phytophthora infestans",
+    "affected_crops": [
+      "tomato",
+      "potato"
+    ],
+    "causes": "The pathogen that caused the Irish Potato Famine (1845-1849) — killing 1 million people. Not a true fungus but a water mold. Spreads explosively in cool, wet conditions. Can destroy a field in 3-5 days under favorable conditions.",
+    "symptoms": "Water-soaked, greasy spots on leaves and stems that turn brown-black rapidly. White fluffy mold (sporangia) visible on undersides of leaves in humid weather. Dark brown lesions on fruit surface extending into fruit flesh.",
+    "severity_levels": {
+      "mild": {
+        "description": "First lesions appearing on lower leaves, less than 5% plants affected",
+        "treatment": "Remove infected leaves immediately. Avoid overhead irrigation. Apply preventive fungicide.",
+        "pesticide_name": "Metalaxyl + Mancozeb (Ridomil Gold MZ 68 WG)",
+        "dosage": "25g per 10 liters",
+        "frequency": "One spray, repeat at 7-10 days",
+        "spray_time": "Morning — NEVER evening (spores spread at night)",
+        "cost_per_acre_inr": 600,
+        "organic_alternative": "1% Bordeaux mixture spray — effective preventive"
+      },
+      "moderate": {
+        "description": "Multiple plants infected, lesions on stems, 10-30% damage",
+        "treatment": "Systemic fungicide immediately. Stop all overhead irrigation. Stake plants.",
+        "pesticide_name": "Cymoxanil + Mancozeb (Curzate M8)",
+        "dosage": "30g per 10 liters",
+        "frequency": "2-3 sprays at 5-7 day intervals (fast-moving disease!)",
+        "spray_time": "Early morning",
+        "cost_per_acre_inr": 850,
+        "organic_alternative": "Copper hydroxide 77% WP (Kocide) spray"
+      },
+      "severe": {
+        "description": "More than 30% plants collapsing, field-wide spread, fruit rot",
+        "treatment": "Emergency. This disease is a RACE — act immediately or lose the crop.",
+        "pesticide_name": "Fenamidone + Mancozeb (Sectin) or Propamocarb HCl (Previcur)",
+        "dosage": "Per label — typically 30g per 10L",
+        "frequency": "Every 5 days until controlled",
+        "spray_time": "Early morning only",
+        "cost_per_acre_inr": 1800,
+        "emergency_action": "If fruit already infected — harvest whatever is healthy immediately. Consider emergency harvest."
+      }
+    },
+    "organic_alternative": "Bordeaux mixture 1% (proven since 1800s). Copper oxychloride spray.",
+    "prevention_tips": [
+      "Never plant in areas with history of late blight",
+      "Use certified disease-free seed/transplants",
+      "Avoid overhead irrigation — drip only",
+      "Ensure good spacing and air circulation",
+      "Apply preventive copper fungicide at transplanting",
+      "Scout field every 2-3 days during monsoon"
+    ],
+    "ipm_notes": "Source: ICAR late blight emergency management protocol. HISTORICAL NOTE: P. infestans caused the Great Irish Famine."
+  },
+  "tomato_leaf_curl": {
+    "disease_id": "tomato_leaf_curl",
+    "common_name": "Tomato Leaf Curl Virus",
+    "odia_name": "ଟମାଟୋ ପତ୍ର କୁଞ୍ଚନ ରୋଗ",
+    "hindi_name": "टमाटर पत्ती कुंचन रोग",
+    "pathogen_type": "Viral",
+    "pathogen_scientific": "Tomato Leaf Curl Virus (ToLCV) — Begomovirus",
+    "affected_crops": [
+      "tomato"
+    ],
+    "causes": "Transmitted exclusively by whitefly (Bemisia tabaci). THERE IS NO CHEMICAL CURE FOR THE VIRUS — only whitefly control can prevent spread. Once a plant has the virus, it cannot be cured.",
+    "symptoms": "Leaves curl upward and inward, becoming thick and leathery. Interveinal yellowing. Stunted plant growth. Flowers may fall without setting fruit. Plants infected early produce no yield.",
+    "severity_levels": {
+      "mild": {
+        "description": "1-5 plants showing symptoms, whitefly population moderate",
+        "treatment": "Remove and destroy infected plants IMMEDIATELY to prevent spread. Control whitefly vector.",
+        "pesticide_name": "Imidacloprid 17.8% SL (Confidor / Tatamida) for whitefly control",
+        "dosage": "0.3ml per liter (for whitefly — insecticide, not fungicide)",
+        "frequency": "Spray every 7 days for whitefly control",
+        "spray_time": "Evening (whiteflies active in morning — contact spray more effective in evening)",
+        "cost_per_acre_inr": 450,
+        "organic_alternative": "Yellow sticky traps 20/acre. Neem oil 5ml/L spray for whitefly."
+      },
+      "moderate": {
+        "description": "5-20% plants infected, active whitefly infestation",
+        "treatment": "Remove ALL infected plants. Intensive whitefly control. Consider border planting with maize as barrier.",
+        "pesticide_name": "Thiamethoxam 25% WG (Actara) for whitefly",
+        "dosage": "0.2g per liter",
+        "frequency": "2-3 sprays at 7-day intervals, rotate insecticides",
+        "spray_time": "Evening",
+        "cost_per_acre_inr": 700,
+        "organic_alternative": "Beauveria bassiana biocontrol spray for whitefly"
+      },
+      "severe": {
+        "description": "More than 20% plants infected, epidemic spread",
+        "treatment": "Remove all infected plants. Apply reflective mulch to confuse whiteflies. Consider crop abandonment if more than 50% infected.",
+        "pesticide_name": "Spiromesifen 22.9% SC (Oberon) — targets whitefly eggs and nymphs",
+        "dosage": "1ml per liter",
+        "frequency": "2 sprays at 10-day intervals",
+        "spray_time": "Evening",
+        "cost_per_acre_inr": 1200,
+        "emergency_action": "IMPORTANT: No virus cure exists. Focus entirely on preventing whitefly from spreading to healthy plants."
+      }
+    },
+    "organic_alternative": "Yellow sticky traps, reflective silver mulch, companion planting with basil. Neem cake soil application.",
+    "prevention_tips": [
+      "Use TYLCV-resistant varieties: Arka Rakshak, Pusa Hybrid-1",
+      "Install 40-mesh nylon net in nursery to exclude whiteflies",
+      "Use silver reflective mulch — whiteflies avoid bright light",
+      "Plant border rows of maize or sorghum as wind barrier",
+      "Do not plant near fields with history of leaf curl"
+    ],
+    "ipm_notes": "Source: ICAR-IIHR viral disease management. KEY: No cure, only prevention/vector control."
+  },
+  "potato_late_blight": {
+    "disease_id": "potato_late_blight",
+    "common_name": "Potato Late Blight",
+    "odia_name": "ଆଳୁ ଗୋଡ଼ ଝଳସ",
+    "hindi_name": "आलू का पछेती झुलसा",
+    "pathogen_type": "Oomycete",
+    "pathogen_scientific": "Phytophthora infestans",
+    "affected_crops": [
+      "potato"
+    ],
+    "causes": "Same devastating pathogen as tomato late blight. Particularly destructive in potato because tubers in soil also get infected. Cool (10-20°C), wet weather with high humidity causes explosive spread.",
+    "symptoms": "Dark brown-black water-soaked lesions on leaves starting at margins. White mold on lower leaf surface. Brown rotting of tubers in soil — undetectable until harvest.",
+    "severity_levels": {
+      "mild": {
+        "description": "First lesions on lower leaves, 3-5 plants in a patch",
+        "treatment": "Remove infected haulms. Apply preventive fungicide immediately. Reduce irrigation.",
+        "pesticide_name": "Metalaxyl 8% + Mancozeb 64% WP (Ridomil Gold MZ)",
+        "dosage": "25g per 10 liters",
+        "frequency": "Every 7-10 days preventively",
+        "spray_time": "Morning",
+        "cost_per_acre_inr": 700,
+        "organic_alternative": "1% Bordeaux mixture preventive spray"
+      },
+      "moderate": {
+        "description": "Patches of infected plants, 10-25% foliage affected",
+        "treatment": "Systemic fungicide. Kill and bury haulms of infected plants to prevent tuber spread.",
+        "pesticide_name": "Dimethomorph + Mancozeb (Acrobat MZ)",
+        "dosage": "30g per 10 liters",
+        "frequency": "3 sprays at 5-7 days",
+        "spray_time": "Morning",
+        "cost_per_acre_inr": 1100,
+        "organic_alternative": "Copper hydroxide 77% WP spray"
+      },
+      "severe": {
+        "description": "Field-wide infection, haulm collapse, tuber rot in soil",
+        "treatment": "Emergency. Kill haulms by cutting/herbicide to stop infection moving to tubers. Harvest early.",
+        "pesticide_name": "Fenamidone 10% + Mancozeb 50% WG (Sectin)",
+        "dosage": "30g per 10 liters",
+        "frequency": "Every 5-7 days",
+        "spray_time": "Morning only",
+        "cost_per_acre_inr": 2000,
+        "emergency_action": "Destroy haulms immediately. Delay harvest 2-3 weeks after killing haulms for skin set. Check tubers carefully before storing."
+      }
+    },
+    "organic_alternative": "Bordeaux mixture. Copper sulfate spray. Biocontrol Bacillus subtilis.",
+    "prevention_tips": [
+      "Plant certified disease-free seed potato",
+      "Avoid planting in low-lying areas",
+      "Earthing-up protects tubers from spores",
+      "Use late blight resistant varieties: Kufri Jyoti, Kufri Bahar",
+      "Destroy volunteer potato plants and nightshade weeds"
+    ],
+    "ipm_notes": "Source: ICAR-CPRI Shimla potato disease management guidelines"
+  },
+  "potato_black_scurf": {
+    "disease_id": "potato_black_scurf",
+    "common_name": "Potato Black Scurf (Rhizoctonia)",
+    "odia_name": "ଆଳୁ କଳା ଦାଗ ରୋଗ",
+    "hindi_name": "आलू का काला पपड़ी रोग",
+    "pathogen_type": "Fungal",
+    "pathogen_scientific": "Rhizoctonia solani",
+    "affected_crops": [
+      "potato"
+    ],
+    "causes": "Soilborne fungus that persists in soil for many years. Infected seed tubers are the main source. Cool, wet soils slow emergence and increase infection window.",
+    "symptoms": "Black or brown crusty sclerotia (fungal resting structures) on tuber surface — like dirt that won't wash off. Stem canker causes girdling of underground stems, yellowing and purple-red discoloration of above-ground leaves.",
+    "severity_levels": {
+      "mild": {
+        "description": "Black spots on tuber skin only, no stem canker, plants growing normally",
+        "treatment": "No in-season chemical treatment changes much. Tubers are marketable if consumers accept. Focus on seed treatment for next crop.",
+        "pesticide_name": "Thiram 75% WP seed treatment",
+        "dosage": "3g per kg of seed tubers (for next crop)",
+        "frequency": "Seed treatment only",
+        "spray_time": "Before planting",
+        "cost_per_acre_inr": 150,
+        "organic_alternative": "Trichoderma viride seed treatment 10g per kg"
+      },
+      "moderate": {
+        "description": "Stem canker visible, some plant stunting, 10-25% plants affected",
+        "treatment": "Soil drench around affected plants. Improve drainage.",
+        "pesticide_name": "Carbendazim 50% WP (Bavistin) soil drench",
+        "dosage": "1g per liter, drench around plant base",
+        "frequency": "One treatment at stem canker appearance",
+        "spray_time": "Any time",
+        "cost_per_acre_inr": 400,
+        "organic_alternative": "Trichoderma harzianum soil drench 2.5 kg/ha in 500L water"
+      },
+      "severe": {
+        "description": "Widespread stem canker, plant wilting, significant yield loss",
+        "treatment": "Limited in-season options. Improve drainage. Apply gypsum to improve soil. Focus on harvest and next season.",
+        "pesticide_name": "Flutolanil 20% SC (Moncut) soil application",
+        "dosage": "Per label, applied at planting in next season",
+        "frequency": "At planting",
+        "spray_time": "At planting",
+        "cost_per_acre_inr": 800,
+        "emergency_action": "Harvest as soon as possible. Sort and store only clean tubers. Do not save infected seed for next crop."
+      }
+    },
+    "organic_alternative": "Trichoderma seed treatment. Well-decomposed organic matter improves soil biology to suppress Rhizoctonia.",
+    "prevention_tips": [
+      "Use certified disease-free seed tubers",
+      "Treat seed with Carbendazim before cutting",
+      "Plant in well-drained soils",
+      "Avoid planting in same field repeatedly",
+      "Incorporate organic matter to promote beneficial microbes"
+    ],
+    "ipm_notes": "Source: ICAR-CPRI potato disease management"
+  },
+  "maize_leaf_spot": {
+    "disease_id": "maize_leaf_spot",
+    "common_name": "Maize Turcicum Leaf Blight",
+    "odia_name": "ମକା ପତ୍ର ଦାଗ ରୋଗ",
+    "hindi_name": "मक्का का पत्ती झुलसा रोग",
+    "pathogen_type": "Fungal",
+    "pathogen_scientific": "Exserohilum turcicum",
+    "affected_crops": [
+      "maize"
+    ],
+    "causes": "Fungal disease spreading through air and water. Favors moderate temperatures (18-27°C) with frequent dew and rain. Older leaves infected first, moving upward.",
+    "symptoms": "Long, elliptical (cigar-shaped) gray-green to tan lesions, 2.5-15cm long, following the leaf veins. Multiple lesions coalesce causing large dead areas. Severe infection before tasseling drastically reduces yield.",
+    "severity_levels": {
+      "mild": {
+        "description": "Lesions on lower leaves only, less than 10% leaf area",
+        "treatment": "Remove infected leaves if accessible. Apply protective fungicide.",
+        "pesticide_name": "Mancozeb 75% WP (Dithane M-45)",
+        "dosage": "25g per 10 liters",
+        "frequency": "One spray, repeat at 12-15 days",
+        "spray_time": "Morning",
+        "cost_per_acre_inr": 280,
+        "organic_alternative": "Trichoderma harzianum 2g per liter spray"
+      },
+      "moderate": {
+        "description": "Mid-canopy leaves infected, 10-30% leaf area, approaching tasseling",
+        "treatment": "Systemic fungicide. Timing is critical — protect leaves above the ear.",
+        "pesticide_name": "Propiconazole 25% EC (Tilt)",
+        "dosage": "1ml per liter",
+        "frequency": "2 sprays at 10-day intervals",
+        "spray_time": "Morning",
+        "cost_per_acre_inr": 550,
+        "organic_alternative": "Neem oil spray 3ml/L + Trichoderma combination"
+      },
+      "severe": {
+        "description": "Upper leaf canopy infected before/during tasseling, ear leaves affected, more than 30%",
+        "treatment": "Immediate systemic fungicide to save ear leaf and flag leaf — crucial for grain fill.",
+        "pesticide_name": "Azoxystrobin 23% SC (Amistar) or Tebuconazole",
+        "dosage": "1ml per liter",
+        "frequency": "2-3 sprays at 7-10 days",
+        "spray_time": "Morning",
+        "cost_per_acre_inr": 1000,
+        "emergency_action": "Focus on protecting ear leaf and two leaves above/below ear. These 3 leaves are responsible for most grain fill."
+      }
+    },
+    "organic_alternative": "Bioagent Trichoderma seed treatment. Pseudomonas fluorescens foliar spray.",
+    "prevention_tips": [
+      "Plant resistant hybrids: DKC 9108, Bio 9681, Pioneer P3396",
+      "Rotate with non-grass crops (legumes, vegetables)",
+      "Balanced NPK fertilization",
+      "Avoid overhead irrigation",
+      "Maintain proper plant density"
+    ],
+    "ipm_notes": "Source: ICAR-IIMR (Indian Institute of Maize Research) disease management"
+  },
+  "maize_rust": {
+    "disease_id": "maize_rust",
+    "common_name": "Maize Common Rust",
+    "odia_name": "ମକା ମାଞ୍ଜ ରୋଗ",
+    "hindi_name": "मक्का का साधारण रतुआ",
+    "pathogen_type": "Fungal",
+    "pathogen_scientific": "Puccinia sorghi",
+    "affected_crops": [
+      "maize"
+    ],
+    "causes": "Airborne rust fungus. Spreads extremely fast under cool, humid conditions (16-23°C). New crops can be infected from spores traveling long distances. Sorrel (Oxalis) is an alternate host — removing it helps.",
+    "symptoms": "Small, circular to elongate, brick-red to brown powdery pustules (uredia) on both leaf surfaces. Unlike leaf blight (which has elongated lesions), rust pustules are small and round. Leaves may yellow and die with severe infection.",
+    "severity_levels": {
+      "mild": {
+        "description": "Scattered small pustules on lower leaves, less than 5% leaf area",
+        "treatment": "Monitor crop. Protective spray if conditions favor spread.",
+        "pesticide_name": "Mancozeb 75% WP (Dithane M-45)",
+        "dosage": "25g per 10 liters",
+        "frequency": "One preventive spray",
+        "spray_time": "Morning",
+        "cost_per_acre_inr": 280,
+        "organic_alternative": "Sulfur dust 20 kg/acre broadcast"
+      },
+      "moderate": {
+        "description": "Pustules on multiple leaves, 5-20% infection, spreading upward",
+        "treatment": "Systemic fungicide before tasseling.",
+        "pesticide_name": "Propiconazole 25% EC or Hexaconazole 5% SC",
+        "dosage": "1ml propiconazole per liter",
+        "frequency": "2 sprays at 10-12 days",
+        "spray_time": "Morning",
+        "cost_per_acre_inr": 520,
+        "organic_alternative": "Trichoderma viride 2g/L spray"
+      },
+      "severe": {
+        "description": "Widespread pustules on upper canopy, flag leaf and ear leaves affected",
+        "treatment": "Emergency systemic fungicide. Severe rust can reduce yield 30-50%.",
+        "pesticide_name": "Tebuconazole 25.9% EC (Folicur)",
+        "dosage": "1ml per liter",
+        "frequency": "2-3 sprays at 7-10 days",
+        "spray_time": "Morning",
+        "cost_per_acre_inr": 900,
+        "emergency_action": "Protect ear leaf region. If near maturity, consider early harvest."
+      }
+    },
+    "organic_alternative": "Wettable sulfur spray. Biological control with Trichoderma.",
+    "prevention_tips": [
+      "Plant rust-resistant hybrids",
+      "Early planting avoids peak rust pressure",
+      "Remove Oxalis (sorrel) weeds from and around field",
+      "Balanced potassium fertilization strengthens cell walls"
+    ],
+    "ipm_notes": "Source: ICAR-IIMR maize disease management guidelines"
+  },
+  "cotton_bollworm": {
+    "disease_id": "cotton_bollworm",
+    "common_name": "Cotton American Bollworm",
+    "odia_name": "କପା ବୋଲ ପୋକ",
+    "hindi_name": "कपास का अमेरिकन सुंडी",
+    "pathogen_type": "Insect Pest",
+    "pathogen_scientific": "Helicoverpa armigera",
+    "affected_crops": [
+      "cotton",
+      "tomato",
+      "chickpea"
+    ],
+    "causes": "Major polyphagous insect pest — attacks 181+ plant species. Female moth lays eggs on young leaves; larvae bore into bolls, buds and flowers. Most devastating when it attacks bolls (cotton seed capsules).",
+    "symptoms": "Circular entry holes in bolls/flower buds. Larva (caterpillar) visible inside boll. Bolls shed prematurely. Internal boll damage with frass (insect excrement) visible. Damaged squares (flower buds) drop.",
+    "severity_levels": {
+      "mild": {
+        "description": "Less than 5% boll damage, few larvae visible",
+        "treatment": "Hand pick and destroy larvae. Install pheromone traps for monitoring.",
+        "pesticide_name": "Spinosad 45% SC (Tracer) or Emamectin Benzoate 5% SG (Proclaim)",
+        "dosage": "Spinosad 0.3ml/L, Emamectin 0.4g per 10L",
+        "frequency": "One spray, monitor with pheromone traps",
+        "spray_time": "Evening (larvae active at night, better contact)",
+        "cost_per_acre_inr": 500,
+        "organic_alternative": "Bt (Bacillus thuringiensis) spray 2g/L. Nuclear Polyhedrosis Virus (NPV) of Helicoverpa 250 LE/ha."
+      },
+      "moderate": {
+        "description": "5-20% boll damage, multiple larvae per plant",
+        "treatment": "Spray systemic insecticide. Pheromone traps 5/acre. Remove and destroy damaged bolls.",
+        "pesticide_name": "Chlorantraniliprole 18.5% SC (Coragen / Ferterra)",
+        "dosage": "0.3ml per liter (30ml per 10L water)",
+        "frequency": "2 sprays at 10-day intervals",
+        "spray_time": "Evening",
+        "cost_per_acre_inr": 900,
+        "organic_alternative": "NPV-H 250 LE/ha spray. Trichogramma egg parasitoid release."
+      },
+      "severe": {
+        "description": "More than 20% boll damage, economic threshold exceeded, 2+ larvae per plant",
+        "treatment": "Emergency systemic insecticide rotation (important: rotate to prevent resistance).",
+        "pesticide_name": "Flubendiamide 20% WG (Fame) + Thiamethoxam 25% WG alternating",
+        "dosage": "Per label",
+        "frequency": "Alternate 2-3 sprays at 7-day intervals",
+        "spray_time": "Evening",
+        "cost_per_acre_inr": 1600,
+        "emergency_action": "RESISTANCE MANAGEMENT: Never use same insecticide class twice in a row. Helicoverpa has developed resistance to many chemicals. Rotate modes of action."
+      }
+    },
+    "organic_alternative": "Bt var. kurstaki spray. NPV of Helicoverpa. Trichogramma chilonis parasitoid release.",
+    "prevention_tips": [
+      "Use Bt cotton varieties (provides built-in resistance)",
+      "Install 5 pheromone traps per acre for early monitoring",
+      "Intercrop with trap crops (marigold, pigeonpea)",
+      "Deep ploughing after harvest destroys pupae in soil",
+      "Avoid continuous cotton — rotate with wheat/sorghum"
+    ],
+    "ipm_notes": "Source: CICR (Central Institute for Cotton Research) Nagpur IPM guidelines"
+  },
+  "cotton_leaf_curl": {
+    "disease_id": "cotton_leaf_curl",
+    "common_name": "Cotton Leaf Curl Virus Disease",
+    "odia_name": "କପା ପତ୍ର କୁଞ୍ଚ ରୋଗ",
+    "hindi_name": "कपास का पत्ती मरोड़ रोग",
+    "pathogen_type": "Viral",
+    "pathogen_scientific": "Cotton Leaf Curl Kokhran Virus (CLCuKoV)",
+    "affected_crops": [
+      "cotton"
+    ],
+    "causes": "Devastating viral disease transmitted by whitefly Bemisia tabaci. Has devastated Punjab and Haryana cotton in 1990s (30 lakh acres affected). New strains continuously overcome resistant varieties.",
+    "symptoms": "Leaves curl downward (unlike tomato leaf curl which curls upward). Enations (leaf-like outgrowths) on underside of leaves — DIAGNOSTIC feature. Thickened, dark green veins. Severe stunting. No yield if infected early.",
+    "severity_levels": {
+      "mild": {
+        "description": "1-5% plants showing symptoms, whitefly population low",
+        "treatment": "Uproot and destroy infected plants. Control whitefly immediately.",
+        "pesticide_name": "Imidacloprid 17.8% SL (Confidor) for whitefly",
+        "dosage": "0.5ml per liter for whitefly control",
+        "frequency": "Every 10 days for whitefly",
+        "spray_time": "Evening",
+        "cost_per_acre_inr": 500,
+        "organic_alternative": "Yellow sticky traps 10/acre. Neem oil 5ml/L for whitefly."
+      },
+      "moderate": {
+        "description": "5-20% plants infected, active whitefly",
+        "treatment": "Rogue out all infected plants. Intensive whitefly management. Add border crops.",
+        "pesticide_name": "Thiamethoxam 25% WG (Actara) for whitefly control",
+        "dosage": "0.5g per liter",
+        "frequency": "2-3 sprays at 10 days, rotate chemicals",
+        "spray_time": "Evening",
+        "cost_per_acre_inr": 750,
+        "organic_alternative": "Beauveria bassiana spray for whitefly biocontrol"
+      },
+      "severe": {
+        "description": "More than 20% plants infected — epidemic",
+        "treatment": "VIRUS CANNOT BE CURED. Focus entirely on whitefly elimination to save uninfected plants.",
+        "pesticide_name": "Spiromesifen 22.9% SC (Oberon) for whitefly",
+        "dosage": "1ml per liter",
+        "frequency": "2 sprays at 10 days",
+        "spray_time": "Evening",
+        "cost_per_acre_inr": 1300,
+        "emergency_action": "Remove all infected plants from field. Consider abandoning severely affected crop. File insurance claim."
+      }
+    },
+    "organic_alternative": "Reflective mulch. Marigold border planting. Neem cake soil application reduces whitefly.",
+    "prevention_tips": [
+      "Plant CLCuD-resistant varieties: RCH 134 Bt, MRC 7301 Bt",
+      "Avoid late planting (high whitefly pressure in late season)",
+      "Install yellow sticky traps before crop establishes",
+      "Avoid planting near tomato, brinjal (alternate hosts for whitefly)",
+      "Do not save seed from infected crop"
+    ],
+    "ipm_notes": "Source: CICR cotton virus disease management. NOTE: No chemical cure for virus — vector control is everything."
+  },
+  "healthy_leaf": {
+    "disease_id": "healthy_leaf",
+    "common_name": "Healthy Plant",
+    "odia_name": "ସୁସ୍ଥ ଗଛ",
+    "hindi_name": "स्वस्थ पौधा",
+    "pathogen_type": "None",
+    "pathogen_scientific": "N/A",
+    "affected_crops": [
+      "all"
+    ],
+    "causes": "No disease detected. Plant appears healthy.",
+    "symptoms": "Normal leaf color (green), no spots, no discoloration, normal leaf shape and texture.",
+    "severity_levels": {
+      "mild": {
+        "description": "Plant is healthy",
+        "treatment": "No treatment needed. Continue regular care.",
+        "pesticide_name": "None required",
+        "dosage": "N/A",
+        "frequency": "N/A",
+        "spray_time": "N/A",
+        "cost_per_acre_inr": 0,
+        "organic_alternative": "Preventive organic spray: neem oil monthly"
+      },
+      "moderate": {
+        "description": "Plant is healthy",
+        "treatment": "Continue regular crop management practices.",
+        "pesticide_name": "None required",
+        "dosage": "N/A",
+        "frequency": "N/A",
+        "spray_time": "N/A",
+        "cost_per_acre_inr": 0,
+        "organic_alternative": "Maintain balanced nutrition with organic compost"
+      },
+      "severe": {
+        "description": "Plant is healthy",
+        "treatment": "No treatment needed.",
+        "pesticide_name": "None required",
+        "dosage": "N/A",
+        "frequency": "N/A",
+        "spray_time": "N/A",
+        "cost_per_acre_inr": 0,
+        "organic_alternative": "N/A"
+      }
+    },
+    "organic_alternative": "Preventive care: neem cake application, regular monitoring.",
+    "prevention_tips": [
+      "Continue regular monitoring for early disease detection",
+      "Maintain proper irrigation and drainage",
+      "Apply balanced fertilizers as per soil test",
+      "Keep field clean of weeds and crop debris",
+      "Monitor for insects and apply IPM practices"
+    ],
+    "ipm_notes": "No disease detected. The model is confident the plant is healthy."
+  }
+}
