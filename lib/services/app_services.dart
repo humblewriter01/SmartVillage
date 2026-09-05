@@ -223,6 +223,19 @@ class KnowledgeService {
             false));
       } catch (_) {}
     }
+    try {
+      final catalog = jsonDecode(await rootBundle
+              .loadString('assets/knowledge/verified_nigeria_catalog.json'))
+          as Map<String, dynamic>;
+      for (final item in (catalog['crops'] as List)) {
+        entries.add(KnowledgeEntry(item['name'].toString(),
+            '${item['guidance']}\\n\\nSource: ${item['source']}', false));
+      }
+      for (final item in (catalog['healthTopics'] as List)) {
+        entries.add(KnowledgeEntry(item['name'].toString(),
+            '${item['guidance']}\\n\\nSource: ${item['source']}', true));
+      }
+    } catch (_) {}
     entries.addAll(const [
       KnowledgeEntry(
           'Fever and danger signs',
