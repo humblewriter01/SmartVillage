@@ -37,6 +37,7 @@ flutter:
     - assets/models/health/health_model.tflite
     - assets/knowledge/crop_kb.jsonl
     - assets/knowledge/disease_data.json
+    - assets/knowledge/verified_nigeria_catalog.json
 
 flutter_intl:
   enabled: false
