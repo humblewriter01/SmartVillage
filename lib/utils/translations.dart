@@ -9,6 +9,8 @@ class AppStrings {
     'health': 'Health',
     'weather': 'Weather',
     'knowledge': 'Knowledge',
+    'history': 'History',
+    'noHistory': 'No saved records yet',
     'checkCrop': 'Check crop',
     'checkHealth': 'Check health',
     'cropSubtitle': 'Scan a leaf for offline disease guidance',
@@ -57,6 +59,8 @@ class AppStrings {
     'health': 'Lafiya',
     'weather': 'Yanayi',
     'knowledge': 'Ilimi',
+    'history': 'Tarihi',
+    'noHistory': 'Babu bayanan da aka adana tukuna',
     'checkCrop': 'Duba amfanin gona',
     'checkHealth': 'Duba lafiya',
     'cropSubtitle':

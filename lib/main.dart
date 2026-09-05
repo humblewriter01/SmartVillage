@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import 'services/app_services.dart';
+import 'services/local_database.dart';
 import 'utils/translations.dart';
 
 void main() => runApp(ChangeNotifierProvider(
@@ -19,8 +20,10 @@ class AppState extends ChangeNotifier {
   final voice = VoiceService();
   final weather = WeatherService();
   final knowledge = KnowledgeService();
+  final localDatabase = LocalDatabase();
   List<WeatherDay> forecast = const [];
   List<KnowledgeEntry> entries = const [];
+  List<HistoryRecord> history = const [];
   bool weatherLoading = false;
   bool knowledgeLoading = false;
   bool listening = false;
@@ -50,6 +53,30 @@ class AppState extends ChangeNotifier {
     entries = await knowledge.load();
     knowledgeLoading = false;
     notifyListeners();
+  }
+
+  Future<void> loadHistory() async {
+    try {
+      history = await localDatabase.list();
+    } catch (_) {
+      // sqflite is enabled on Android; keep UI usable on test/web runtimes.
+      history = const [];
+    }
+    notifyListeners();
+  }
+
+  Future<void> saveHistory(HistoryRecord record) async {
+    try {
+      await localDatabase.insert(record);
+      await loadHistory();
+    } catch (_) {
+      // The Android build uses SQLite. Unsupported runtimes remain usable.
+    }
+  }
+
+  Future<void> deleteHistory(int id) async {
+    await localDatabase.delete(id);
+    await loadHistory();
   }
 
   Future<void> toggleListening(void Function(String) onText) async {
@@ -97,6 +124,7 @@ class _ShellState extends State<Shell> {
       final s = context.read<AppState>();
       s.loadWeather();
       s.loadKnowledge();
+      s.loadHistory();
     });
   }
 
@@ -108,15 +136,24 @@ class _ShellState extends State<Shell> {
       const CropScreen(),
       const HealthScreen(),
       const WeatherScreen(),
-      const KnowledgeScreen()
+      const KnowledgeScreen(),
+      const HistoryScreen()
     ];
-    final labels = ['home', 'crop', 'health', 'weather', 'knowledge'];
+    final labels = [
+      'home',
+      'crop',
+      'health',
+      'weather',
+      'knowledge',
+      'history'
+    ];
     final icons = [
       Icons.home_rounded,
       Icons.grass_rounded,
       Icons.health_and_safety_rounded,
       Icons.cloud_rounded,
-      Icons.menu_book_rounded
+      Icons.menu_book_rounded,
+      Icons.history_rounded
     ];
     return Scaffold(
       appBar: AppBar(title: Text(AppStrings.t(context, 'appName')), actions: [
@@ -294,6 +331,18 @@ class _CropScreenState extends State<CropScreen> {
         result = r;
         busy = false;
       });
+    await context.read<AppState>().saveHistory(HistoryRecord(
+          type: 'crop',
+          createdAt: DateTime.now(),
+          title: r.predictions.first.label.replaceAll('_', ' '),
+          detail: r.predictions
+              .map((p) =>
+                  '${p.label}: ${(p.confidence * 100).toStringAsFixed(1)}%')
+              .join('\\n'),
+          advice: r.advice,
+          confidence: r.predictions.first.confidence,
+          imagePath: photo?.path,
+        ));
   }
 
   @override
@@ -359,6 +408,17 @@ class _HealthScreenState extends State<HealthScreen> {
         result = r;
         busy = false;
       });
+    await context.read<AppState>().saveHistory(HistoryRecord(
+          type: 'health',
+          createdAt: DateTime.now(),
+          title: r.condition,
+          detail: symptoms.text.trim().isEmpty
+              ? 'Image screening'
+              : symptoms.text.trim(),
+          advice: '${r.advice}\\n\\n${r.urgency}',
+          confidence: r.confidence,
+          imagePath: photo?.path,
+        ));
   }
 
   @override
@@ -616,5 +676,72 @@ class _KnowledgeScreenState extends State<KnowledgeScreen> {
                             ]));
                   }))
     ]);
+  }
+}
+
+class HistoryScreen extends StatelessWidget {
+  const HistoryScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final state = context.watch<AppState>();
+    return RefreshIndicator(
+      onRefresh: state.loadHistory,
+      child: state.history.isEmpty
+          ? ListView(children: [
+              const SizedBox(height: 180),
+              Center(child: Text(AppStrings.t(context, 'noHistory')))
+            ])
+          : ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: state.history.length,
+              itemBuilder: (context, index) {
+                final record = state.history[index];
+                final isHealth = record.type == 'health';
+                return Card(
+                  child: Dismissible(
+                    key: ValueKey(record.id ?? '${record.createdAt}-$index'),
+                    background: Container(
+                        color: Colors.red.shade100,
+                        alignment: Alignment.centerRight,
+                        padding: const EdgeInsets.only(right: 24),
+                        child: const Icon(Icons.delete_outline)),
+                    direction: DismissDirection.endToStart,
+                    onDismissed: record.id == null
+                        ? null
+                        : (_) => state.deleteHistory(record.id!),
+                    child: ExpansionTile(
+                      leading: Icon(
+                        isHealth
+                            ? Icons.health_and_safety_outlined
+                            : Icons.grass_outlined,
+                        color: isHealth ? Colors.red : Colors.green,
+                      ),
+                      title: Text(record.title,
+                          style: const TextStyle(fontWeight: FontWeight.bold)),
+                      subtitle: Text(
+                          '${isHealth ? AppStrings.t(context, 'health') : AppStrings.t(context, 'crop')} · ${DateFormat('d MMM yyyy, HH:mm').format(record.createdAt)}'),
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                          child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if (record.confidence > 0)
+                                  Text(
+                                      '${AppStrings.t(context, 'confidence')}: ${(record.confidence * 100).toStringAsFixed(1)}%'),
+                                const SizedBox(height: 6),
+                                Text(record.detail),
+                                const SizedBox(height: 10),
+                                Text(record.advice),
+                              ]),
+                        )
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+    );
   }
 }

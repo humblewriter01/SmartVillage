@@ -4,7 +4,8 @@ import 'package:smart_village/main.dart';
 
 void main() {
   testWidgets('SmartVillage launches with both core actions', (tester) async {
-    await tester.pumpWidget(ChangeNotifierProvider(create: (_) => AppState(), child: const SmartVillageApp()));
+    await tester.pumpWidget(ChangeNotifierProvider(
+        create: (_) => AppState(), child: const SmartVillageApp()));
     await tester.pumpAndSettle(const Duration(seconds: 2));
 
     expect(find.text('SmartVillage'), findsOneWidget);
