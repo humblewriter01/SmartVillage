@@ -1,0 +1,14 @@
+{
+  "model": "BIHealthScan-derived TensorFlow Lite asset",
+  "status": "research adapter only",
+  "verified_labels": false,
+  "verified_preprocessing": false,
+  "verified_output_contract": false,
+  "clinical_diagnosis": false,
+  "limitations": [
+    "Do not map outputs to named illnesses without the model owner's official label map and tensor specification.",
+    "Do not use image-only output to prescribe treatment or delay care.",
+    "Independent clinical validation and local ethics/privacy review are required."
+  ],
+  "source": "https://github.com/BCBLearning/BIHealthScan"
+}

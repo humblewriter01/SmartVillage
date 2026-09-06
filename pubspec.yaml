@@ -34,7 +34,9 @@ flutter:
   assets:
     - assets/models/crop/kisandoc.tflite
     - assets/models/crop/labels.txt
+    - assets/models/crop/model_card.json
     - assets/models/health/health_model.tflite
+    - assets/models/health/model_card.json
     - assets/knowledge/crop_kb.jsonl
     - assets/knowledge/disease_data.json
     - assets/knowledge/verified_nigeria_catalog.json

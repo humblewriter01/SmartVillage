@@ -71,6 +71,12 @@ class CropModelService {
           (i) => Prediction(_labels[i], values[i]))
         ..sort((a, b) => b.confidence.compareTo(a.confidence));
       final top = ranked.take(3).toList();
+      if (top.isEmpty || top.first.confidence < 0.55) {
+        return CropResult(
+          top,
+          'The image is uncertain (confidence below the safety threshold). Take a clearer photo in daylight, compare the offline guidance, and ask a local extension worker before spraying or removing plants.',
+        );
+      }
       return CropResult(top, _cropAdvice(top.first.label));
     } catch (_) {
       return const CropResult([

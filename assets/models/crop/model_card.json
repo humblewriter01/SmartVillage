@@ -1,0 +1,15 @@
+{
+  "model": "KisanDoc MobileNetV2 TensorFlow Lite asset",
+  "classes": 15,
+  "labels": "labels.txt",
+  "input": {"width": 224, "height": 224, "channels": 3, "pixel_range": "0..1 RGB"},
+  "scope": ["rice", "wheat", "tomato", "potato", "maize", "cotton"],
+  "limitations": [
+    "The model does not cover every Nigerian crop.",
+    "A high softmax score is not proof of field accuracy.",
+    "The app must present low-confidence results as uncertain and recommend extension confirmation.",
+    "Independent evaluation on representative Nigerian farm images is required before agronomic deployment."
+  ],
+  "source": "https://github.com/AsMetOP/KisanDoc",
+  "source_verification": "Repository and labels inspected; independent field accuracy not established by SmartVillage."
+}

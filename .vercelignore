@@ -1,0 +1,8 @@
+.dart_tool
+build
+android
+assets/models
+.venv
+artifacts
+*.jks
+android/key.properties

@@ -1,0 +1,7 @@
+{
+  "cleanUrls": true,
+  "rewrites": [
+    { "source": "/", "destination": "/web_companion/index.html" },
+    { "source": "/(.*)", "destination": "/web_companion/$1" }
+  ]
+}
