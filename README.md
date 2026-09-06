@@ -39,20 +39,10 @@ The current build does not require an API key. Open-Meteo is used without a key 
 
 SmartVillage is a screening and education aid, not a medical diagnostic device. It must not be used to delay urgent care, prescribe medicines, determine pregnancy status, or make treatment decisions without a qualified health worker. Crop recommendations are advisory and should be checked against local extension guidance and approved product labels.
 
-## Public repositories reviewed
+## Rural-community roadmap
 
-The implementation and integration boundaries were informed by the following public projects:
+SmartVillage is being developed in practical phases. The current release provides offline crop screening, health safety guidance, English/Hausa UI and voice pathways, cached weather, searchable knowledge, SQLite history, and Android build automation. The next foundations are a seasonal planting calendar for rainy, dry, harmattan, planting, care, and harvest periods; water-safety education that clearly distinguishes visual screening from laboratory testing; and poultry-care records for flock size, vaccination reminders, feed, mortality, and warning signs.
 
-| Repository | Reused concept or asset | Attribution |
-|---|---|---|
-| [AgrioCrop](https://github.com/humayun-mhk/agriocrop-plant-disease-ai) | Flutter crop-classifier separation and image preprocessing patterns | Public repository reviewed; no code copied into the initial build |
-| [KisanDoc](https://github.com/AsMetOP/KisanDoc) | MobileNetV2 TFLite crop model, labels, severity-oriented workflow, local history and TTS design | Model and labels copied into `assets/models/crop/`; retain upstream license obligations |
-| [AgriScanDetection](https://github.com/is-project-4th-year/AgriScanDetection) | Offline-first capture → diagnose → explain flow and JSONL knowledge-base pattern | Knowledge asset copied into `assets/knowledge/`; retain upstream license obligations |
-| [BIHealthScan](https://github.com/BCBLearning/BIHealthScan) | On-device health model asset and local health-history architecture | Health model copied into `assets/models/health/`; verify redistribution terms before release |
-| [BioScan AI](https://github.com/arsenetuye80/bioscan-ai) | Health feature scope and multimodal screening reference | Public repository reviewed; no asset copied |
-| [AI Health Guardian](https://github.com/RifahTasniaOrthi/AI-Health-Guardian) | Offline multimodal health UX and safety disclaimer pattern | Public repository reviewed; no asset copied |
-| [Aarogya Saathi](https://github.com/erpranjalmishra/Aarogya-Saathi) | Flutter health navigation and local model integration reference | Public repository reviewed; no asset copied |
-| [KrishiVaani AI](https://github.com/ankan123basu/KrishiVaaniAI) | Voice/image/text agronomy interaction reference | Public repository reviewed; no asset copied |
-| [Smart Farmer PWA](https://smart-farmer-theta.vercel.app/) | Region-first farmer onboarding and simple task selection | Interaction pattern reviewed |
+The app will not claim that a photograph can accurately diagnose any plant, human illness, or water contaminant without a validated model and representative Nigerian evaluation data. New models must be trained, tested, licensed, and reviewed before they replace guidance-only fallbacks. Source provenance and license details are maintained in [`docs/ATTRIBUTIONS.md`](docs/ATTRIBUTIONS.md), while the production limitations are documented in [`docs/PRODUCTION_READINESS.md`](docs/PRODUCTION_READINESS.md).
 
-Before publishing an APK, read `docs/PRODUCTION_READINESS.md`, add the complete upstream license texts for every redistributed model, dataset, knowledge record, and copied source file. The model files may have separate terms from their repositories.
+Before publishing an APK, retain complete upstream license texts for every redistributed model, dataset, knowledge record, and copied source file. The model files may have separate terms from their repositories.

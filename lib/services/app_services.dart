@@ -236,6 +236,14 @@ class KnowledgeService {
             '${item['guidance']}\\n\\nSource: ${item['source']}', true));
       }
     } catch (_) {}
+    try {
+      final rural = jsonDecode(await rootBundle.loadString(
+          'assets/knowledge/rural_guidance.json')) as Map<String, dynamic>;
+      for (final item in (rural['entries'] as List)) {
+        entries.add(KnowledgeEntry(item['title'].toString(),
+            item['body'].toString(), item['health'] == true));
+      }
+    } catch (_) {}
     entries.addAll(const [
       KnowledgeEntry(
           'Fever and danger signs',

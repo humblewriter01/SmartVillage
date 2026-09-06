@@ -1,0 +1,15 @@
+{
+  "entries": [
+    {"title":"Rainy-season planting window","body":"Use local rainfall onset, soil moisture, crop duration, and extension advice rather than a fixed calendar date. Plant when the soil has received enough reliable rain for germination and replanting risk is low.","health":false},
+    {"title":"Rainy-season young-crop care","body":"After establishment, prioritize weeding, gap filling, drainage, scouting for insects and disease, and protecting seedlings from runoff. Weather forecasts are guidance, not a guarantee.","health":false},
+    {"title":"Dry-season planning","body":"Use irrigation only where water access and safety are confirmed. Plan water, mulch, shade, pest scouting, and harvest timing. Avoid planting a water-demanding crop when reliable water is unavailable.","health":false},
+    {"title":"Harmattan precautions","body":"Dry dusty air and strong winds can increase moisture loss and reduce visibility. Protect seedlings, reduce wind exposure, monitor soil moisture, and avoid spraying when wind can carry products to people, animals, or water.","health":false},
+    {"title":"Harvest timing","body":"Harvest timing depends on crop maturity, moisture, weather, pests, and storage capacity. Use local crop-specific extension guidance and plan drying and safe storage before harvest.","health":false},
+    {"title":"Climate-aware farm planning","body":"Compare forecast rainfall and temperature with past local experience, keep a simple farm diary, diversify timing and crops where practical, and avoid treating one forecast as certainty.","health":false},
+    {"title":"Water safety","body":"Clear-looking water is not proven safe. Keep drinking water protected, use an approved treatment method where advised, store it in clean covered containers, and seek testing or health-worker guidance after suspected contamination.","health":true},
+    {"title":"Water quality warning","body":"Unusual colour, smell, taste, dead animals, chemical spills, flooding, or nearby latrines are reasons to avoid drinking the water until it is assessed. A phone photograph cannot identify microbes or most chemicals reliably.","health":true},
+    {"title":"Poultry record keeping","body":"Track flock size, age, vaccination dates, feed, water, eggs, illness, deaths, and treatments. Isolate sick birds where practical and contact a veterinary worker for unusual mortality or rapidly spreading illness.","health":false},
+    {"title":"Poultry biosecurity","body":"Limit unnecessary visitors, clean equipment, quarantine new birds, avoid sharing crates, dispose of dead birds safely, and wash hands after handling poultry. Follow local veterinary vaccination schedules.","health":false},
+    {"title":"Poultry heat and harmattan care","body":"Provide shade, ventilation without chilling, clean water, and dry litter. Monitor for crowding, panting, lethargy, coughing, nasal discharge, diarrhoea, or sudden deaths and seek veterinary advice.","health":false}
+  ]
+}

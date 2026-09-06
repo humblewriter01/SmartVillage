@@ -38,6 +38,7 @@ flutter:
     - assets/knowledge/crop_kb.jsonl
     - assets/knowledge/disease_data.json
     - assets/knowledge/verified_nigeria_catalog.json
+    - assets/knowledge/rural_guidance.json
 
 flutter_intl:
   enabled: false
