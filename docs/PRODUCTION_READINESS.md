@@ -41,6 +41,10 @@ The public repositories were reviewed and their reusable architecture patterns w
 
 The integrated build uses the crop model and labels from KisanDoc, the offline knowledge-base pattern and crop model architecture from AgriScanDetection, a health model asset and health-history pattern from BIHealthScan, and voice/UI ideas from AgrioCrop, KrishiVaani AI, AI Health Guardian, Aarogya Saathi, and Smart Farmer. Attribution and integration details are in the root README.
 
+## Vercel deployment note
+
+The repository now includes a root `vercel.json` rewrite that serves `web_companion/index.html`, plus `.vercelignore` rules that exclude Flutter build artifacts and model binaries from the static deployment. This avoids asking Vercel to compile the native Flutter application. The earlier deployment-log message about retrieving deployment files came from the Vercel Git project context: the connected project could not be verified by the available team permissions. A direct static deployment works, while a durable automatic Git deployment requires the repository to be connected from the Vercel dashboard by an account with access to the project.
+
 ## Release blockers before public deployment
 
 A Flutter-enabled Android build machine must produce and install a release APK. The health model owner’s official labels, tensor shapes, preprocessing, and redistribution terms must be confirmed. Hausa speech recognition and Hausa TTS must be tested on the exact Tecno, Infinix, and Itel devices used in the field. Crop and health predictions require evaluation against a representative, locally collected and ethically governed test set. Privacy consent, data deletion, crash reporting policy, accessibility review, signed release configuration, and professional medical/agronomic review are also required.
