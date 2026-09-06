@@ -8,6 +8,10 @@ The app includes a unified six-tab experience: Home, Crop, Health, Weather, Know
 
 English and Hausa are available from the app-bar language switcher. The voice layer uses Android speech recognition and text-to-speech when the installed device language packs support the requested locale. Native voice availability varies by device and should be checked during field testing.
 
+## Build, test, and improve the app
+
+See [`docs/BUILD_AND_TEST.md`](docs/BUILD_AND_TEST.md) for exact Android device testing, offline Hausa voice checks, debug/release APK commands, keystore signing, GitHub Actions artifacts, and Python crop-model training.
+
 ## Run the project
 
 Install Flutter 3.16 or newer, connect an Android 8+ device or emulator, then run:
