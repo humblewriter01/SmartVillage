@@ -1,3 +1,5 @@
+import org.jetbrains.kotlin.gradle.dsl.kotlinExtension
+
 allprojects {
     repositories {
         google()
@@ -19,20 +21,10 @@ subprojects {
     project.evaluationDependsOn(":app")
 }
 
-// Force JVM 17 for all subprojects to fix tflite_flutter mismatch
+// Fix JVM target mismatch for tflite_flutter using the modern Toolchain API
 subprojects {
     afterEvaluate {
-        if (project.hasProperty("android")) {
-            extensions.configure<com.android.build.gradle.BaseExtension>("android") {
-                compileOptions {
-                    sourceCompatibility = JavaVersion.VERSION_17
-                    targetCompatibility = JavaVersion.VERSION_17
-                }
-                (this as? com.android.build.gradle.internal.dsl.BaseAppModuleExtension)?.kotlinOptions {
-                    jvmTarget = "17"
-                }
-            }
-        }
+        kotlinExtension.jvmToolchain(17)
     }
 }
 
