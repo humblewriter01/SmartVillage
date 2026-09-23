@@ -114,6 +114,16 @@ export const CROP_HARVEST_PRESETS: Array<{
     criticalTipsEn:
       'Harvest irrigated wheat before high March temperatures cause shattering and shriveling.',
   },
+  {
+    cropId: 'soybeans',
+    name: 'Soybeans',
+    hausaName: 'Waken Soya',
+    maturityDays: 105,
+    criticalTipsHa:
+      'A girbe waken soya da zaran kashi 90% na ganyen ya zube kuma kwasfar ta bushe zuwa launin ruwan kasa. Idan aka jinkirta kwasfar na fashewa tana zubar da iri.',
+    criticalTipsEn:
+      'Harvest when 90% of leaves drop and pods turn golden-brown and rattle. Avoid over-drying in the field to prevent severe pod shattering losses.',
+  },
 ];
 
 interface HarvestCountdownCardProps {
@@ -170,13 +180,18 @@ export const HarvestCountdownCard: React.FC<HarvestCountdownCardProps> = ({
     }
   }, [selectedCropId]);
 
-  // Listen for sync from HomeScreen or other tabs
+  // Listen for sync from HomeScreen or other tabs with equality guard
   useEffect(() => {
     const handleSync = () => {
       try {
         const saved = localStorage.getItem('smartvillage.harvest_countdowns');
         if (saved) {
-          setPlantings(JSON.parse(saved));
+          setPlantings((prev) => {
+            if (JSON.stringify(prev) === saved) {
+              return prev;
+            }
+            return JSON.parse(saved);
+          });
         }
       } catch {}
     };
@@ -188,13 +203,13 @@ export const HarvestCountdownCard: React.FC<HarvestCountdownCardProps> = ({
     };
   }, []);
 
-  // Persist plantings
-  useEffect(() => {
+  const persistUpdatedPlantings = (updated: PlantedCrop[]) => {
+    setPlantings(updated);
     try {
-      localStorage.setItem('smartvillage.harvest_countdowns', JSON.stringify(plantings));
+      localStorage.setItem('smartvillage.harvest_countdowns', JSON.stringify(updated));
       window.dispatchEvent(new Event('smartvillage_harvest_updated'));
     } catch {}
-  }, [plantings]);
+  };
 
   // Calculate countdown status
   const calculateStatus = (plantingDateStr: string, maturityDays: number) => {
@@ -246,7 +261,13 @@ export const HarvestCountdownCard: React.FC<HarvestCountdownCardProps> = ({
   };
 
   const handleAddNew = () => {
-    const preset = CROP_HARVEST_PRESETS.find((p) => p.cropId === activeCropId) || CROP_HARVEST_PRESETS[0];
+    const preset =
+      CROP_HARVEST_PRESETS.find(
+        (p) =>
+          p.cropId === activeCropId ||
+          (p.cropId === 'soybeans' && activeCropId === 'soybean') ||
+          (p.cropId === 'soybean' && activeCropId === 'soybeans')
+      ) || CROP_HARVEST_PRESETS[0];
     const newPlanting: PlantedCrop = {
       id: `crop-${Date.now()}`,
       cropId: preset.cropId,
@@ -259,14 +280,16 @@ export const HarvestCountdownCard: React.FC<HarvestCountdownCardProps> = ({
       criticalTipsEn: preset.criticalTipsEn,
     };
 
-    setPlantings((prev) => [newPlanting, ...prev]);
+    const updated = [newPlanting, ...plantings];
+    persistUpdatedPlantings(updated);
     setIsAddingNew(false);
     setFieldLabel('');
     if (onSelectCrop) onSelectCrop(preset.cropId);
   };
 
   const handleDelete = (id: string) => {
-    setPlantings((prev) => prev.filter((p) => p.id !== id));
+    const updated = plantings.filter((p) => p.id !== id);
+    persistUpdatedPlantings(updated);
   };
 
   const handleSpeakCountdown = async (planting: PlantedCrop) => {

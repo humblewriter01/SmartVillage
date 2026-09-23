@@ -192,6 +192,25 @@ export const CROP_CALENDAR: CropCalendarSchedule[] = [
     babyPlantCare: 'Irrigate immediately after broadcasting seed, then irrigate every 7-10 days depending on soil type.',
     babyPlantCare_hausa: 'Shayar da gona nan take bayan shuka, sannan a ci gaba da shayarwa kowanne kwanaki 7-10.',
   },
+  {
+    id: 'soybeans',
+    name: 'Soybeans',
+    hausa_name: 'Waken Soya',
+    seasonType: 'rainfed',
+    plantingStartMonth: 6, // June 15
+    plantingStartDay: 15,
+    plantingEndMonth: 7, // July 15
+    plantingEndDay: 15,
+    harvestStartMonth: 10,
+    harvestEndMonth: 11,
+    carePeriodWeeks: 3,
+    idealRainfall: '500 - 800 mm',
+    idealTemp: '20°C - 30°C',
+    advice: 'Plant when rains are well established in late June to early July. Ensure shallow planting (2-3 cm deep) for rapid emergence.',
+    advice_hausa: 'A shuka a ƙarshen watan Yuni zuwa tsakiyar Yuli idan damina ta kafu sosai. Kada a binne irin da zurfi sosai don ya fito da sauri.',
+    babyPlantCare: 'Weed within the first 3-4 weeks before canopy closes. Inoculate seed with Rhizobium or apply basal SSP fertilizer.',
+    babyPlantCare_hausa: 'Yi ciyawa a makonni 3-4 na farko kafin ganye ya rufe gona. Sanya takin sinadarin phosphorus (SSP) yayin shuka.',
+  },
 ];
 
 export interface PlantingRecommendation {

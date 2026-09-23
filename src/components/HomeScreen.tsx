@@ -14,11 +14,13 @@ import {
   Sparkles,
   VolumeX,
   Clock,
+  Layers,
 } from 'lucide-react';
 import { Language, t } from '../utils/translations';
 import { WeatherDay } from '../services/weatherService';
 import { voiceService } from '../services/voiceService';
 import { HomeHarvestCountdown } from './HomeHarvestCountdown';
+import { QuickAlertCard } from './QuickAlertCard';
 
 interface HomeScreenProps {
   locale: Language;
@@ -70,6 +72,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           onNavigate(8); // Calendar
         } else if (lower.includes('learn') || lower.includes('library') || lower.includes('ilimi')) {
           onNavigate(9); // Library
+        } else if (lower.includes('soil') || lower.includes('kasa') || lower.includes('ƙasa') || lower.includes('laima') || lower.includes('moisture') || lower.includes('ph')) {
+          onNavigate(11); // Soil Health
+        } else if (lower.includes('sos') || lower.includes('alert') || lower.includes('gaggawa') || lower.includes('taimako') || lower.includes('help')) {
+          showToast(locale === 'ha' ? 'An kunna sashin Gaggawa (Quick Alert SOS)!' : 'Quick Alert SOS active below!');
         }
       },
       (err) => {
@@ -127,6 +133,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </p>
         </div>
       </div>
+
+      {/* Emergency Distress Quick Alert (100% Offline SMS + GPS) */}
+      <QuickAlertCard locale={locale} />
 
       {/* Active Crop Harvest Countdown Component */}
       <HomeHarvestCountdown
@@ -248,6 +257,30 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             </div>
           </div>
           <ArrowRight className="w-5 h-5 text-slate-400 group-hover:text-amber-700 group-hover:translate-x-0.5 transition-transform" />
+        </button>
+
+        {/* 7. Soil Health & Moisture Tracker */}
+        <button
+          onClick={() => onNavigate(11)}
+          className="text-left bg-white hover:bg-lime-50/50 border border-lime-200/80 p-4 rounded-2xl shadow-xs transition-all active:scale-[0.99] flex items-center justify-between group cursor-pointer sm:col-span-2"
+        >
+          <div className="flex items-center space-x-3.5">
+            <div className="p-3 bg-lime-700 text-white rounded-xl shadow-2xs">
+              <Layers className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="flex items-center space-x-2">
+                <h2 className="font-extrabold text-base text-slate-800 group-hover:text-lime-900 transition-colors">
+                  {t(locale, 'checkSoil')}
+                </h2>
+                <span className="text-[10px] font-extrabold uppercase bg-lime-100 text-lime-800 px-2 py-0.5 rounded-full border border-lime-300">
+                  pH & Moisture
+                </span>
+              </div>
+              <p className="text-slate-500 text-xs mt-0.5">{t(locale, 'soilSubtitle')}</p>
+            </div>
+          </div>
+          <ArrowRight className="w-5 h-5 text-slate-400 group-hover:text-lime-700 group-hover:translate-x-0.5 transition-transform" />
         </button>
       </div>
 

@@ -447,6 +447,47 @@ export function diagnoseCropBySymptoms(spokenText: string): CropResult {
     };
   }
 
+  // 7. Soybeans (Waken Soya) Matches
+  if (
+    q.includes('soya') ||
+    q.includes('soybean') ||
+    q.includes('soybeans') ||
+    q.includes('waken soya') ||
+    q.includes('waken-soya') ||
+    q.includes('pustule') ||
+    q.includes('kwasfa')
+  ) {
+    const soyCrop = CROP_REFERENCE_DATA.find((c) => c.id === 'soybeans' || c.id === 'soybean')!;
+    if (q.includes('tsatsa') || q.includes('rust') || q.includes('brown')) {
+      const d = soyCrop.diseases.find((item) => item.id === 'soybean_rust')!;
+      return {
+        predictions: [{ label: 'soybean_rust', confidence: 0.94 }],
+        advice: d.treatment,
+        adviceHausa: d.treatment_hausa,
+        isLowConfidence: false,
+        referenceDetail: d,
+      };
+    }
+    if (q.includes('borer') || q.includes('kwasfa') || q.includes('bug') || q.includes('kwari')) {
+      const d = soyCrop.diseases.find((item) => item.id === 'soybean_pod_borer')!;
+      return {
+        predictions: [{ label: 'soybean_pod_borer', confidence: 0.93 }],
+        advice: d.treatment,
+        adviceHausa: d.treatment_hausa,
+        isLowConfidence: false,
+        referenceDetail: d,
+      };
+    }
+    const d = soyCrop.diseases[0];
+    return {
+      predictions: [{ label: d.id, confidence: 0.92 }],
+      advice: d.treatment,
+      adviceHausa: d.treatment_hausa,
+      isLowConfidence: false,
+      referenceDetail: d,
+    };
+  }
+
   // Fallback match: Onion Purple Blotch if ambiguous
   const defaultCrop = CROP_REFERENCE_DATA[0];
   const defaultDisease = defaultCrop.diseases[0];

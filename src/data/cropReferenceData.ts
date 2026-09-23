@@ -19,6 +19,7 @@ export interface CropReference {
   crop: string;
   name?: string;
   hausa_name: string;
+  emoji?: string;
   healthy_image: string;
   description: string;
   description_hausa: string;
@@ -52,7 +53,9 @@ export const CROP_REFERENCE_DATA: CropReference[] = [
   {
     id: 'onion',
     crop: 'Onion',
+    name: 'Onion',
     hausa_name: 'Albasa',
+    emoji: '🧅',
     healthy_image: makeLeafSvg('#2e7d32', undefined, false, '<circle cx="100" cy="170" r="22" fill="#8e24aa" opacity="0.9"/>'),
     description: 'Vital cash crop grown in dry season under irrigation in Kano, Sokoto, and Kebbi.',
     description_hausa: 'Muhimmin amfanin gona da ake nomawa a lokacin rani ta hanyar ban ruwa a Kano, Sokoto, da Kebbi.',
@@ -137,7 +140,9 @@ export const CROP_REFERENCE_DATA: CropReference[] = [
   {
     id: 'maize',
     crop: 'Maize',
+    name: 'Maize',
     hausa_name: 'Masara',
+    emoji: '🌽',
     healthy_image: makeLeafSvg('#2e7d32'),
     description: 'Primary grain crop across Northern and Middle Belt Nigeria.',
     description_hausa: 'Babban hatsi a Arewacin Najeriya da tsakiyar ƙasar.',
@@ -177,7 +182,9 @@ export const CROP_REFERENCE_DATA: CropReference[] = [
   {
     id: 'sorghum',
     crop: 'Sorghum',
+    name: 'Sorghum',
     hausa_name: 'Dawa',
+    emoji: '🌾',
     healthy_image: makeLeafSvg('#388e3c'),
     description: 'Drought-tolerant staple grain central to Northern Nigerian food security.',
     description_hausa: 'Abincin gargajiya mai jure fari da ake amfani da shi sosai a Arewa.',
@@ -202,7 +209,9 @@ export const CROP_REFERENCE_DATA: CropReference[] = [
   {
     id: 'millet',
     crop: 'Pearl Millet',
+    name: 'Pearl Millet',
     hausa_name: 'Gero',
+    emoji: '🌾',
     healthy_image: makeLeafSvg('#2e7d32'),
     description: 'Fast-maturing, resilient crop grown across the semi-arid northern belts.',
     description_hausa: 'Shuka mai saurin nuna da ke jure fari a yankin arewa mai zafi.',
@@ -227,7 +236,9 @@ export const CROP_REFERENCE_DATA: CropReference[] = [
   {
     id: 'tomato',
     crop: 'Tomato',
+    name: 'Tomato',
     hausa_name: 'Tumatir',
+    emoji: '🍅',
     healthy_image: makeLeafSvg('#2e7d32'),
     description: 'Valued vegetable grown across Fadama irrigation plains in Kano, Kaduna, and Plateau.',
     description_hausa: 'Kayan lambu mai muhimmanci a fadama a Kano, Kaduna, da Filato.',
@@ -267,7 +278,9 @@ export const CROP_REFERENCE_DATA: CropReference[] = [
   {
     id: 'cowpea',
     crop: 'Cowpea (Beans)',
+    name: 'Cowpea (Beans)',
     hausa_name: 'Wake',
+    emoji: '🫘',
     healthy_image: makeLeafSvg('#388e3c'),
     description: 'Vital protein legume for human food and fodder across Nigeria.',
     description_hausa: 'Abincin gina jiki mai muhimmanci ga mutane da dabbobi.',
@@ -292,7 +305,9 @@ export const CROP_REFERENCE_DATA: CropReference[] = [
   {
     id: 'groundnut',
     crop: 'Groundnut (Peanut)',
+    name: 'Groundnut (Peanut)',
     hausa_name: 'Gyada',
+    emoji: '🥜',
     healthy_image: makeLeafSvg('#2e7d32'),
     description: 'High-value oilseed and staple legume grown across the savanna.',
     description_hausa: 'Shukar mai da abinci mai daraja a yankin savanna.',
@@ -317,7 +332,9 @@ export const CROP_REFERENCE_DATA: CropReference[] = [
   {
     id: 'rice',
     crop: 'Rice',
+    name: 'Rice',
     hausa_name: 'Shinkafa',
+    emoji: '🌾',
     healthy_image: makeLeafSvg('#2e7d32'),
     description: 'Primary grain grown under lowland, upland, and irrigation ecologies.',
     description_hausa: 'Shuka mai muhimmanci da ake nomawa a fadama da tudu.',
@@ -342,7 +359,9 @@ export const CROP_REFERENCE_DATA: CropReference[] = [
   {
     id: 'cassava',
     crop: 'Cassava',
+    name: 'Cassava',
     hausa_name: 'Rogo',
+    emoji: '🥔',
     healthy_image: makeLeafSvg('#388e3c'),
     description: 'Resilient root tuber feeding millions across Nigeria.',
     description_hausa: 'Tushen abinci mai gina jiki da juriya a dukkan Najeriya.',
@@ -367,7 +386,9 @@ export const CROP_REFERENCE_DATA: CropReference[] = [
   {
     id: 'yam',
     crop: 'Yam',
+    name: 'Yam',
     hausa_name: 'Doya',
+    emoji: '🍠',
     healthy_image: makeLeafSvg('#2e7d32'),
     description: 'Cultural and nutritional king tuber cultivated heavily in Benue, Niger, and Taraba.',
     description_hausa: 'Sarkin abinci a jihar Binuwai, Neja, da Taraba.',
@@ -392,7 +413,9 @@ export const CROP_REFERENCE_DATA: CropReference[] = [
   {
     id: 'pepper',
     crop: 'Pepper (Chili / Atarodo)',
+    name: 'Pepper (Chili / Atarodo)',
     hausa_name: 'Barkono',
+    emoji: '🌶️',
     healthy_image: makeLeafSvg('#388e3c'),
     description: 'High-value condiment cultivated in home gardens and commercial plots.',
     description_hausa: 'Kayan lambu mai riba da ake buƙata a kowanne gida.',
@@ -417,7 +440,9 @@ export const CROP_REFERENCE_DATA: CropReference[] = [
   {
     id: 'wheat',
     crop: 'Wheat',
+    name: 'Wheat',
     hausa_name: 'Alkama',
+    emoji: '🌾',
     healthy_image: makeLeafSvg('#2e7d32'),
     description: 'Irrigated cool-season winter cereal cultivated across Kano, Jigawa, and Borno basin.',
     description_hausa: 'Hatsi na lokacin sanyi da ake nomawa a fadama a Kano, Jigawa, da Borno.',
@@ -436,6 +461,63 @@ export const CROP_REFERENCE_DATA: CropReference[] = [
         treatment_hausa: 'Fesa maganin tebuconazole da zaran an ga alamar tsatsa.',
         prevention: 'Plant certified wheat varieties resistant to current rust strains.',
         prevention_hausa: 'Shuka ingantaccen irin alkama mai jure cutar tsatsa.',
+      },
+    ],
+  },
+  {
+    id: 'soybeans',
+    crop: 'Soybeans',
+    name: 'Soybeans',
+    hausa_name: 'Waken Soya',
+    emoji: '🫘',
+    healthy_image: makeLeafSvg('#2e7d32', undefined, false, '<circle cx="100" cy="155" r="14" fill="#aed581"/><circle cx="118" cy="142" r="12" fill="#c5e1a5"/>'),
+    description: 'High-protein grain legume and lucrative cash crop grown across Northern Nigeria for food, oil processing, and soil nitrogen enrichment.',
+    description_hausa: 'Muhimmin amfanin gona mai gina jiki da ake nomawa a Arewacin Najeriya domin mai, abinci, da kuma sanya takin azot a ƙasa.',
+    diseases: [
+      {
+        id: 'soybean_rust',
+        name: 'Soybean Rust (Asian Rust)',
+        hausa_name: 'Tsatsar Ganyen Waken Soya',
+        image: makeLeafSvg('#558b2f', '#d84315', true),
+        affected_parts: ['Leaves', 'Stems', 'Pods'],
+        causes: 'Airborne fungus (Phakopsora pachyrhizi) favored by warm, humid rainy seasons with prolonged leaf wetness.',
+        causes_hausa: 'Naman gwari mai yaduwa ta iska a lokacin damina mai dumi da raɓa da ke daɗewa a kan ganye.',
+        symptoms: 'Small reddish-brown to tan pustules on underside of leaves; leaves turn yellow and drop prematurely, causing stunted pods.',
+        symptoms_hausa: 'Ƙananan ɗigo masu launin ruwan kasa a kasan ganye; ganye na komawa rawaya yana zubewa, yana rage cikar kwasfa.',
+        treatment: 'Apply systemic fungicide (e.g., azoxystrobin + difenoconazole or Mancozeb) at first flowering or first sign of pustules.',
+        treatment_hausa: 'Fesa maganin naman gwari (azoxystrobin ko Mancozeb) tun a lokacin fara fure ko da zaran an ga ɗigo.',
+        prevention: 'Plant certified rust-resistant TGx varieties; avoid excessively dense planting to improve airflow; practice crop rotation.',
+        prevention_hausa: 'Shuka ingantaccen irin TGx mai jure tsatsa; bada isasshen fili don samun iska; canza shuka da hatsi.',
+      },
+      {
+        id: 'soybean_bacterial_pustule',
+        name: 'Bacterial Pustule',
+        hausa_name: 'Ƙurar Bakteriya ta Waken Soya',
+        image: makeLeafSvg('#689f38', '#f57f17', true),
+        affected_parts: ['Leaves', 'Young stems'],
+        causes: 'Bacterium Xanthomonas surviving on crop debris and seed, spread by splashing rain and farm tools.',
+        causes_hausa: 'Kwayar bakteriya mai wanzuwa a sauran shuka da iri, mai yaduwa ta yayyafin ruwan sama.',
+        symptoms: 'Small, pale yellow-green spots with elevated pustule centers on lower surface; lesions tear, giving ragged leaf appearance.',
+        symptoms_hausa: 'Ɗigo masu launin rawaya-kore da ƙuraje a kasan ganye; ganyen na yagewa yana zama kamar an yayyaga shi.',
+        treatment: 'Spray copper hydroxide bactericide early; bury crop residues deeply after harvest; avoid moving through wet fields.',
+        treatment_hausa: 'Fesa maganin tagulla da wuri; binne ragowar shuka bayan girbi; kada a shiga gona idan ganye na da laima.',
+        prevention: 'Use certified disease-free seeds; rotate with maize or sorghum for at least 2 seasons.',
+        prevention_hausa: 'Yi amfani da ingantaccen iri mara cuta; canza shuka da masara ko dawa na tsawon kaka biyu.',
+      },
+      {
+        id: 'soybean_pod_borer',
+        name: 'Pod Borer & Stink Bug Damage',
+        hausa_name: 'Kwarin Kwasfar Waken Soya',
+        image: makeLeafSvg('#7cb342', '#3e2723', true),
+        affected_parts: ['Pods', 'Seeds', 'Flowers'],
+        causes: 'Insect pests (Maruca vitrata caterpillar and Nezara viridula green stink bug) attacking pods and seeds.',
+        causes_hausa: 'Tsutsa da kwarin da ke tsotse ruwan kwasfa da cin kwayar waken soya.',
+        symptoms: 'Webbing of flowers, entry holes in pods with dark frass, shriveled or aborted seeds, stained deformed grain.',
+        symptoms_hausa: 'Dunkulewar fure da zaren gizo, ramuka a kwasfa, kwayoyi marasa cika da suka ƙone ko lallace.',
+        treatment: 'Spray neem seed kernel extract (NSKE 5%) or approved pyrethroid (cypermethrin/deltamethrin) at 50% flowering and early pod stage.',
+        treatment_hausa: 'Fesa ruwan maganin dogon-yaro ko maganin feshin kwari mai izini (cypermethrin) a lokacin fure da kafa kwasfa.',
+        prevention: 'Intercrop with maize or sorghum; keep field borders free of weeds; harvest promptly when pods are dry.',
+        prevention_hausa: 'Yi lafce da masara ko dawa; cire ciyawar daji a bakin gona; kwashe girbi da wuri da zarar ya bushe.',
       },
     ],
   },

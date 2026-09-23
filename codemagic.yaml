@@ -28,11 +28,9 @@ workflows:
     scripts:
       - name: Ensure Android platform files
         script: |
-          # If native android directory is missing, initialize Flutter android scaffolding
-          if [ ! -d "android" ]; then
-            echo "Scaffolding Flutter Android project..."
-            flutter create . --platforms=android --org=com.smartvillage
-          fi
+          # Upgrade or recreate native android scaffolding with modern declarative plugins
+          flutter create . --platforms=android --org=com.smartvillage --overwrite
+          echo "flutter.sdk=$FLUTTER_ROOT" > android/local.properties
       - name: Set up local.properties and versions
         script: |
           echo "flutter.sdk=$FLUTTER_ROOT" > android/local.properties

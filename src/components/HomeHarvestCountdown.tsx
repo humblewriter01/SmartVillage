@@ -92,7 +92,12 @@ export const HomeHarvestCountdown: React.FC<HomeHarvestCountdownProps> = ({
       try {
         const saved = localStorage.getItem('smartvillage.harvest_countdowns');
         if (saved) {
-          setPlantings(JSON.parse(saved));
+          setPlantings((prev) => {
+            if (JSON.stringify(prev) === saved) {
+              return prev;
+            }
+            return JSON.parse(saved);
+          });
         }
       } catch {}
     };

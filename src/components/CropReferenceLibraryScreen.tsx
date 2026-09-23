@@ -127,7 +127,7 @@ export const CropReferenceLibraryScreen: React.FC<CropReferenceLibraryScreenProp
                   : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
               }`}
             >
-              <Sprout className="w-3.5 h-3.5" />
+              <span>{crop.emoji || '🌱'}</span>
               <span>
                 {crop.crop || crop.name} ({crop.hausa_name})
               </span>

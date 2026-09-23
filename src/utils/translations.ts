@@ -15,10 +15,13 @@ export const translations: Record<Language, Record<string, string>> = {
     map: 'Map',
     calendar: 'Calendar',
     library: 'Library',
+    soil: 'Soil Health',
 
     // Home Action Cards
     checkCrop: 'Check Crop Disease',
     cropSubtitle: 'Scan leaves or detect onion & grain diseases offline',
+    checkSoil: 'Soil pH & Moisture Tracker',
+    soilSubtitle: 'Log soil tests, track moisture & get crop remedies',
     checkHealth: 'Check Health Symptoms',
     healthSubtitle: 'Describe symptoms with voice or check skin concerns',
     checkWater: 'Check Water Quality',
@@ -154,10 +157,13 @@ export const translations: Record<Language, Record<string, string>> = {
     map: 'Taswira',
     calendar: 'Kalandar Noma',
     library: 'Laburare',
+    soil: 'Lafiyar Ƙasa',
 
     // Home Action Cards
     checkCrop: 'Duba Cutar Shuka',
     cropSubtitle: 'Duba ganyen albasa, masara, dawa da sauran amfanin gona',
+    checkSoil: 'Lafiyar Ƙasa da Laima',
+    soilSubtitle: 'Auna tsami (pH), laima, da takin toka ko gargajiya',
     checkHealth: 'Duba Alamomin Lafiya',
     healthSubtitle: 'Yi magana da murya ko dauki hoton matsalar fata',
     checkWater: 'Duba Tsabtar Ruwa',

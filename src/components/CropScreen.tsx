@@ -120,7 +120,9 @@ export const CropScreen: React.FC<CropScreenProps> = ({
   };
 
   const selectedCropCategory =
-    CROP_REFERENCE_DATA.find((c) => c.id === selectedCropId) || CROP_REFERENCE_DATA[0];
+    CROP_REFERENCE_DATA.find((c) => c.id === selectedCropId) ||
+    CROP_REFERENCE_DATA.find((c) => c.id === 'soybeans' && (selectedCropId === 'soybean' || selectedCropId === 'soybeans')) ||
+    CROP_REFERENCE_DATA[0];
 
   // 1-Tap Crop Selection Handler: Sets crop WITHOUT immediately showing results!
   const handleSelectCropOnly = (cropId: string) => {
@@ -399,6 +401,7 @@ export const CropScreen: React.FC<CropScreenProps> = ({
                         : 'border-emerald-200 bg-emerald-50/70 hover:bg-emerald-100 text-slate-800'
                     }`}
                   >
+                    <span>{crop.emoji || '🌱'}</span>
                     <span>{crop.crop}</span>
                     <span
                       className={`text-[11px] ${
@@ -416,8 +419,8 @@ export const CropScreen: React.FC<CropScreenProps> = ({
           {/* Active Selected Crop Banner */}
           <div className="bg-gradient-to-r from-emerald-50 to-teal-50/70 border-2 border-emerald-300/80 rounded-2xl p-3.5 shadow-2xs flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-xs shrink-0">
-                <Sprout className="w-6 h-6" />
+              <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-xs shrink-0 text-xl">
+                {selectedCropCategory.emoji || <Sprout className="w-6 h-6" />}
               </div>
               <div>
                 <span className="text-[10px] text-emerald-800 font-bold uppercase tracking-wider block">
@@ -771,8 +774,8 @@ export const CropScreen: React.FC<CropScreenProps> = ({
                         }`}
                       >
                         <div className="flex items-center space-x-2">
-                          <div className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
-                            <Sprout className="w-4 h-4" />
+                          <div className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center shrink-0 text-sm">
+                            {crop.emoji || <Sprout className="w-4 h-4" />}
                           </div>
                           <div className="min-w-0">
                             <div className="text-xs font-extrabold text-slate-800 truncate">

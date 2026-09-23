@@ -14,6 +14,7 @@ import {
   MapPin,
   Volume2,
   Mic,
+  Layers,
 } from 'lucide-react';
 import { Language, t } from './utils/translations';
 import { weatherService, WeatherDay } from './services/weatherService';
@@ -30,6 +31,7 @@ import { LivestockScreen } from './components/LivestockScreen';
 import { OfflineMapScreen } from './components/OfflineMapScreen';
 import { PlantingCalendarScreen } from './components/PlantingCalendarScreen';
 import { CropReferenceLibraryScreen } from './components/CropReferenceLibraryScreen';
+import { SoilHealthScreen } from './components/SoilHealthScreen';
 import {
   CropCategoryReference,
   CropDiseaseReference,
@@ -142,6 +144,7 @@ export function App() {
     { id: 6, labelKey: 'livestock', icon: Sprout, isEmoji: '🐔' },
     { id: 7, labelKey: 'map', icon: MapPin },
     { id: 8, labelKey: 'calendar', icon: Calendar },
+    { id: 11, labelKey: 'soil', icon: Layers },
     { id: 4, labelKey: 'knowledge', icon: BookOpen },
     { id: 10, labelKey: 'history', icon: History },
   ];
@@ -267,6 +270,7 @@ export function App() {
             onReload={loadHistory}
           />
         )}
+        {tab === 11 && <SoilHealthScreen locale={locale} />}
       </main>
 
       {/* Bottom Sticky Navigation Bar */}
