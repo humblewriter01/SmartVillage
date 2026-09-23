@@ -1,6 +1,6 @@
 export interface HistoryRecord {
   id: number;
-  type: 'crop' | 'health';
+  type: 'crop' | 'health' | 'water' | 'livestock' | 'map_pin';
   createdAt: string;
   title: string;
   detail: string;

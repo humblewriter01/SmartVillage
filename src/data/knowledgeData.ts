@@ -99,6 +99,38 @@ export const KNOWLEDGE_ITEMS: KnowledgeItem[] = [
     source: 'IITA / Extension',
   },
   {
+    id: 'crop-onion',
+    category: 'crop',
+    title: 'Onion (Irrigated Dry Season)',
+    hausa: 'Albasa (Noman Rani da Ban Ruwa)',
+    body: 'Vital dry-season cash crop in Kano, Sokoto, Kebbi, and Kaduna. Grow in raised beds with sandy-loam soil. Transplant healthy 6-8 week seedlings in Nov-Dec. Maintain regular shallow furrow irrigation every 5-7 days. Protect against Purple Blotch and Thrips using crop rotation and neem extract. Stop irrigation 2 weeks before harvest and cure bulbs in shade.',
+    source: 'IAR Samaru / FAO Nigeria',
+  },
+  {
+    id: 'crop-onion-purple-blotch',
+    category: 'crop',
+    title: 'Onion — Purple Blotch (Alternaria porri)',
+    hausa: 'Albasa — Duhun Ganye mai Ruwan Hoda',
+    body: 'Symptoms: small water-soaked sunken lesions on leaves turning purple to dark brown with concentric rings and yellow halos. Leaves yellow, girdle, and fall over prematurely. Prevention: spray neem seed kernel extract or copper hydroxide early; avoid furrow flooding onto foliage; rotate away from allium crops.',
+    source: 'IITA / Extension Guidance',
+  },
+  {
+    id: 'crop-onion-thrips',
+    category: 'crop',
+    title: 'Onion — Thrips Infestation (Kwarin Albasa)',
+    hausa: 'Albasa — Farin Kwari a Tsakanin Ganye',
+    body: 'Symptoms: minute yellowish/brown insects feeding deep inside leaf sheaths causing silvery white patches, distorted curly leaves, and reduced bulb sizing. Prevention: spray garlic-chili or neem oil solution early morning; destroy weeds around field borders.',
+    source: 'National Horticultural Research Institute (NIHORT)',
+  },
+  {
+    id: 'crop-onion-curing-storage',
+    category: 'crop',
+    title: 'Onion — Post-Harvest Curing & Ventilated Barn Storage',
+    hausa: 'Albasa — Busarwa a Inuwa da Ajiyarta a Rumbu',
+    body: 'To prevent neck rot and sprouting: harvest when 50-70% of leaf tops fall over. Cure in shade with good airflow for 10-14 days until neck is completely dry and paper-like. Store on elevated slatted bamboo/wooden racks inside well-ventilated mud barns away from direct floor contact.',
+    source: 'KNARDA / Kano Agricultural Extension',
+  },
+  {
     id: 'crop-tomato-late-blight',
     category: 'crop',
     title: 'Tomato — Late blight',
@@ -285,6 +317,11 @@ export const KNOWLEDGE_ITEMS: KnowledgeItem[] = [
 ];
 
 export const CROP_LABELS = [
+  'onion_purple_blotch',
+  'onion_stemphylium_blight',
+  'onion_thrips',
+  'onion_downy_mildew',
+  'onion_neck_rot',
   'rice_blast',
   'rice_brown_spot',
   'rice_leaf_blight',
@@ -303,6 +340,47 @@ export const CROP_LABELS = [
 ] as const;
 
 export const DISEASE_DETAILS: Record<string, DiseaseInfo> = {
+  onion_purple_blotch: {
+    disease_id: 'onion_purple_blotch',
+    common_name: 'Onion Purple Blotch',
+    hausa_name: 'Duhun Ganye mai Ruwan Hoda a Albasa',
+    pathogen_type: 'Fungal (Alternaria porri)',
+    affected_crops: ['onion', 'garlic', 'shallot'],
+    causes: 'Prolonged leaf wetness, warm humid nights (21-30°C), and overhead water splashing from rain or watering cans.',
+    symptoms: 'Sunken water-soaked lesions turning purple-brown with distinctive concentric rings; yellowing and girdling of leaf shafts.',
+    treatments: {
+      mild: 'Remove infected leaves promptly, weed beds for air circulation, avoid evening irrigation.',
+      moderate: 'Spray Mancozeb (2g/L) or copper hydroxide. Add a wetting agent (surfactant) to stick to waxy onion leaves.',
+      severe: 'Systemic fungicide treatment (Azoxystrobin or Difenoconazole) and withhold overhead water.',
+    },
+    organic_alternative: 'Spray neem seed kernel extract (NSKE 5%) or garlic-soap extract at first sign.',
+    prevention_tips: [
+      'Practice 3-year crop rotation without onions or garlic',
+      'Use certified disease-free sets and seeds',
+      'Plant on raised ridges or beds with furrow irrigation rather than overhead sprinkling',
+      'Cure harvested bulbs in shade until necks are completely dry',
+    ],
+  },
+  onion_thrips: {
+    disease_id: 'onion_thrips',
+    common_name: 'Onion Thrips Infestation',
+    hausa_name: 'Farin Kwari / Tsutsa a Albasa',
+    pathogen_type: 'Insect Pest (Thrips tabaci)',
+    affected_crops: ['onion', 'garlic', 'tomato'],
+    causes: 'Dry hot weather favors rapid thrips reproduction; weeds around field serve as alternative hosts.',
+    symptoms: 'Silvery white patches and streaks on leaves with minute black fecal dots; leaves curl, twist, and wither prematurely.',
+    treatments: {
+      mild: 'Wash foliage with mild soap solution; weed around field borders.',
+      moderate: 'Spray neem oil or pyrethrin-based botanical insecticide early in the morning.',
+      severe: 'Apply registered insecticide like lambda-cyhalothrin or spinosad; ensure spray reaches inside leaf sheaths.',
+    },
+    organic_alternative: 'Garlic and hot chili pepper extract spray (steep crushed garlic & chili overnight in water with soap).',
+    prevention_tips: [
+      'Maintain adequate soil moisture — drought stress worsens thrips damage',
+      'Intercrop with companion plants like coriander or carrots',
+      'Destroy old crop residues immediately after harvest',
+    ],
+  },
   rice_blast: {
     disease_id: 'rice_blast',
     common_name: 'Rice Blast',

@@ -24,7 +24,7 @@ export const HistoryScreen: React.FC<HistoryScreenProps> = ({
   records,
   onReload,
 }) => {
-  const [filter, setFilter] = useState<'all' | 'crop' | 'health'>('all');
+  const [filter, setFilter] = useState<'all' | 'crop' | 'health' | 'water' | 'livestock'>('all');
   const [expandedId, setExpandedId] = useState<number | null>(null);
 
   const filteredRecords = records.filter((r) =>
@@ -83,12 +83,12 @@ export const HistoryScreen: React.FC<HistoryScreenProps> = ({
       </div>
 
       {/* Filter Tabs */}
-      <div className="flex gap-2">
-        {(['all', 'crop', 'health'] as const).map((tabKey) => (
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        {(['all', 'crop', 'health', 'water', 'livestock'] as const).map((tabKey) => (
           <button
             key={tabKey}
             onClick={() => setFilter(tabKey)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold capitalize transition-colors cursor-pointer border ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold capitalize whitespace-nowrap transition-colors cursor-pointer border ${
               filter === tabKey
                 ? 'bg-[#1f7a4c] text-white border-[#1f7a4c]'
                 : 'bg-white text-slate-700 border-slate-200'
@@ -98,7 +98,11 @@ export const HistoryScreen: React.FC<HistoryScreenProps> = ({
               ? t(locale, 'allGuidance')
               : tabKey === 'crop'
               ? t(locale, 'crop')
-              : t(locale, 'health')}
+              : tabKey === 'health'
+              ? t(locale, 'health')
+              : tabKey === 'water'
+              ? t(locale, 'water')
+              : t(locale, 'livestock')}
           </button>
         ))}
       </div>

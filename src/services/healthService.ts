@@ -1,9 +1,207 @@
+// Clinical Diagnostic & Health Screening Service with Full Hausa Localization
+
+export interface ManualHealthCondition {
+  id: string;
+  condition: string;
+  conditionHausa: string;
+  category: 'infectious' | 'respiratory' | 'emergency' | 'environmental' | 'skin';
+  urgency: 'critical' | 'high' | 'moderate' | 'mild';
+  urgencyLabel: string;
+  urgencyLabelHausa: string;
+  symptoms: string;
+  symptomsHausa: string;
+  firstAid: string;
+  firstAidHausa: string;
+  clinicalAdvice: string;
+  clinicalAdviceHausa: string;
+  dangerSigns: string;
+  dangerSignsHausa: string;
+}
+
 export interface HealthResult {
   condition: string;
+  conditionHausa: string;
   advice: string;
+  adviceHausa: string;
   urgency: string;
+  urgencyHausa: string;
   confidence: number;
+  firstAid?: string;
+  firstAidHausa?: string;
 }
+
+export const MANUAL_HEALTH_CONDITIONS: ManualHealthCondition[] = [
+  {
+    id: 'malaria',
+    condition: 'Malaria Infection',
+    conditionHausa: 'Zazzabin Cizon Sauro (Malaria)',
+    category: 'infectious',
+    urgency: 'high',
+    urgencyLabel: 'Prompt Medical Care within 24 Hours',
+    urgencyLabelHausa: 'Nemi Magani a Asibiti cikin Sa\'o\'i 24',
+    symptoms: 'High fever, shaking chills, severe headache, muscle aches, bitter mouth taste, loss of appetite, sweating.',
+    symptomsHausa: 'Zazzabi mai zafi, rawar sanyi, ciwon kai, ciwon gabobi, dacin baki, da yawan gumi.',
+    firstAid: 'Take paracetamol for high fever (avoid aspirin in children). Sponge with room-temperature water. Drink clean water or ORS to replace sweat fluids.',
+    firstAidHausa: 'Sha paracetamol domin saukar da zafin jiki. Yi amfani da ruwan ɗumi-ɗumi wajen goge jiki. Sha ruwa mai tsabta ko ORS.',
+    clinicalAdvice: 'Confirm with a Rapid Diagnostic Test (RDT) or microscopy at the local PHC before taking Artemisinin-based Combination Therapy (ACT). Complete full 3-day dose even if feeling better.',
+    clinicalAdviceHausa: 'A tabbatar da cutar ta hanyar gwajin jini (RDT) a asibitin kusa kafin shan maganin ACT (misali Coartem). A sha maganin har a gama ko da an ji sauki.',
+    dangerSigns: 'Convulsions/fits, unconsciousness or confusion, severe breathlessness, dark "coca-cola" urine, yellow eyes, inability to retain fluids.',
+    dangerSignsHausa: 'Farfadiya ko fita hayyaci, numfashi mai wahala, fitsari mai baki kamar koka-kola, ko idanu masu rawaya.',
+  },
+  {
+    id: 'cholera_diarrhea',
+    condition: 'Cholera & Acute Watery Diarrhea',
+    conditionHausa: 'Kwalara da Gudawa mai Zawayi',
+    category: 'emergency',
+    urgency: 'critical',
+    urgencyLabel: 'Critical Emergency: Immediate Rehydration',
+    urgencyLabelHausa: 'Gaggawa: Sha Ruwan ORS Nan Take',
+    symptoms: 'Sudden onset of frequent painless watery stools ("rice water"), projectile vomiting, rapid fatigue, extreme thirst.',
+    symptomsHausa: 'Zawayi mai ruwa fari kamar ruwan shinkafa, amai akai-akai, kishirwa mai tsanani, da mutuwar jiki cikin kankanin lokaci.',
+    firstAid: 'Mix 1 packet of ORS in 1 litre of clean safe boiled water (or 6 level teaspoons sugar + 1/2 teaspoon salt in 1 litre water). Give continuous cupfuls after each stool.',
+    firstAidHausa: 'Haɗa fakitin ORS a cikin litar ruwa 1 mai tsabta da aka tafasa (ko cokali 6 na sukari da rabin cokali na gishiri a litar ruwa). Sha bayan kowanne zawayi.',
+    clinicalAdvice: 'Dehydration can cause shock and kidney shutdown within hours. Transfer immediately to the nearest Cholera Treatment Unit (CTU) or General Hospital for IV Ringer\'s Lactate and antibiotics.',
+    clinicalAdviceHausa: 'Rashin ruwa na iya kashe mutum cikin sa\'o\'i. Kai mara lafiya asibiti nan take domin sanya masa ruwan roba (IV drip).',
+    dangerSigns: 'Sunken eyes, skin pinch stays pinched, dry mouth, no urine for over 6 hours, cold clammy hands, lethargy or floppiness in babies.',
+    dangerSignsHausa: 'Idanu sun fada ciki, fata ba ta komawa idan an ja, rashin fitsari sama da sa\'a 6, da sanyin hannaye da kafafu.',
+  },
+  {
+    id: 'typhoid_fever',
+    condition: 'Enteric / Typhoid Fever',
+    conditionHausa: 'Zazzabin Taifot (Ciwon Hanji)',
+    category: 'infectious',
+    urgency: 'high',
+    urgencyLabel: 'Doctor Consultation & Lab Confirmation Required',
+    urgencyLabelHausa: 'Nemi Shawarar Likita da Gwaji',
+    symptoms: 'Gradual step-ladder fever rising daily, severe frontal headache, dry cough, tummy pain, constipation or pea-soup diarrhea, coated tongue.',
+    symptomsHausa: 'Zazzabi mai hauhawa a kowanne yini, ciwon kai mai tsanani, ciwon ciki, rashin kashi ko gudawa, da danyen harshe mai fari.',
+    firstAid: 'Drink exclusively boiled or bottled water. Eat soft, easily digestible foods (light porridge, kunu). Rest completely in bed.',
+    firstAidHausa: 'Sha ruwan da aka tafasa kawai. Ci abinci mai laushi kamar kunu ko koko. Huta sosai a kan gado.',
+    clinicalAdvice: 'Prescription antibiotics (e.g., Ciprofloxacin, Azithromycin, or Ceftriaxone) are strictly required. Do not stop antibiotics early to prevent intestinal perforation.',
+    clinicalAdviceHausa: 'Likita zai rubuta maganin kwayoyin cuta (antibiotics). Kada a daina shan magani har sai an gama kwanakin da aka diba domin kare hudar hanji.',
+    dangerSigns: 'Sudden agonizing belly pain with rigid hardness (danger of bowel hole/perforation), vomiting blood, delirium or confusion.',
+    dangerSignsHausa: 'Ciwon ciki mai tsanani kwatsam tare da taurin ciki (alamar hudar hanji), aman jini, ko susucewa.',
+  },
+  {
+    id: 'snakebite',
+    condition: 'Viper / Cobra Snakebite Emergency',
+    conditionHausa: 'Gaggawa: Cizon Maciji a Gona ko Gida',
+    category: 'emergency',
+    urgency: 'critical',
+    urgencyLabel: 'Life-Threatening Emergency: Rush to Hospital',
+    urgencyLabelHausa: 'Gaggawa mai Hadarin Rai: Koma Asibiti Nan Take',
+    symptoms: 'Two distinct puncture fang marks, severe throbbing pain, rapid swelling spreading up limb, bleeding from gums/wound, drooping eyelids.',
+    symptomsHausa: 'Alamomin hakoran cizo guda biyu, zafi mai radadi, kumburi mai saurin hawa, zubar jini a bakin cizo ko a dasashi.',
+    firstAid: 'Keep patient totally calm and still. Immobilize the bitten limb with a splint/cloth below heart level. DO NOT apply a tight tourniquet (dauri da roba), DO NOT cut or suck venom, DO NOT apply black stone or petrol.',
+    firstAidHausa: 'Kwantar da mara lafiya ya natsu. Ɗaure sanyayyen itace ko tsumma a hankali don kada gaɓar ta motsa. KADA a daure da roba mai matsewa, KADA a tsaga ko a tsotsa, KADA a saka dutsen magani ko fetur.',
+    clinicalAdvice: 'Transport immediately to a hospital with Polyvalent Antivenom (ASV - e.g. EchiTAb-Plus / EchiTAb-G). Time is critical within the first 1-2 hours.',
+    clinicalAdviceHausa: 'Kai mara lafiya asibiti mafi kusa inda ake da allurar kashe dafin maciji (Anti-snake venom) ba tare da bata lokaci ba.',
+    dangerSigns: 'Spontaneous bleeding from gums or nose, vomiting blood, inability to swallow, paralysis, difficulty breathing.',
+    dangerSignsHausa: 'Jini yana fita daga hanci ko baki, rashin iya haɗiye yawu, shanyewar jiki, da kasa numfashi.',
+  },
+  {
+    id: 'pneumonia',
+    condition: 'Pneumonia / Acute Respiratory Infection',
+    conditionHausa: 'Ciwon Kirji da Numfashi mai Sauri (Pneumonia)',
+    category: 'respiratory',
+    urgency: 'critical',
+    urgencyLabel: 'Immediate Emergency Care for Fast Breathing',
+    urgencyLabelHausa: 'Gaggawa: Numfashi mai Sauri yana Bukatar Taimako',
+    symptoms: 'Fast heavy breathing, chest sucking inwards (indrawing), high fever, productive cough, grunting sounds during breathing in infants.',
+    symptomsHausa: 'Numfashi da sauri da wahala, shigar kirji ciki idan ana jan numfashi, zazzabi mai zafi, tari, da kukan zafin kirji ga yara.',
+    firstAid: 'Keep child in an upright supported sitting posture. Keep warm but do not bundle in suffocating thick blankets. Encourage frequent sips of warm fluid or breastmilk.',
+    firstAidHausa: 'Sanya yaro ya zauna a jingine don bude hanyar iska. Rike shi a wuri mai dumi amma ba tare da lullube shi da mayafi mai kauri ba.',
+    clinicalAdvice: 'Urgent antibiotic treatment (e.g. Amoxicillin dispersible tablets) and oxygen therapy if blood oxygen saturation is low. Delay can be fatal in young children.',
+    clinicalAdviceHausa: 'Yana bukatar maganin kwayoyin cuta na gaggawa (kwayoyin Amoxicillin) da iskar shaka ta oxygen a asibiti.',
+    dangerSigns: 'Bluish tint on lips/tongue, inability to drink or breastfeed, chest indrawing, stridor when calm, extreme sleepiness or lethargy.',
+    dangerSignsHausa: 'Leɓe ko harshe ya koma ruwan bula, yaro ya kasa shan nono, kirji yana shiga ciki, ko yawan barci marar motsi.',
+  },
+  {
+    id: 'measles',
+    condition: 'Measles (Rubeola)',
+    conditionHausa: 'Ciwon Kyanda',
+    category: 'infectious',
+    urgency: 'high',
+    urgencyLabel: 'High Contagion: Isolate & Protect Eyes',
+    urgencyLabelHausa: 'Maiurin Yaduwa: Ware Mara Lafiya da Kula da Idanu',
+    symptoms: 'High fever, red watery eyes (light sensitive), running nose, dry barking cough, tiny white spots inside mouth (Koplik spots), followed by red rash spreading from hairline down.',
+    symptomsHausa: 'Zazzabi mai zafi, jajayen idanu masu ruwa, majina, tari, da kuraje jajaye da ke farawa daga fuska zuwa dukkan jiki.',
+    firstAid: 'Isolate child in a darkened, well-ventilated room to protect sensitive eyes. Give Vitamin A drops immediately. Sponge fever with clean water.',
+    firstAidHausa: 'Keɓe yaro a daki mai iska amma marar hasken rana mai zafi don kare idanu. Bashi man kifin Vitamin A nan take. Sha ruwa da abinci mai gina jiki.',
+    clinicalAdvice: 'Two doses of high-dose Vitamin A (capsules from health center) prevent measles blindness. Watch for complications like pneumonia or diarrhea.',
+    clinicalAdviceHausa: 'Karɓi maganin Vitamin A a asibiti domin kare makanta. Kula da tari ko gudawa da ka iya biyo baya.',
+    dangerSigns: 'Corneal cloudiness/whitening in eye, rapid breathing, severe earache with pus, severe mouth ulcers preventing swallowing.',
+    dangerSignsHausa: 'Fari a tsakiyar ido, numfashi da sauri, ruwa a kunne, ko ciwukan baki da suka hana cin abinci.',
+  },
+  {
+    id: 'meningitis',
+    condition: 'Cerebrospinal Meningitis (CSM)',
+    conditionHausa: 'Ciwon Sankarau',
+    category: 'emergency',
+    urgency: 'critical',
+    urgencyLabel: 'Life-Threatening Emergency: Hospitalize Immediately',
+    urgencyLabelHausa: 'Gaggawa mai Hadari: Kai Asibiti Nan Take',
+    symptoms: 'Sudden onset of very high fever, stiff rigid neck (inability to touch chin to chest), agonizing headache, vomiting, aversion to light, purplish skin spots.',
+    symptomsHausa: 'Zazzabi mai zafi kwatsam, taurin wuya (kasa sunkuyar da haba zuwa kirji), ciwon kai mai tsanani, amai, da kyamar haske.',
+    firstAid: 'Do not delay at home with herbal medicines. Sponge body with water to lower fever on the way to hospital. Keep the vehicle well-ventilated.',
+    firstAidHausa: 'Kada a tsaya maganin gargajiya a gida. A kintsa a nufi babban asibiti nan take. Goge jiki da ruwa a hanya don saukar da zafin jiki.',
+    clinicalAdvice: 'Requires emergency intravenous Ceftriaxone injection within hours of onset. Family contacts may need prophylactic antibiotic tablets.',
+    clinicalAdviceHausa: 'Yana bukatar allurar maganin Ceftriaxone a asibiti nan take domin tsira da rayuwa da kuma kare shanyewar gabobi.',
+    dangerSigns: 'Seizures/convulsions, inability to wake up, arched back rigidity, purple bruising rash that does not fade when pressed.',
+    dangerSignsHausa: 'Farfadiya, bacci marar farkawa, taurin baya, ko kuraje masu launin shunayya da ba sa ɓacewa idan an danna.',
+  },
+  {
+    id: 'heat_exhaustion',
+    condition: 'Heat Exhaustion & Sunstroke',
+    conditionHausa: 'Zafin Rana da Karin Hasken Rana (Heat Stroke)',
+    category: 'environmental',
+    urgency: 'high',
+    urgencyLabel: 'Cool Down Immediately to Prevent Brain Damage',
+    urgencyLabelHausa: 'Saukar da Zafin Jiki Nan Take a Inuwa',
+    symptoms: 'Extreme sweating followed by hot dry skin, dizzy faintness, intense throbbing headache, muscle cramps after farming under hot midday sun, nausea.',
+    symptomsHausa: 'Yawan gumi sannan bushewar fata, jiri da duhun gani, ciwon kai mai zafi bayan aiki a karkashin rana, da ciwon tsoka.',
+    firstAid: 'Move patient immediately to cool shaded area or breezy tree. Remove excess clothing. Fan vigorously and pour cool water over head, neck, and chest. Offer cool salted water or kunu if conscious.',
+    firstAidHausa: 'Kwashe mutumin zuwa inuwar bishiya mai iska. Cire mayafi ko rigar kauri. Zuba masa ruwa mai sanyi a kai da wuya da kirji, a shayar da shi ruwa a hankali.',
+    clinicalAdvice: 'If body remains hot (>40°C), confusion develops, or patient stops sweating and faints, this is life-threatening Heat Stroke requiring urgent hospital IV fluids.',
+    clinicalAdviceHausa: 'Idan jiki ya ki yin sanyi, ko mutum ya fadi sumamme ko ya daina gumi amma jikinsa na ci da wuta, a garzaya da shi asibiti nan take.',
+    dangerSigns: 'Loss of consciousness, delirium or aggressive confusion, seizures, vomiting while unconscious.',
+    dangerSignsHausa: 'Sumewa, hauka ko fita hayyaci, farfadiya, ko amai a lokacin da ba a cikin hayyaci.',
+  },
+  {
+    id: 'severe_dehydration',
+    condition: 'Severe Dehydration',
+    conditionHausa: 'Rashin Ruwa a Jiki mai Tsanani',
+    category: 'emergency',
+    urgency: 'critical',
+    urgencyLabel: 'Critical: Immediate Fluids Needed',
+    urgencyLabelHausa: 'Gaggawa: Yana Bukatar Ruwa Nan Take',
+    symptoms: 'Very dry tongue and mouth, sunken eyes, skin pinch on abdomen goes back very slowly (>2 seconds), absent tears, no urine for hours, weak rapid pulse.',
+    symptomsHausa: 'Busasshen harshe da baki, idanu sun fada ciki, fatar ciki ba ta komawa da wuri idan an ja, rashin hawaye yayin kuka, da rashin fitsari.',
+    firstAid: 'If able to drink, administer Oral Rehydration Solution (ORS) in continuous frequent sips. For nursing babies, breastfeed immediately and constantly.',
+    firstAidHausa: 'Bashi ruwan gishiri da sukari (ORS) ko ruwan nono a kai-a-kai idan yana iya haɗiyewa.',
+    clinicalAdvice: 'Severe dehydration in children and elderly requires intravenous fluid replacement (IV drip) at a health clinic.',
+    clinicalAdviceHausa: 'Yana bukatar sanya ruwan roba (drip) a asibiti cikin gaggawa domin ceto rayuwa.',
+    dangerSigns: 'Unable to drink, limp or floppy baby, cold extremities, rapid shallow breathing.',
+    dangerSignsHausa: 'Kasa shan ruwa, sanyin hannaye da kafafu, da numfashi sama-sama.',
+  },
+  {
+    id: 'scabies_skin',
+    condition: 'Scabies & Itchy Skin Rash',
+    conditionHausa: 'Kurajen Makero da Kaikayin Fata (Scabies)',
+    category: 'skin',
+    urgency: 'moderate',
+    urgencyLabel: 'Treat Household Contacts Simultaneously',
+    urgencyLabelHausa: 'A Nemi Magani a Asibiti kuma a Wanke Tufafi',
+    symptoms: 'Intense itching worse at night, tiny red pimples or blisters between fingers, on wrists, waist, groin, and ankles.',
+    symptomsHausa: 'Kaikayi mai tsanani da dare, kuraje kanana a tsakanin yatsu, a wuyan hannu, kugu, da marainanta.',
+    firstAid: 'Bathe with clean water and mild soap. Wash all family bedding and clothes in hot boiling water and sun-dry thoroughly to kill mites.',
+    firstAidHausa: 'Yi wanka da ruwa mai tsabta da sabulu. Wanke duk mayafan gado da tufafi da ruwan zafi sannan a shanya su a rana mai zafi.',
+    clinicalAdvice: 'Apply Permethrin cream or Benzyl Benzoate lotion from neck downwards for 8-12 hours before washing off. ALL household members must be treated at the same time.',
+    clinicalAdviceHausa: 'Shafa man Benzyl Benzoate ko Permethrin a dukkan jiki na tsawon sa\'a 8 zuwa 12. DUKKAN mutanen gida dole su yi maganin tare a rana guda.',
+    dangerSigns: 'Secondary bacterial infection with yellow crusty pus, fever, widespread boils.',
+    dangerSignsHausa: 'Kumburin fata mai fitar da mugunya mai ruwan rawaya, zazzabi, ko kuraje masu yaduwa.',
+  },
+];
 
 export function analyzeHealth(
   symptomsText: string,
@@ -11,160 +209,241 @@ export function analyzeHealth(
 ): HealthResult {
   const query = symptomsText.toLowerCase().trim();
 
-  // If both photo and text provided, or text provided:
+  // If text or voice symptoms were provided:
   if (query) {
-    // Malaria check
+    // 1. Snakebite check
     if (
-      query.includes('fever') ||
-      query.includes('chill') ||
-      query.includes('malaria') ||
-      query.includes('zazzabi') ||
-      query.includes('shivering') ||
-      query.includes('sauro')
+      query.includes('snake') ||
+      query.includes('maciji') ||
+      query.includes('bite') ||
+      query.includes('cizo') ||
+      query.includes('fang')
     ) {
-      const hasDangerSigns =
-        query.includes('breath') ||
-        query.includes('convulsion') ||
-        query.includes('seizure') ||
-        query.includes('confus') ||
-        query.includes('dark urine') ||
-        query.includes('bleed');
-
+      const match = MANUAL_HEALTH_CONDITIONS.find((c) => c.id === 'snakebite')!;
       return {
-        condition: hasDangerSigns
-          ? 'Emergency fever alert (Possible severe malaria / danger signs)'
-          : 'Fever / Malaria screening guidance',
-        advice: hasDangerSigns
-          ? 'EMERGENCY: Difficulty breathing, confusion, convulsions, dark urine, or abnormal bleeding indicate severe illness. Go to the nearest hospital immediately.'
-          : 'Fever, chills, and headache are common with malaria but are not specific. Take plenty of safe fluids, rest, and visit a health center for a rapid diagnostic test (RDT) or blood smear before taking antimalarials.',
-        urgency: hasDangerSigns
-          ? 'Immediate emergency care required at nearest health facility'
-          : 'Prompt health-worker review within 24 hours',
-        confidence: hasDangerSigns ? 0.92 : 0.85,
+        condition: match.condition,
+        conditionHausa: match.conditionHausa,
+        advice: `${match.firstAid} ${match.clinicalAdvice}`,
+        adviceHausa: `${match.firstAidHausa} ${match.clinicalAdviceHausa}`,
+        urgency: match.urgencyLabel,
+        urgencyHausa: match.urgencyLabelHausa,
+        confidence: 0.95,
+        firstAid: match.firstAid,
+        firstAidHausa: match.firstAidHausa,
       };
     }
 
-    // Diarrhoea / Cholera
+    // 2. Cholera / Acute Diarrhea check
     if (
+      query.includes('cholera') ||
+      query.includes('kwalara') ||
       query.includes('diarrhea') ||
       query.includes('diarrhoea') ||
-      query.includes('stool') ||
-      query.includes('vomit') ||
       query.includes('gudawa') ||
-      query.includes('amai') ||
-      query.includes('cholera') ||
-      query.includes('kwalara')
+      query.includes('zawayi') ||
+      (query.includes('stool') && query.includes('vomit')) ||
+      (query.includes('kashi') && query.includes('amai'))
     ) {
+      const match = MANUAL_HEALTH_CONDITIONS.find((c) => c.id === 'cholera_diarrhea')!;
       return {
-        condition: 'Acute diarrhoea / Dehydration warning',
-        advice:
-          'Repeated watery diarrhoea can rapidly cause life-threatening dehydration. Prepare oral rehydration salts (ORS) with clean drinking water and drink after each loose stool. Continue feeding and breast milk.',
-        urgency:
-          'Seek urgent clinic care if there is blood in stool, persistent vomiting, sunken eyes, inability to drink, or extreme weakness.',
-        confidence: 0.88,
+        condition: match.condition,
+        conditionHausa: match.conditionHausa,
+        advice: `${match.firstAid} ${match.clinicalAdvice}`,
+        adviceHausa: `${match.firstAidHausa} ${match.clinicalAdviceHausa}`,
+        urgency: match.urgencyLabel,
+        urgencyHausa: match.urgencyLabelHausa,
+        confidence: 0.92,
+        firstAid: match.firstAid,
+        firstAidHausa: match.firstAidHausa,
       };
     }
 
-    // Cough / Respiratory / Tuberculosis
+    // 3. Meningitis check
     if (
-      query.includes('cough') ||
-      query.includes('tari') ||
-      query.includes('chest') ||
-      query.includes('breath') ||
-      query.includes('sweat') ||
-      query.includes('fuka')
-    ) {
-      return {
-        condition: 'Respiratory / Persistent cough guidance',
-        advice:
-          'A cough lasting more than two weeks, night sweats, unexplained weight loss, fever, or coughing blood require formal assessment and sputum testing for tuberculosis or pneumonia.',
-        urgency:
-          'Visit a primary healthcare center or DOTS clinic. Seek urgent hospital care if breathing is rapid or difficult.',
-        confidence: 0.82,
-      };
-    }
-
-    // Meningitis
-    if (
-      query.includes('neck') ||
-      query.includes('stiff') ||
       query.includes('sankarau') ||
-      query.includes('headache') ||
-      query.includes('ciwon kai')
+      (query.includes('stiff') && (query.includes('neck') || query.includes('wuya'))) ||
+      (query.includes('taurin wuya') && query.includes('zazzabi'))
     ) {
-      if (query.includes('stiff') || query.includes('fever') || query.includes('light')) {
-        return {
-          condition: 'Meningitis warning signs',
-          advice:
-            'High fever accompanied by a stiff neck, sensitivity to bright light, severe headache, confusion, or vomiting are critical signs. Do not delay.',
-          urgency: 'Immediate emergency hospital evaluation required.',
-          confidence: 0.90,
-        };
-      }
+      const match = MANUAL_HEALTH_CONDITIONS.find((c) => c.id === 'meningitis')!;
+      return {
+        condition: match.condition,
+        conditionHausa: match.conditionHausa,
+        advice: `${match.firstAid} ${match.clinicalAdvice}`,
+        adviceHausa: `${match.firstAidHausa} ${match.clinicalAdviceHausa}`,
+        urgency: match.urgencyLabel,
+        urgencyHausa: match.urgencyLabelHausa,
+        confidence: 0.94,
+        firstAid: match.firstAid,
+        firstAidHausa: match.firstAidHausa,
+      };
     }
 
-    // Skin concern / Rash
+    // 4. Measles check
     if (
+      query.includes('measles') ||
+      query.includes('kyanda') ||
+      (query.includes('red eyes') && query.includes('rash')) ||
+      (query.includes('kuraje') && query.includes('zazzabi') && query.includes('ido'))
+    ) {
+      const match = MANUAL_HEALTH_CONDITIONS.find((c) => c.id === 'measles')!;
+      return {
+        condition: match.condition,
+        conditionHausa: match.conditionHausa,
+        advice: `${match.firstAid} ${match.clinicalAdvice}`,
+        adviceHausa: `${match.firstAidHausa} ${match.clinicalAdviceHausa}`,
+        urgency: match.urgencyLabel,
+        urgencyHausa: match.urgencyLabelHausa,
+        confidence: 0.91,
+        firstAid: match.firstAid,
+        firstAidHausa: match.firstAidHausa,
+      };
+    }
+
+    // 5. Pneumonia / Chest & Fast Breathing check
+    if (
+      query.includes('pneumonia') ||
+      query.includes('numfashi') ||
+      query.includes('kirji') ||
+      query.includes('breath') ||
+      query.includes('chest') ||
+      query.includes('fast breath')
+    ) {
+      const match = MANUAL_HEALTH_CONDITIONS.find((c) => c.id === 'pneumonia')!;
+      return {
+        condition: match.condition,
+        conditionHausa: match.conditionHausa,
+        advice: `${match.firstAid} ${match.clinicalAdvice}`,
+        adviceHausa: `${match.firstAidHausa} ${match.clinicalAdviceHausa}`,
+        urgency: match.urgencyLabel,
+        urgencyHausa: match.urgencyLabelHausa,
+        confidence: 0.89,
+        firstAid: match.firstAid,
+        firstAidHausa: match.firstAidHausa,
+      };
+    }
+
+    // 6. Heat Exhaustion / Sunstroke check
+    if (
+      query.includes('sunstroke') ||
+      query.includes('zafin rana') ||
+      query.includes('heat') ||
+      query.includes('rana') ||
+      query.includes('faint') ||
+      query.includes('jiri')
+    ) {
+      const match = MANUAL_HEALTH_CONDITIONS.find((c) => c.id === 'heat_exhaustion')!;
+      return {
+        condition: match.condition,
+        conditionHausa: match.conditionHausa,
+        advice: `${match.firstAid} ${match.clinicalAdvice}`,
+        adviceHausa: `${match.firstAidHausa} ${match.clinicalAdviceHausa}`,
+        urgency: match.urgencyLabel,
+        urgencyHausa: match.urgencyLabelHausa,
+        confidence: 0.87,
+        firstAid: match.firstAid,
+        firstAidHausa: match.firstAidHausa,
+      };
+    }
+
+    // 7. Typhoid Fever check
+    if (
+      query.includes('typhoid') ||
+      query.includes('taifot') ||
+      (query.includes('fever') && (query.includes('belly') || query.includes('ciki') || query.includes('abdomen')))
+    ) {
+      const match = MANUAL_HEALTH_CONDITIONS.find((c) => c.id === 'typhoid_fever')!;
+      return {
+        condition: match.condition,
+        conditionHausa: match.conditionHausa,
+        advice: `${match.firstAid} ${match.clinicalAdvice}`,
+        adviceHausa: `${match.firstAidHausa} ${match.clinicalAdviceHausa}`,
+        urgency: match.urgencyLabel,
+        urgencyHausa: match.urgencyLabelHausa,
+        confidence: 0.88,
+        firstAid: match.firstAid,
+        firstAidHausa: match.firstAidHausa,
+      };
+    }
+
+    // 8. Malaria / General Fever check
+    if (
+      query.includes('malaria') ||
+      query.includes('fever') ||
+      query.includes('chill') ||
+      query.includes('zazzabi') ||
+      query.includes('sanyi') ||
+      query.includes('sauro')
+    ) {
+      const match = MANUAL_HEALTH_CONDITIONS.find((c) => c.id === 'malaria')!;
+      return {
+        condition: match.condition,
+        conditionHausa: match.conditionHausa,
+        advice: `${match.firstAid} ${match.clinicalAdvice}`,
+        adviceHausa: `${match.firstAidHausa} ${match.clinicalAdviceHausa}`,
+        urgency: match.urgencyLabel,
+        urgencyHausa: match.urgencyLabelHausa,
+        confidence: 0.90,
+        firstAid: match.firstAid,
+        firstAidHausa: match.firstAidHausa,
+      };
+    }
+
+    // 9. Skin Rash / Scabies check
+    if (
+      query.includes('scabies') ||
+      query.includes('makero') ||
       query.includes('rash') ||
       query.includes('itch') ||
-      query.includes('skin') ||
+      query.includes('kaikayi') ||
       query.includes('kurji') ||
-      query.includes('fata') ||
-      query.includes('blister') ||
-      query.includes('wound')
+      query.includes('fata')
     ) {
+      const match = MANUAL_HEALTH_CONDITIONS.find((c) => c.id === 'scabies_skin')!;
       return {
-        condition: 'Skin concern / Dermatological screening',
-        advice:
-          'Keep the affected area clean and dry. Avoid sharing creams or applying unprescribed steroid creams. Wash with clean water and mild soap.',
-        urgency:
-          'Seek medical evaluation if redness spreads rapidly, pus develops, fever is present, or the eye/face is involved.',
-        confidence: 0.80,
-      };
-    }
-
-    // Yellowing / Jaundice
-    if (
-      query.includes('yellow') ||
-      query.includes('jaundice') ||
-      query.includes('shawara') ||
-      query.includes('rawaya')
-    ) {
-      return {
-        condition: 'Jaundice / Liver concern screening',
-        advice:
-          'Yellowing of the whites of the eyes or skin can indicate hepatitis, severe malaria hemolysis, or liver disease. Avoid alcohol and herbal concoctions.',
-        urgency: 'Prompt clinical testing and doctor consultation recommended.',
+        condition: match.condition,
+        conditionHausa: match.conditionHausa,
+        advice: `${match.firstAid} ${match.clinicalAdvice}`,
+        adviceHausa: `${match.firstAidHausa} ${match.clinicalAdviceHausa}`,
+        urgency: match.urgencyLabel,
+        urgencyHausa: match.urgencyLabelHausa,
         confidence: 0.86,
+        firstAid: match.firstAid,
+        firstAidHausa: match.firstAidHausa,
       };
     }
 
-    // General symptoms
+    // Fallback general guidance
     return {
-      condition: 'Symptoms need a health-worker assessment',
-      advice: `Reported symptoms: "${symptomsText}". Keep a note of when symptoms started, temperature if available, fluids taken, and any medicines used. Avoid unverified medications.`,
-      urgency: 'Seek care at your nearest clinic if symptoms are severe, sudden, or worsening.',
-      confidence: 0.65,
-    };
-  }
-
-  // If only photo is uploaded without text
-  if (hasPhoto) {
-    return {
-      condition: 'Skin or visible health concern',
-      advice:
-        'A photo screening cannot replace a medical physical examination. Keep the affected skin clean and dry. Do not scratch or puncture lesions. Avoid applying harsh chemicals or shared creams.',
-      urgency:
-        'Seek professional care if you experience spreading redness, intense pain, fever, pus, or if lesions do not heal.',
+      condition: 'Health Symptoms Require Review',
+      conditionHausa: 'Alamomin suna Bukatar Duban Likita',
+      advice: `You reported: "${symptomsText}". Keep hydrated with clean water, note when symptoms started, and visit the nearest health dispensary for examination.`,
+      adviceHausa: `Ka faɗi cewa: "${symptomsText}". Sha ruwa mai tsafta sosai, rubuta ranar da matsalar ta fara, kuma garzaya asibitin kusa domin dubawa.`,
+      urgency: 'Visit Local Clinic or Health Post',
+      urgencyHausa: 'Je Asibiti ko Wurin Shan Magani na Kusa',
       confidence: 0.70,
     };
   }
 
+  // Photo uploaded without text
+  if (hasPhoto) {
+    return {
+      condition: 'Visible Skin or Health Observation',
+      conditionHausa: 'Duba Matsalar Fata ko Kurji',
+      advice: 'Keep affected skin clean and dry with mild soap. Avoid scratching or applying motor oil/battery acid remedies. Have a health worker inspect in person.',
+      adviceHausa: 'Wanke wurin da ruwa mai tsabta da sabulu marar zafi. Kada a shafa man inji ko maganin da ba a sani ba. Nemi likita ya duba.',
+      urgency: 'Clinical Review Recommended',
+      urgencyHausa: 'A Nemi Likita ya Duba a Asibiti',
+      confidence: 0.75,
+    };
+  }
+
   return {
-    condition: 'Symptoms need a health-worker assessment',
-    advice:
-      'Keep a note of symptoms, temperature if available, fluids taken, and any medicines used. Seek a health worker for testing.',
-    urgency: 'Seek care if symptoms worsen.',
+    condition: 'No Symptoms Provided',
+    conditionHausa: 'Babu Alamomin da aka Bayyana',
+    advice: 'Please describe symptoms using voice or select a health condition manually.',
+    adviceHausa: 'Da fatan za a faɗi alamomin rashin lafiya da murya ko zaɓi da kanka.',
+    urgency: 'Routine',
+    urgencyHausa: 'Babu Gaggawa',
     confidence: 0.0,
   };
 }

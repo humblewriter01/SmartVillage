@@ -97,7 +97,10 @@ export const KnowledgeScreen: React.FC<KnowledgeScreenProps> = ({ locale }) => {
     }
 
     setActiveSpeechId(item.id);
-    const textToRead = `${item.title}. ${item.hausa ? `In Hausa: ${item.hausa}. ` : ''}${item.body}`;
+    const textToRead =
+      locale === 'ha'
+        ? `${item.hausa || item.title}. ${item.body}`
+        : `${item.title}. ${item.hausa ? `In Hausa: ${item.hausa}. ` : ''}${item.body}`;
     await voiceService.speak(textToRead, locale);
     setActiveSpeechId(null);
   };

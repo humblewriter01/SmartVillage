@@ -9,9 +9,20 @@ import {
   AlertCircle,
   ShieldAlert,
   Info,
+  ListFilter,
+  X,
+  HeartPulse,
+  AlertTriangle,
+  CheckCircle2,
+  Activity,
 } from 'lucide-react';
 import { Language, t } from '../utils/translations';
-import { analyzeHealth, HealthResult } from '../services/healthService';
+import {
+  analyzeHealth,
+  HealthResult,
+  MANUAL_HEALTH_CONDITIONS,
+  ManualHealthCondition,
+} from '../services/healthService';
 import { voiceService } from '../services/voiceService';
 import { historyService } from '../services/historyService';
 
@@ -22,11 +33,13 @@ interface HealthScreenProps {
 
 const COMMON_SYMPTOM_CHIPS = [
   { label: 'Fever & chills', hausa: 'Zazzabi da rawar sanyi' },
-  { label: 'Persistent cough', hausa: 'Tari mai tsawo' },
-  { label: 'Watery diarrhea', hausa: 'Gudawa da zawayi' },
+  { label: 'Watery diarrhea & vomiting', hausa: 'Gudawa da zawayi da amai' },
+  { label: 'Fast difficult breathing', hausa: 'Numfashi da sauri da wahala' },
+  { label: 'Snakebite on leg or foot', hausa: 'Cizon maciji a kafa ko hannu' },
   { label: 'Stiff neck & headache', hausa: 'Taurin wuya da ciwon kai' },
-  { label: 'Itchy skin rash', hausa: 'Kurajen fata da kaikayi' },
-  { label: 'Yellow eyes (Jaundice)', hausa: 'Rawaya a idanu' },
+  { label: 'Measles red rash & red eyes', hausa: 'Kurajen kyanda da jan idanu' },
+  { label: 'Heat exhaustion & fainting', hausa: 'Zafin rana da jiri ko sumewa' },
+  { label: 'Itchy skin rash (scabies)', hausa: 'Kurajen makero da kaikayi' },
 ];
 
 export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSaved }) => {
@@ -36,6 +49,8 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
   const [busy, setBusy] = useState(false);
   const [listening, setListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [showManualModal, setShowManualModal] = useState(false);
+  const [manualCategoryFilter, setManualCategoryFilter] = useState<'all' | 'emergency' | 'infectious' | 'respiratory' | 'skin'>('all');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -55,6 +70,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
     }
   };
 
+  // Voice-to-Text: Speak symptoms aloud
   const toggleListening = () => {
     if (listening) {
       voiceService.stopListening();
@@ -69,6 +85,10 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
           const trimmed = prev.trim();
           return trimmed ? `${trimmed} ${recognizedText}` : recognizedText;
         });
+
+        // Automatically run instant analysis on the spoken words
+        const res = analyzeHealth(recognizedText, Boolean(photoUrl));
+        setResult(res);
       },
       (err) => {
         showToast(`Voice error: ${err}`);
@@ -86,7 +106,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
 
   const handleAnalyze = async () => {
     if (!photoUrl && !symptoms.trim()) {
-      showToast(t(locale, 'noPhoto') + ' or enter symptoms');
+      showToast(locale === 'ha' ? 'Shigar da alamomi ko dauki hoto' : 'Enter symptoms or take a photo');
       return;
     }
 
@@ -99,16 +119,47 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
       historyService.insert({
         type: 'health',
         createdAt: new Date().toISOString(),
-        title: r.condition,
+        title: locale === 'ha' ? r.conditionHausa : r.condition,
         detail: symptoms.trim() || 'Visual screening',
-        advice: `${r.advice}\n\nUrgency: ${r.urgency}`,
+        advice: `${locale === 'ha' ? r.adviceHausa : r.advice}\n\n${locale === 'ha' ? r.urgencyHausa : r.urgency}`,
         confidence: r.confidence,
         imagePath: photoUrl || undefined,
       });
 
       onRecordSaved?.();
       setBusy(false);
-    }, 450);
+    }, 350);
+  };
+
+  // Manual Health Condition Selection Handler
+  const handleSelectManualCondition = (cond: ManualHealthCondition) => {
+    const res: HealthResult = {
+      condition: cond.condition,
+      conditionHausa: cond.conditionHausa,
+      advice: `${cond.firstAid} ${cond.clinicalAdvice}`,
+      adviceHausa: `${cond.firstAidHausa} ${cond.clinicalAdviceHausa}`,
+      urgency: cond.urgencyLabel,
+      urgencyHausa: cond.urgencyLabelHausa,
+      confidence: 0.95,
+      firstAid: cond.firstAid,
+      firstAidHausa: cond.firstAidHausa,
+    };
+
+    setSymptoms(locale === 'ha' ? cond.symptomsHausa : cond.symptoms);
+    setResult(res);
+    setShowManualModal(false);
+
+    historyService.insert({
+      type: 'health',
+      createdAt: new Date().toISOString(),
+      title: locale === 'ha' ? cond.conditionHausa : cond.condition,
+      detail: `Manual Condition: ${locale === 'ha' ? cond.symptomsHausa : cond.symptoms}`,
+      advice: `${locale === 'ha' ? res.adviceHausa : res.advice}`,
+      confidence: 0.95,
+    });
+
+    onRecordSaved?.();
+    showToast(locale === 'ha' ? 'An ɗora bayanin cutar!' : 'Loaded condition details!');
   };
 
   const handleSpeak = async () => {
@@ -120,8 +171,14 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
     }
 
     setIsSpeaking(true);
-    const textToSpeak = `${result.condition}. ${result.advice}. ${result.urgency}`;
-    await voiceService.speak(textToSpeak, locale);
+    const titleText = locale === 'ha' ? result.conditionHausa : result.condition;
+    const adviceText = locale === 'ha' ? result.adviceHausa : result.advice;
+    const urgencyText = locale === 'ha' ? result.urgencyHausa : result.urgency;
+    const textToSpeak = `${titleText}. ${adviceText}. ${urgencyText}`;
+
+    await voiceService.speak(textToSpeak, locale, (warning) => {
+      showToast(warning);
+    }, 'health');
     setIsSpeaking(false);
   };
 
@@ -135,11 +192,16 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
     });
   };
 
+  const filteredConditions = MANUAL_HEALTH_CONDITIONS.filter((c) => {
+    if (manualCategoryFilter === 'all') return true;
+    return c.category === manualCategoryFilter;
+  });
+
   return (
     <div className="max-w-2xl mx-auto px-4 py-6 space-y-5">
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white text-sm px-4 py-2.5 rounded-xl shadow-lg border border-slate-700 animate-fade-in">
+        <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white text-xs sm:text-sm px-4 py-2.5 rounded-xl shadow-lg border border-slate-700 animate-fade-in">
           {toastMessage}
         </div>
       )}
@@ -161,22 +223,125 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
         className="hidden"
       />
 
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-[#c44747]">
-          {t(locale, 'health')}
-        </h1>
-        <p className="text-sm text-slate-600 mt-1">{t(locale, 'healthSubtitle')}</p>
+      {/* Header & Manual Selector Button */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-[#991b1b]">
+            {t(locale, 'health')}
+          </h1>
+          <p className="text-xs sm:text-sm text-slate-600 mt-0.5">
+            {locale === 'ha'
+              ? 'Binciken alamomin zazzabi, amai, cizon maciji da lafiyar iyali'
+              : 'Offline rural health symptom guidance, first aid & triage'}
+          </p>
+        </div>
+
+        {/* Large Manual Selector Button */}
+        <button
+          onClick={() => setShowManualModal(true)}
+          className="flex items-center justify-center space-x-2 px-3.5 py-2.5 bg-red-50 hover:bg-red-100 text-red-900 border border-red-300 rounded-xl font-bold text-xs sm:text-sm transition-all cursor-pointer shadow-2xs shrink-0"
+        >
+          <ListFilter className="w-4 h-4 text-red-700" />
+          <span>{t(locale, 'manualHealthTitle')}</span>
+        </button>
       </div>
 
-      {/* Photo Preview / Upload Area (Optional for skin/visible signs) */}
-      <div className="bg-white rounded-2xl border-2 border-dashed border-red-200 p-4 flex flex-col items-center justify-center min-h-[170px] relative overflow-hidden group">
+      {/* Voice-to-Text Recording Banner for Grandma & Patients */}
+      <div
+        className={`p-4 rounded-2xl border transition-all ${
+          listening
+            ? 'bg-red-50 border-red-300 ring-2 ring-red-400'
+            : 'bg-gradient-to-r from-red-50 to-rose-50/50 border-red-200'
+        }`}
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <button
+              onClick={toggleListening}
+              className={`w-12 h-12 rounded-full flex items-center justify-center shadow-md transition-all cursor-pointer ${
+                listening
+                  ? 'bg-red-600 text-white animate-pulse scale-105'
+                  : 'bg-red-700 hover:bg-red-800 text-white'
+              }`}
+              title={listening ? t(locale, 'stop') : t(locale, 'speakDescribeHealth')}
+            >
+              {listening ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
+            </button>
+            <div>
+              <h2 className="font-extrabold text-sm sm:text-base text-slate-800">
+                {listening ? t(locale, 'listeningNow') : t(locale, 'speakDescribeHealth')}
+              </h2>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                {t(locale, 'healthSpeechHint')}
+              </p>
+            </div>
+          </div>
+
+          {listening && (
+            <span className="text-[11px] font-bold text-red-600 animate-pulse bg-red-100/80 px-2.5 py-1 rounded-full border border-red-200">
+              REC
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Symptoms Text Area */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+            {t(locale, 'symptoms')}
+          </label>
+          {symptoms && (
+            <button
+              onClick={() => {
+                setSymptoms('');
+                setResult(null);
+              }}
+              className="text-xs text-slate-400 hover:text-slate-600 cursor-pointer font-medium"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+
+        <textarea
+          rows={3}
+          value={symptoms}
+          onChange={(e) => setSymptoms(e.target.value)}
+          placeholder={t(locale, 'symptomsHint')}
+          className="w-full p-3.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent shadow-2xs"
+        />
+
+        {/* Quick Symptom Chips */}
+        <div className="flex flex-wrap gap-1.5 pt-1">
+          {COMMON_SYMPTOM_CHIPS.map((chip, idx) => {
+            const label = locale === 'ha' ? chip.hausa : chip.label;
+            const isIncluded = symptoms.toLowerCase().includes(label.toLowerCase());
+            return (
+              <button
+                key={idx}
+                onClick={() => addSymptomChip(chip)}
+                className={`text-[11px] px-2.5 py-1 rounded-lg border transition-colors cursor-pointer ${
+                  isIncluded
+                    ? 'bg-red-700 text-white border-red-700 font-bold'
+                    : 'bg-white text-slate-700 border-slate-200 hover:bg-red-50/60'
+                }`}
+              >
+                + {label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Optional Photo Section (Wound, rash, snakebite puncture) */}
+      <div className="bg-white rounded-2xl border-2 border-dashed border-red-200 p-3.5 flex flex-col items-center justify-center min-h-[140px] relative overflow-hidden">
         {photoUrl ? (
           <div className="w-full flex flex-col items-center">
             <img
               src={photoUrl}
-              alt="Health concern"
-              className="max-h-56 rounded-xl object-contain shadow-sm border border-red-100"
+              alt="Health observation"
+              className="max-h-48 rounded-xl object-contain shadow-xs border border-red-100"
             />
             <button
               onClick={() => {
@@ -185,156 +350,202 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
               }}
               className="mt-2 text-xs text-red-600 hover:text-red-700 font-medium underline cursor-pointer"
             >
-              Remove photo
+              {locale === 'ha' ? 'Cire hoto' : 'Remove photo'}
             </button>
           </div>
         ) : (
-          <div className="text-center p-4 space-y-2">
-            <div className="w-12 h-12 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto mb-1">
-              <ShieldAlert className="w-6 h-6 opacity-80" />
+          <div className="text-center p-2 space-y-1.5">
+            <ShieldAlert className="w-6 h-6 text-red-600 opacity-80 mx-auto" />
+            <p className="text-slate-700 font-bold text-xs">
+              {locale === 'ha' ? 'Hoton matsalar fata ko cizon maciji (Idan akwai)' : 'Optional photo for rash, bite, or visible wound'}
+            </p>
+            <div className="flex justify-center gap-2 pt-1">
+              <button
+                onClick={() => cameraInputRef.current?.click()}
+                className="py-1.5 px-3 border border-red-300 text-red-800 bg-white hover:bg-red-50 rounded-lg font-bold text-xs cursor-pointer shadow-2xs"
+              >
+                <Camera className="w-3.5 h-3.5 inline mr-1 text-red-700" />
+                <span>{t(locale, 'takePhoto')}</span>
+              </button>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="py-1.5 px-3 border border-red-300 text-red-800 bg-white hover:bg-red-50 rounded-lg font-bold text-xs cursor-pointer shadow-2xs"
+              >
+                <ImageIcon className="w-3.5 h-3.5 inline mr-1 text-red-700" />
+                <span>{t(locale, 'gallery')}</span>
+              </button>
             </div>
-            <p className="text-slate-700 font-medium text-sm">
-              Optional skin / visual photo
-            </p>
-            <p className="text-xs text-slate-400 max-w-xs">
-              Upload a clear photo if there is a rash, bite, wound, or skin discoloration
-            </p>
           </div>
         )}
-      </div>
-
-      {/* Photo source buttons */}
-      <div className="grid grid-cols-2 gap-3">
-        <button
-          onClick={() => cameraInputRef.current?.click()}
-          className="flex items-center justify-center space-x-2 py-2.5 px-3 border border-red-300 text-red-800 bg-white hover:bg-red-50 rounded-xl font-medium text-xs sm:text-sm transition-colors cursor-pointer"
-        >
-          <Camera className="w-4 h-4 text-red-700" />
-          <span>{t(locale, 'takePhoto')}</span>
-        </button>
-        <button
-          onClick={() => fileInputRef.current?.click()}
-          className="flex items-center justify-center space-x-2 py-2.5 px-3 border border-red-300 text-red-800 bg-white hover:bg-red-50 rounded-xl font-medium text-xs sm:text-sm transition-colors cursor-pointer"
-        >
-          <ImageIcon className="w-4 h-4 text-red-700" />
-          <span>{t(locale, 'gallery')}</span>
-        </button>
-      </div>
-
-      {/* Symptoms Text Area & Voice Input */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-            {t(locale, 'symptoms')}
-          </label>
-          <button
-            onClick={toggleListening}
-            className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-              listening
-                ? 'bg-red-600 text-white animate-pulse'
-                : 'bg-red-50 text-red-700 hover:bg-red-100 border border-red-200'
-            }`}
-          >
-            {listening ? (
-              <>
-                <MicOff className="w-3.5 h-3.5" />
-                <span>{t(locale, 'stop')}</span>
-              </>
-            ) : (
-              <>
-                <Mic className="w-3.5 h-3.5" />
-                <span>{t(locale, 'voice')}</span>
-              </>
-            )}
-          </button>
-        </div>
-
-        <textarea
-          rows={4}
-          value={symptoms}
-          onChange={(e) => setSymptoms(e.target.value)}
-          placeholder={t(locale, 'symptomsHint')}
-          className="w-full p-3.5 bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
-        />
-
-        {/* Quick Symptom Chips */}
-        <div className="flex flex-wrap gap-1.5 pt-1">
-          {COMMON_SYMPTOM_CHIPS.map((chip, idx) => (
-            <button
-              key={idx}
-              onClick={() => addSymptomChip(chip)}
-              className="text-xs px-2.5 py-1 bg-white hover:bg-red-50 text-slate-700 hover:text-red-700 border border-slate-200 rounded-lg transition-colors cursor-pointer"
-            >
-              + {locale === 'ha' ? chip.hausa : chip.label}
-            </button>
-          ))}
-        </div>
       </div>
 
       {/* Analyze Button */}
-      <button
-        onClick={handleAnalyze}
-        disabled={busy}
-        className="w-full py-4 bg-[#c44747] hover:bg-[#b03b3b] disabled:opacity-60 text-white font-bold rounded-2xl shadow-md flex items-center justify-center space-x-2 transition-all cursor-pointer"
-      >
-        {busy ? (
-          <>
-            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-            <span>{t(locale, 'analyzing')}</span>
-          </>
-        ) : (
-          <>
-            <Sparkles className="w-5 h-5" />
-            <span>{t(locale, 'analyze')}</span>
-          </>
-        )}
-      </button>
+      {(symptoms.trim() || photoUrl) && !result && (
+        <button
+          onClick={handleAnalyze}
+          disabled={busy}
+          className="w-full py-3.5 bg-red-700 hover:bg-red-800 disabled:opacity-50 text-white font-extrabold rounded-xl text-sm flex items-center justify-center space-x-2 shadow-md transition-all cursor-pointer"
+        >
+          <Sparkles className="w-4 h-4 text-red-200" />
+          <span>{busy ? t(locale, 'analyzing') : t(locale, 'analyze')}</span>
+        </button>
+      )}
 
-      {/* Result Card */}
+      {/* Clinical Assessment Result Card */}
       {result && (
-        <div className="bg-white rounded-2xl p-5 border border-red-200 shadow-md space-y-4 animate-fade-in">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-[#c44747]">
-              {t(locale, 'healthResult')}
-            </span>
+        <div className="bg-white rounded-2xl border border-red-200 p-5 shadow-sm space-y-4 animate-scale-up">
+          {/* Header with Title and Grandma Listen Button */}
+          <div className="flex items-start justify-between">
+            <div>
+              <span className="text-xs font-bold text-red-700 uppercase tracking-wider">
+                {t(locale, 'healthResult')}
+              </span>
+              <h3 className="font-extrabold text-lg sm:text-xl text-slate-800 mt-0.5">
+                {locale === 'ha' ? result.conditionHausa : result.condition}
+              </h3>
+            </div>
+
+            {/* Grandma-Friendly Read Aloud Button */}
             <button
               onClick={handleSpeak}
-              className="flex items-center space-x-1 text-xs text-red-700 bg-red-50 hover:bg-red-100 px-2.5 py-1.5 rounded-lg font-medium transition-colors cursor-pointer"
+              className={`flex items-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs font-bold cursor-pointer transition-all shadow-xs ${
+                isSpeaking
+                  ? 'bg-red-600 text-white animate-pulse'
+                  : 'bg-red-50 hover:bg-red-100 text-red-800 border border-red-300'
+              }`}
+              title={t(locale, 'grandmaListen')}
             >
-              <Volume2 className="w-4 h-4" />
-              <span>{isSpeaking ? 'Stop audio' : t(locale, 'speakResult')}</span>
+              <Volume2 className="w-4 h-4 text-red-700" />
+              <span>{locale === 'ha' ? 'Saurara da Murya' : 'Listen Aloud'}</span>
             </button>
           </div>
 
-          <div>
-            <h2 className="text-xl sm:text-2xl font-black text-slate-800">
-              {result.condition}
-            </h2>
-          </div>
-
           {/* Urgency Badge */}
-          <div className="flex items-start space-x-2 p-3 bg-red-50 rounded-xl border border-red-200/80 text-xs text-red-900">
-            <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
-            <div>
-              <span className="font-bold block uppercase tracking-wider">
-                {t(locale, 'urgency')}:
-              </span>
-              <p className="mt-0.5">{result.urgency}</p>
+          <div className="p-3 bg-red-50/90 border border-red-200 rounded-xl space-y-1">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-red-800 block">
+              {t(locale, 'urgency')}
+            </span>
+            <div className="font-extrabold text-xs sm:text-sm text-red-950 flex items-center gap-1.5">
+              <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+              <span>{locale === 'ha' ? result.urgencyHausa : result.urgency}</span>
             </div>
           </div>
 
-          {/* Action Advice */}
-          <div className="bg-slate-50 p-4 rounded-xl text-sm text-slate-800 space-y-1">
-            <span className="font-bold text-[#c44747] block text-xs uppercase tracking-wider">
-              {t(locale, 'advice')}
-            </span>
-            <p className="leading-relaxed whitespace-pre-line">{result.advice}</p>
+          {/* Actionable Medical Advice & First Aid */}
+          <div className="space-y-2">
+            <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+              <HeartPulse className="w-4 h-4 text-red-600" />
+              <span>{t(locale, 'firstAidHomeCare')}</span>
+            </h4>
+            <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-800 leading-relaxed font-medium">
+              {locale === 'ha' ? result.adviceHausa : result.advice}
+            </div>
           </div>
 
-          {/* Medical Disclaimer */}
-          <div className="border-t border-slate-100 pt-3 flex items-start space-x-2 text-slate-500 text-xs">
-            <Info className="w-4 h-4 shrink-0 text-slate-400 mt-0.5" />
-            <p>{t(locale, 'notMedical')}</p>
+          {/* Medical Disclaimer Notice */}
+          <div className="p-2.5 bg-amber-50/70 border border-amber-200/80 rounded-xl text-[11px] text-amber-900 leading-tight">
+            {t(locale, 'notMedical')}
+          </div>
+        </div>
+      )}
+
+      {/* Corrected Manual Health Condition Picker Modal */}
+      {showManualModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full max-h-[88vh] overflow-hidden flex flex-col shadow-2xl border border-slate-200 animate-scale-up">
+            {/* Modal Header */}
+            <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-red-800 text-white">
+              <div className="flex items-center space-x-2">
+                <HeartPulse className="w-5 h-5 text-red-200" />
+                <h3 className="font-extrabold text-sm sm:text-base">
+                  {t(locale, 'manualHealthTitle')}
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowManualModal(false)}
+                className="text-white/80 hover:text-white p-1 rounded-lg hover:bg-red-700 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Filter Tabs */}
+            <div className="p-3 border-b border-slate-100 bg-slate-50 flex gap-1.5 overflow-x-auto">
+              {(['all', 'emergency', 'infectious', 'respiratory', 'skin'] as const).map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => setManualCategoryFilter(cat)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold capitalize whitespace-nowrap transition-colors cursor-pointer border ${
+                    manualCategoryFilter === cat
+                      ? 'bg-red-800 text-white border-red-800 shadow-2xs'
+                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  {cat === 'all'
+                    ? locale === 'ha' ? 'Duk Cututtuka' : 'All Conditions'
+                    : cat === 'emergency'
+                    ? locale === 'ha' ? 'Gaggawa (Hatsari)' : 'Emergencies'
+                    : cat === 'infectious'
+                    ? locale === 'ha' ? 'Zazzabi / Kamuwa' : 'Infectious'
+                    : cat === 'respiratory'
+                    ? locale === 'ha' ? 'Numfashi' : 'Respiratory'
+                    : locale === 'ha' ? 'Fata' : 'Skin'}
+                </button>
+              ))}
+            </div>
+
+            {/* Modal List of Conditions */}
+            <div className="p-4 overflow-y-auto space-y-3">
+              {filteredConditions.map((cond) => {
+                const isEmergency = cond.urgency === 'critical';
+                return (
+                  <div
+                    key={cond.id}
+                    onClick={() => handleSelectManualCondition(cond)}
+                    className="p-3.5 rounded-xl border border-slate-200 hover:border-red-400 hover:bg-red-50/50 transition-all cursor-pointer space-y-1.5"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="font-extrabold text-xs sm:text-sm text-slate-900">
+                        {locale === 'ha' ? cond.conditionHausa : cond.condition}
+                      </div>
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
+                          isEmergency
+                            ? 'bg-red-100 text-red-800 border border-red-200'
+                            : 'bg-amber-100 text-amber-800 border border-amber-200'
+                        }`}
+                      >
+                        {locale === 'ha' ? cond.urgencyLabelHausa : cond.urgencyLabel}
+                      </span>
+                    </div>
+
+                    <p className="text-[11px] text-slate-600 line-clamp-2">
+                      <strong className="text-slate-700">
+                        {locale === 'ha' ? 'Alamomi: ' : 'Symptoms: '}
+                      </strong>
+                      {locale === 'ha' ? cond.symptomsHausa : cond.symptoms}
+                    </p>
+
+                    <div className="flex items-center justify-between pt-1">
+                      <span className="text-[10px] text-red-700 font-bold flex items-center gap-1">
+                        <Activity className="w-3 h-3" />
+                        {locale === 'ha' ? 'Danna domin Zaɓa da Sauraro' : 'Tap to Select & Listen'}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-3 bg-slate-50 border-t border-slate-100 text-right">
+              <button
+                onClick={() => setShowManualModal(false)}
+                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-xl text-xs cursor-pointer"
+              >
+                {locale === 'ha' ? 'Rufe' : 'Close'}
+              </button>
+            </div>
           </div>
         </div>
       )}
