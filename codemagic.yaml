@@ -1,0 +1,96 @@
+workflows:
+  android-release:
+    name: SmartVillage Android Production Release
+    max_build_duration: 60
+    instance_type: mac_mini_m1
+    environment:
+      flutter: stable
+      xcode: latest
+      java: 17
+      groups:
+        - google_play # Set up in Codemagic UI if publishing automatically to Google Play
+      vars:
+        PACKAGE_NAME: "com.smartvillage.app"
+    triggering:
+      events:
+        - push
+        - tag
+      branch_patterns:
+        - pattern: 'main'
+          include: true
+          source: true
+        - pattern: 'release/*'
+          include: true
+          source: true
+      tag_patterns:
+        - pattern: 'v*'
+          include: true
+    scripts:
+      - name: Ensure Android platform files
+        script: |
+          # If native android directory is missing, initialize Flutter android scaffolding
+          if [ ! -d "android" ]; then
+            echo "Scaffolding Flutter Android project..."
+            flutter create . --platforms=android --org=com.smartvillage
+          fi
+      - name: Set up local.properties and versions
+        script: |
+          echo "flutter.sdk=$FLUTTER_ROOT" > android/local.properties
+          # Calculate release build number from Codemagic BUILD_NUMBER or fallback to 2
+          BUILD_NUM=${BUILD_NUMBER:-2}
+          echo "Building version 1.1.0 with build number $BUILD_NUM"
+      - name: Build Web Frontend Assets
+        script: |
+          npm ci || npm install
+          npm run build
+      - name: Get Flutter dependencies
+        script: |
+          flutter packages pub get
+      - name: Build Android App Bundle (AAB for Google Play)
+        script: |
+          BUILD_NUM=${BUILD_NUMBER:-2}
+          flutter build appbundle --release --build-name=1.1.0 --build-number=$BUILD_NUM
+      - name: Build Android Release APK (Direct Install for Field Testing)
+        script: |
+          BUILD_NUM=${BUILD_NUMBER:-2}
+          flutter build apk --release --build-name=1.1.0 --build-number=$BUILD_NUM
+    artifacts:
+      - build/**/outputs/**/*.aab
+      - build/**/outputs/**/*.apk
+      - dist/**
+    publishing:
+      email:
+        recipients:
+          - ameenujaafar432@gmail.com
+        notify:
+          success: true
+          failure: true
+
+  web-production:
+    name: SmartVillage Web Release
+    max_build_duration: 30
+    instance_type: mac_mini_m1
+    environment:
+      node: 20
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: 'main'
+          include: true
+    scripts:
+      - name: Install dependencies
+        script: |
+          npm ci || npm install
+      - name: Build production bundle
+        script: |
+          npm run build
+    artifacts:
+      - dist/**
+    publishing:
+      email:
+        recipients:
+          - ameenujaafar432@gmail.com
+        notify:
+          success: true
+          failure: true

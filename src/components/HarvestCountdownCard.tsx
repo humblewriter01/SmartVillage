@@ -170,10 +170,29 @@ export const HarvestCountdownCard: React.FC<HarvestCountdownCardProps> = ({
     }
   }, [selectedCropId]);
 
+  // Listen for sync from HomeScreen or other tabs
+  useEffect(() => {
+    const handleSync = () => {
+      try {
+        const saved = localStorage.getItem('smartvillage.harvest_countdowns');
+        if (saved) {
+          setPlantings(JSON.parse(saved));
+        }
+      } catch {}
+    };
+    window.addEventListener('smartvillage_harvest_updated', handleSync);
+    window.addEventListener('storage', handleSync);
+    return () => {
+      window.removeEventListener('smartvillage_harvest_updated', handleSync);
+      window.removeEventListener('storage', handleSync);
+    };
+  }, []);
+
   // Persist plantings
   useEffect(() => {
     try {
       localStorage.setItem('smartvillage.harvest_countdowns', JSON.stringify(plantings));
+      window.dispatchEvent(new Event('smartvillage_harvest_updated'));
     } catch {}
   }, [plantings]);
 

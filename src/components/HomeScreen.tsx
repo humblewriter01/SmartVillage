@@ -14,10 +14,13 @@ import {
   Sparkles,
   VolumeX,
   Clock,
+  FileText,
 } from 'lucide-react';
 import { Language, t } from '../utils/translations';
 import { WeatherDay } from '../services/weatherService';
 import { voiceService } from '../services/voiceService';
+import { HomeHarvestCountdown } from './HomeHarvestCountdown';
+import { VoiceTrainingScriptModal } from './VoiceTrainingScriptModal';
 
 interface HomeScreenProps {
   locale: Language;
@@ -35,6 +38,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   isWeatherCached,
 }) => {
   const [isListening, setIsListening] = useState(false);
+  const [showVoiceScriptModal, setShowVoiceScriptModal] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const todayWeather = forecast.length > 0 ? forecast[0] : null;
 
@@ -102,18 +106,29 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               {locale === 'ha' ? '100% Ba tare da Intanet ba' : '100% Offline-First'}
             </span>
 
-            {/* Grandma Mic Button */}
-            <button
-              onClick={handleVoiceListen}
-              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
-                isListening
-                  ? 'bg-rose-500 text-white animate-pulse'
-                  : 'bg-white text-emerald-900 hover:bg-emerald-50 shadow-xs'
-              }`}
-            >
-              {isListening ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
-              <span>{isListening ? t(locale, 'stop') : locale === 'ha' ? 'Yi Magana' : 'Speak'}</span>
-            </button>
+            {/* Buttons: Grandma Mic + Voice Training Script */}
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => setShowVoiceScriptModal(true)}
+                className="flex items-center space-x-1 px-2.5 py-1.5 rounded-full text-xs font-bold bg-white/20 hover:bg-white/30 text-white backdrop-blur-xs transition-all cursor-pointer"
+                title="Voice Training Script"
+              >
+                <FileText className="w-3.5 h-3.5" />
+                <span>{locale === 'ha' ? 'Rubutun Murya' : 'Voice Script'}</span>
+              </button>
+
+              <button
+                onClick={handleVoiceListen}
+                className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                  isListening
+                    ? 'bg-rose-500 text-white animate-pulse'
+                    : 'bg-white text-emerald-900 hover:bg-emerald-50 shadow-xs'
+                }`}
+              >
+                {isListening ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
+                <span>{isListening ? t(locale, 'stop') : locale === 'ha' ? 'Yi Magana' : 'Speak'}</span>
+              </button>
+            </div>
           </div>
 
           <h1 className="text-2xl sm:text-3xl font-extrabold leading-tight">
@@ -126,6 +141,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </p>
         </div>
       </div>
+
+      {/* Active Crop Harvest Countdown Component */}
+      <HomeHarvestCountdown
+        locale={locale}
+        onNavigateToCropHarvest={() => onNavigate(1)}
+      />
 
       {/* Grid of Primary Action Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
@@ -244,34 +265,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </button>
       </div>
 
-      {/* Secondary Row: Harvest Countdown, Plant Reference Library & Weather */}
+      {/* Secondary Row: Plant Reference Library & Weather */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-        {/* Harvest Countdown Link */}
-        <div
-          onClick={() => onNavigate(1)}
-          className="bg-gradient-to-r from-emerald-50 to-teal-50 rounded-2xl p-4 border border-emerald-200 hover:border-emerald-400 shadow-xs cursor-pointer transition-all flex items-center justify-between group"
-        >
-          <div className="flex items-center space-x-3">
-            <div className="p-2.5 bg-emerald-700 text-white rounded-xl shadow-2xs">
-              <Clock className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="flex items-center space-x-1.5">
-                <h3 className="font-extrabold text-sm text-slate-900 group-hover:text-emerald-900">
-                  {locale === 'ha' ? 'Ƙididdigar Kwanakin Girbi' : 'Harvest Countdown'}
-                </h3>
-                <span className="text-[10px] bg-emerald-200 text-emerald-900 font-extrabold px-1.5 py-0.2 rounded-full">
-                  NEW
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-600">
-                {locale === 'ha' ? 'Kwanakin da suka rage kafin girbin albasa da masara' : 'Days remaining until onion & grain harvests'}
-              </p>
-            </div>
-          </div>
-          <ArrowRight className="w-4 h-4 text-emerald-700 group-hover:translate-x-0.5 transition-transform" />
-        </div>
-
         {/* Plant Library Link */}
         <div
           onClick={() => onNavigate(9)}
@@ -319,6 +314,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           <ArrowRight className="w-4 h-4 text-slate-400" />
         </div>
       </div>
+
+      {/* Voice Training Script Modal with 1-Tap Copy */}
+      {showVoiceScriptModal && (
+        <VoiceTrainingScriptModal
+          locale={locale}
+          onClose={() => setShowVoiceScriptModal(false)}
+        />
+      )}
     </div>
   );
 };
