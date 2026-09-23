@@ -1,0 +1,8 @@
+{
+  "name": "SmartVillage",
+  "description": "Offline-first crop and health guidance for Nigeria, with crop leaf disease screening, symptom guidance, local weather forecasts, and agricultural knowledge.",
+  "permissions": [],
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
