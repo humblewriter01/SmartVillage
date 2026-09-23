@@ -14,13 +14,11 @@ import {
   Sparkles,
   VolumeX,
   Clock,
-  FileText,
 } from 'lucide-react';
 import { Language, t } from '../utils/translations';
 import { WeatherDay } from '../services/weatherService';
 import { voiceService } from '../services/voiceService';
 import { HomeHarvestCountdown } from './HomeHarvestCountdown';
-import { VoiceTrainingScriptModal } from './VoiceTrainingScriptModal';
 
 interface HomeScreenProps {
   locale: Language;
@@ -38,7 +36,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   isWeatherCached,
 }) => {
   const [isListening, setIsListening] = useState(false);
-  const [showVoiceScriptModal, setShowVoiceScriptModal] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const todayWeather = forecast.length > 0 ? forecast[0] : null;
 
@@ -106,29 +103,18 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               {locale === 'ha' ? '100% Ba tare da Intanet ba' : '100% Offline-First'}
             </span>
 
-            {/* Buttons: Grandma Mic + Voice Training Script */}
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={() => setShowVoiceScriptModal(true)}
-                className="flex items-center space-x-1 px-2.5 py-1.5 rounded-full text-xs font-bold bg-white/20 hover:bg-white/30 text-white backdrop-blur-xs transition-all cursor-pointer"
-                title="Voice Training Script"
-              >
-                <FileText className="w-3.5 h-3.5" />
-                <span>{locale === 'ha' ? 'Rubutun Murya' : 'Voice Script'}</span>
-              </button>
-
-              <button
-                onClick={handleVoiceListen}
-                className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
-                  isListening
-                    ? 'bg-rose-500 text-white animate-pulse'
-                    : 'bg-white text-emerald-900 hover:bg-emerald-50 shadow-xs'
-                }`}
-              >
-                {isListening ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
-                <span>{isListening ? t(locale, 'stop') : locale === 'ha' ? 'Yi Magana' : 'Speak'}</span>
-              </button>
-            </div>
+            {/* Grandma Mic Button */}
+            <button
+              onClick={handleVoiceListen}
+              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                isListening
+                  ? 'bg-rose-500 text-white animate-pulse'
+                  : 'bg-white text-emerald-900 hover:bg-emerald-50 shadow-xs'
+              }`}
+            >
+              {isListening ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
+              <span>{isListening ? t(locale, 'stop') : locale === 'ha' ? 'Yi Magana' : 'Speak'}</span>
+            </button>
           </div>
 
           <h1 className="text-2xl sm:text-3xl font-extrabold leading-tight">
@@ -314,14 +300,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           <ArrowRight className="w-4 h-4 text-slate-400" />
         </div>
       </div>
-
-      {/* Voice Training Script Modal with 1-Tap Copy */}
-      {showVoiceScriptModal && (
-        <VoiceTrainingScriptModal
-          locale={locale}
-          onClose={() => setShowVoiceScriptModal(false)}
-        />
-      )}
     </div>
   );
 };
