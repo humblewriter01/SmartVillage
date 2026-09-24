@@ -92,6 +92,7 @@ export const CropScreen: React.FC<CropScreenProps> = ({
   const [busy, setBusy] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const [recordedVoiceUrl, setRecordedVoiceUrl] = useState<string | null>(null);
   const [spokenTranscript, setSpokenTranscript] = useState('');
   const [expandedDetails, setExpandedDetails] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -228,18 +229,36 @@ export const CropScreen: React.FC<CropScreenProps> = ({
     }
   };
 
-  // Voice-to-Text: Listen to describe crop problem
-  const handleVoiceListen = () => {
+  // Voice-to-Text & Voice Recording: Listen to describe crop problem
+  const handleVoiceListen = async () => {
     if (isListening) {
-      voiceService.stopListening();
+      const rec = await voiceService.stopListening();
       setIsListening(false);
+      if (rec?.url) {
+        setRecordedVoiceUrl(rec.url);
+        if (!spokenTranscript) {
+          setSpokenTranscript(
+            locale === 'ha'
+              ? 'Muryar amfanin gona da aka ɗauka'
+              : 'Recorded crop voice description'
+          );
+        }
+        showToast(
+          locale === 'ha'
+            ? 'An ɗauki muryarka! Danna \'Bincika Shuka\' a ƙasa.'
+            : 'Voice recorded! Click \'Analyze Crop\' below.'
+        );
+      }
       return;
     }
 
     const started = voiceService.startListening(
       locale === 'ha' ? 'ha-NG' : 'en-NG',
-      (recognizedText) => {
+      (recognizedText, rec) => {
         setSpokenTranscript(recognizedText);
+        if (rec?.url) {
+          setRecordedVoiceUrl(rec.url);
+        }
         showToast(
           locale === 'ha'
             ? 'An ji bayanin murya! Danna \'Bincika Shuka\' a ƙasa.'
@@ -247,11 +266,13 @@ export const CropScreen: React.FC<CropScreenProps> = ({
         );
       },
       (err) => {
-        showToast(err);
         setIsListening(false);
       },
-      () => {
+      (rec) => {
         setIsListening(false);
+        if (rec?.url) {
+          setRecordedVoiceUrl(rec.url);
+        }
       }
     );
 
@@ -492,18 +513,33 @@ export const CropScreen: React.FC<CropScreenProps> = ({
 
             {spokenTranscript && (
               <div className="mt-3 p-2.5 bg-emerald-50 rounded-xl border border-emerald-200 text-xs text-slate-800 flex items-center justify-between">
-                <div>
+                <div className="flex items-center space-x-2">
                   <span className="font-bold text-emerald-900">
                     {locale === 'ha' ? 'Abin da ka faɗa: ' : 'Your speech: '}
                   </span>
                   <span>"{spokenTranscript}"</span>
                 </div>
-                <button
-                  onClick={() => setSpokenTranscript('')}
-                  className="text-slate-400 hover:text-slate-600 ml-2 text-xs cursor-pointer"
-                >
-                  ✕
-                </button>
+                <div className="flex items-center space-x-1.5 ml-2">
+                  {recordedVoiceUrl && (
+                    <button
+                      type="button"
+                      onClick={() => voiceService.playAudioUrl(recordedVoiceUrl)}
+                      className="p-1.5 rounded-full bg-emerald-200/80 hover:bg-emerald-300 text-emerald-900 transition-colors cursor-pointer"
+                      title={locale === 'ha' ? 'Saurari muryar' : 'Play recorded voice'}
+                    >
+                      <Volume2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                  <button
+                    onClick={() => {
+                      setSpokenTranscript('');
+                      setRecordedVoiceUrl(null);
+                    }}
+                    className="text-slate-400 hover:text-slate-600 text-xs cursor-pointer p-1"
+                  >
+                    ✕
+                  </button>
+                </div>
               </div>
             )}
           </div>

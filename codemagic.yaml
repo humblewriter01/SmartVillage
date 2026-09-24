@@ -7,6 +7,7 @@ workflows:
       flutter: stable
       xcode: latest
       java: 17
+      node: 20
       groups:
         - google_play # Set up in Codemagic UI if publishing automatically to Google Play
       vars:
@@ -25,18 +26,16 @@ workflows:
       tag_patterns:
         - pattern: 'v*'
           include: true
+          source: true
     scripts:
-      - name: Ensure Android platform files
-        script: |
-          # Upgrade or recreate native android scaffolding with modern declarative plugins
-          flutter create . --platforms=android --org=com.smartvillage --overwrite
-          echo "flutter.sdk=$FLUTTER_ROOT" > android/local.properties
-      - name: Set up local.properties and versions
+      - name: Set up Android environment and local.properties
         script: |
           echo "flutter.sdk=$FLUTTER_ROOT" > android/local.properties
-          # Calculate release build number from Codemagic BUILD_NUMBER or fallback to 2
           BUILD_NUM=${BUILD_NUMBER:-2}
-          echo "Building version 1.1.0 with build number $BUILD_NUM"
+          echo "flutter.buildMode=release" >> android/local.properties
+          echo "flutter.versionName=1.1.0" >> android/local.properties
+          echo "flutter.versionCode=$BUILD_NUM" >> android/local.properties
+          echo "Building SmartVillage Android version 1.1.0 (build $BUILD_NUM)"
       - name: Build Web Frontend Assets
         script: |
           npm ci || npm install
@@ -80,8 +79,6 @@ workflows:
       - name: Install dependencies
         script: |
           npm ci || npm install
-      - name: Build production bundle
-        script: |
           npm run build
     artifacts:
       - dist/**

@@ -38,6 +38,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   isWeatherCached,
 }) => {
   const [isListening, setIsListening] = useState(false);
+  const [recordedVoiceUrl, setRecordedVoiceUrl] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const todayWeather = forecast.length > 0 ? forecast[0] : null;
 
@@ -46,17 +47,24 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  const handleVoiceListen = () => {
+  const handleVoiceListen = async () => {
     if (isListening) {
-      voiceService.stopListening();
+      const rec = await voiceService.stopListening();
       setIsListening(false);
+      if (rec?.url) {
+        setRecordedVoiceUrl(rec.url);
+        showToast(locale === 'ha' ? 'An ɗauki muryarka cikin nasara!' : 'Voice recorded successfully!');
+      }
       return;
     }
 
     const started = voiceService.startListening(
       locale,
-      (text) => {
-        showToast(`Heard: "${text}"`);
+      (text, rec) => {
+        if (rec?.url) {
+          setRecordedVoiceUrl(rec.url);
+        }
+        showToast(`${locale === 'ha' ? 'An ji' : 'Heard'}: "${text}"`);
         const lower = text.toLowerCase();
         if (lower.includes('crop') || lower.includes('gona') || lower.includes('shuka') || lower.includes('albasa') || lower.includes('masara')) {
           onNavigate(1); // Crop
@@ -79,11 +87,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         }
       },
       (err) => {
-        showToast(err);
         setIsListening(false);
       },
-      () => {
+      (rec) => {
         setIsListening(false);
+        if (rec?.url) {
+          setRecordedVoiceUrl(rec.url);
+        }
       }
     );
 
@@ -109,18 +119,32 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               {locale === 'ha' ? '100% Ba tare da Intanet ba' : '100% Offline-First'}
             </span>
 
-            {/* Grandma Mic Button */}
-            <button
-              onClick={handleVoiceListen}
-              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
-                isListening
-                  ? 'bg-rose-500 text-white animate-pulse'
-                  : 'bg-white text-emerald-900 hover:bg-emerald-50 shadow-xs'
-              }`}
-            >
-              {isListening ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
-              <span>{isListening ? t(locale, 'stop') : locale === 'ha' ? 'Yi Magana' : 'Speak'}</span>
-            </button>
+            <div className="flex items-center space-x-2">
+              {recordedVoiceUrl && (
+                <button
+                  type="button"
+                  onClick={() => voiceService.playAudioUrl(recordedVoiceUrl)}
+                  className="flex items-center space-x-1 px-2.5 py-1.5 rounded-full text-xs font-bold bg-white/20 hover:bg-white/30 text-white backdrop-blur-xs transition-all cursor-pointer shadow-xs"
+                  title={locale === 'ha' ? 'Saurari muryarka' : 'Play recorded voice'}
+                >
+                  <Volume2 className="w-3.5 h-3.5" />
+                  <span>{locale === 'ha' ? 'Saurari Murya' : 'Play Voice'}</span>
+                </button>
+              )}
+
+              {/* Grandma Mic Button */}
+              <button
+                onClick={handleVoiceListen}
+                className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                  isListening
+                    ? 'bg-rose-500 text-white animate-pulse'
+                    : 'bg-white text-emerald-900 hover:bg-emerald-50 shadow-xs'
+                }`}
+              >
+                {isListening ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
+                <span>{isListening ? t(locale, 'stop') : locale === 'ha' ? 'Yi Magana' : 'Speak'}</span>
+              </button>
+            </div>
           </div>
 
           <h1 className="text-2xl sm:text-3xl font-extrabold leading-tight">

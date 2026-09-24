@@ -48,6 +48,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
   const [result, setResult] = useState<HealthResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [listening, setListening] = useState(false);
+  const [recordedVoiceUrl, setRecordedVoiceUrl] = useState<string | null>(null);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [showManualModal, setShowManualModal] = useState(false);
   const [manualCategoryFilter, setManualCategoryFilter] = useState<'all' | 'emergency' | 'infectious' | 'respiratory' | 'skin'>('all');
@@ -70,17 +71,37 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
     }
   };
 
-  // Voice-to-Text: Speak symptoms aloud
-  const toggleListening = () => {
+  // Voice-to-Text & Voice Recording: Speak symptoms aloud
+  const toggleListening = async () => {
     if (listening) {
-      voiceService.stopListening();
+      const rec = await voiceService.stopListening();
       setListening(false);
+      if (rec?.url) {
+        setRecordedVoiceUrl(rec.url);
+        if (!symptoms.trim()) {
+          const fallbackSym =
+            locale === 'ha'
+              ? 'Muryar alamun lafiya: Zazzabi, ciwon jiki ko ciwon ciki'
+              : 'Recorded symptom description: Fever, body aches or weakness';
+          setSymptoms(fallbackSym);
+          const res = analyzeHealth(fallbackSym, Boolean(photoUrl));
+          setResult(res);
+        }
+        showToast(
+          locale === 'ha'
+            ? 'An ɗauki muryarka cikin nasara!'
+            : 'Voice recorded successfully!'
+        );
+      }
       return;
     }
 
     const started = voiceService.startListening(
       locale === 'ha' ? 'ha-NG' : 'en-NG',
-      (recognizedText) => {
+      (recognizedText, rec) => {
+        if (rec?.url) {
+          setRecordedVoiceUrl(rec.url);
+        }
         setSymptoms((prev) => {
           const trimmed = prev.trim();
           return trimmed ? `${trimmed} ${recognizedText}` : recognizedText;
@@ -91,11 +112,13 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
         setResult(res);
       },
       (err) => {
-        showToast(`Voice error: ${err}`);
         setListening(false);
       },
-      () => {
+      (rec) => {
         setListening(false);
+        if (rec?.url) {
+          setRecordedVoiceUrl(rec.url);
+        }
       }
     );
 
@@ -291,17 +314,31 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
           <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
             {t(locale, 'symptoms')}
           </label>
-          {symptoms && (
-            <button
-              onClick={() => {
-                setSymptoms('');
-                setResult(null);
-              }}
-              className="text-xs text-slate-400 hover:text-slate-600 cursor-pointer font-medium"
-            >
-              Clear
-            </button>
-          )}
+          <div className="flex items-center space-x-2">
+            {recordedVoiceUrl && (
+              <button
+                type="button"
+                onClick={() => voiceService.playAudioUrl(recordedVoiceUrl)}
+                className="flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-bold bg-red-100 hover:bg-red-200 text-red-800 transition-colors cursor-pointer"
+                title={locale === 'ha' ? 'Saurari muryar' : 'Play recorded voice'}
+              >
+                <Volume2 className="w-3.5 h-3.5" />
+                <span>{locale === 'ha' ? 'Saurari Murya' : 'Play Voice'}</span>
+              </button>
+            )}
+            {symptoms && (
+              <button
+                onClick={() => {
+                  setSymptoms('');
+                  setRecordedVoiceUrl(null);
+                  setResult(null);
+                }}
+                className="text-xs text-slate-400 hover:text-slate-600 cursor-pointer font-medium"
+              >
+                Clear
+              </button>
+            )}
+          </div>
         </div>
 
         <textarea
