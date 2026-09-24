@@ -4,7 +4,7 @@ workflows:
     max_build_duration: 60
     instance_type: mac_mini_m2
     environment:
-      java: 17
+      java: 21
       node: 22
     triggering:
       events:
@@ -20,14 +20,8 @@ workflows:
       - name: Build Web Frontend (React + Vite)
         script: |
           npm run build
-      - name: Add and Sync Capacitor Android Platform
+      - name: Sync Capacitor Android
         script: |
-          if [ ! -d "android" ]; then
-            echo "Android folder missing. Generating with Capacitor..."
-            npm install @capacitor/core @capacitor/cli @capacitor/android
-            npx cap init SmartVillage com.smartvillage.app --web-dir=dist
-            npx cap add android
-          fi
           npx cap sync android
       - name: Build Android Release APK
         script: |
