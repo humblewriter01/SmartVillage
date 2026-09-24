@@ -1093,4 +1093,28 @@ export const voiceService = {
       window.speechSynthesis.cancel();
     }
   },
+
+  isInIframe(): boolean {
+    try {
+      return window.self !== window.top;
+    } catch {
+      return true;
+    }
+  },
+
+  async startAudioRecording(): Promise<boolean> {
+    const started = this.startListening(
+      'ha-NG',
+      () => {},
+      () => {},
+      undefined,
+      { type: 'general', label: 'Grandma Voice' }
+    );
+    return started;
+  },
+
+  async stopAudioRecording(): Promise<string | null> {
+    const rec = await this.stopListening();
+    return rec?.url || null;
+  },
 };

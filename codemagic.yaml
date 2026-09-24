@@ -36,6 +36,16 @@ workflows:
           echo "flutter.versionName=1.1.0" >> android/local.properties
           echo "flutter.versionCode=$BUILD_NUM" >> android/local.properties
           echo "Building SmartVillage Android version 1.1.0 (build $BUILD_NUM)"
+          # Ensure Gradle wrapper is set to 8.14 or newer required by latest Flutter Gradle plugin
+          mkdir -p android/gradle/wrapper
+          cat << 'EOF' > android/gradle/wrapper/gradle-wrapper.properties
+          distributionBase=GRADLE_USER_HOME
+          distributionPath=wrapper/dists
+          zipStoreBase=GRADLE_USER_HOME
+          zipStorePath=wrapper/dists
+          distributionUrl=https\://services.gradle.org/distributions/gradle-8.14-bin.zip
+          EOF
+          chmod +x android/gradlew 2>/dev/null || true
       - name: Build Web Frontend Assets
         script: |
           npm ci || npm install
@@ -46,11 +56,11 @@ workflows:
       - name: Build Android App Bundle (AAB for Google Play)
         script: |
           BUILD_NUM=${BUILD_NUMBER:-2}
-          flutter build appbundle --release --build-name=1.1.0 --build-number=$BUILD_NUM
+          flutter build appbundle --release --android-skip-build-dependency-validation --build-name=1.1.0 --build-number=$BUILD_NUM
       - name: Build Android Release APK (Direct Install for Field Testing)
         script: |
           BUILD_NUM=${BUILD_NUMBER:-2}
-          flutter build apk --release --build-name=1.1.0 --build-number=$BUILD_NUM
+          flutter build apk --release --android-skip-build-dependency-validation --build-name=1.1.0 --build-number=$BUILD_NUM
     artifacts:
       - build/**/outputs/**/*.aab
       - build/**/outputs/**/*.apk
