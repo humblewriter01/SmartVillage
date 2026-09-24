@@ -1,29 +1,16 @@
 workflows:
   android-release:
-    name: SmartVillage Android Production Release (Capacitor)
+    name: SmartVillage Android Production Release
     max_build_duration: 60
-    instance_type: mac_mini_m1
+    instance_type: mac_mini_m2
     environment:
-      android_ndk: default
       java: 17
       node: 20
-      groups:
-        - google_play # Set up in Codemagic UI if publishing automatically to Google Play
-      vars:
-        PACKAGE_NAME: "com.smartvillage.app"
     triggering:
       events:
         - push
-        - tag
       branch_patterns:
         - pattern: 'main'
-          include: true
-          source: true
-        - pattern: 'release/*'
-          include: true
-          source: true
-      tag_patterns:
-        - pattern: 'v*'
           include: true
           source: true
     scripts:
@@ -41,13 +28,8 @@ workflows:
           cd android
           chmod +x gradlew
           ./gradlew assembleRelease
-      - name: Build Android App Bundle (AAB for Google Play)
-        script: |
-          cd android
-          ./gradlew bundleRelease
     artifacts:
-      - android/app/build/outputs/**/*.apk
-      - android/app/build/outputs/**/*.aab
+      - android/app/build/outputs/apk/release/*.apk
       - dist/**
     publishing:
       email:
@@ -60,7 +42,7 @@ workflows:
   web-production:
     name: SmartVillage Web Release
     max_build_duration: 30
-    instance_type: mac_mini_m1
+    instance_type: mac_mini_m2
     environment:
       node: 20
     triggering:
@@ -78,10 +60,3 @@ workflows:
           npm run build
     artifacts:
       - dist/**
-    publishing:
-      email:
-        recipients:
-          - ameenujaafar432@gmail.com
-        notify:
-          success: true
-          failure: true
