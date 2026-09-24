@@ -3,6 +3,16 @@
 export type VoiceMode = 'developer' | 'system';
 export type VoiceCategory = 'greeting' | 'crop' | 'health';
 
+export interface VoiceContext {
+  type: 'crop' | 'health' | 'livestock' | 'water' | 'general';
+  cropId?: string;
+  diseaseId?: string;
+  healthId?: string;
+  conditionId?: string;
+  livestockType?: string;
+  label?: string;
+}
+
 export interface VoiceRecordingResult {
   url: string;
   blob: Blob;
@@ -11,6 +21,7 @@ export interface VoiceRecordingResult {
   transcript?: string;
   isSimulated?: boolean;
   timestamp: number;
+  context?: VoiceContext;
 }
 
 interface SpeechRecognitionErrorEvent extends Event {
@@ -37,6 +48,7 @@ let recordedChunks: Blob[] = [];
 let recordingStartTime = 0;
 let isCurrentlyRecording = false;
 let isSimulatedRecording = false;
+let activeRecordingContext: VoiceContext | undefined = undefined;
 let lastRecordedAudio: VoiceRecordingResult | null = null;
 
 // PCM 16-bit WAV file generator (100% browser & mobile compatible)
@@ -79,26 +91,313 @@ function encodeWav(samples: Float32Array, sampleRate: number): Blob {
   return new Blob([view], { type: 'audio/wav' });
 }
 
-// Generate realistic vocal-pitch audio waveform for preview fallback when iframe blocks hardware mic
-function generateSyntheticVoiceBlob(durationSeconds: number): Blob {
+// Generate distinct sound waveforms for each crop, crop disease, and health condition
+function generateSyntheticVoiceBlob(durationSeconds: number, context?: VoiceContext): Blob {
   const sampleRate = 22050;
-  const numSamples = Math.floor(sampleRate * Math.max(1.2, Math.min(durationSeconds, 4.0)));
+  const numSamples = Math.floor(sampleRate * Math.max(1.5, Math.min(durationSeconds, 4.5)));
   const samples = new Float32Array(numSamples);
 
-  // Fundamental vocal pitch for human speech (150Hz) with formants & slight vibrato
-  for (let i = 0; i < numSamples; i++) {
-    const t = i / sampleRate;
-    const f0 = 155 + Math.sin(2 * Math.PI * 3.5 * t) * 12; // Natural human pitch fluctuation
-    const envelope = Math.sin((Math.PI * i) / numSamples); // Smooth in & out ramp
+  const ctxType = context?.type || 'general';
+  const cropId = (context?.cropId || '').toLowerCase();
+  const diseaseId = (context?.diseaseId || '').toLowerCase();
+  const healthId = (context?.healthId || context?.conditionId || '').toLowerCase();
 
-    // 1st, 2nd, and 3rd speech formants
-    const wave =
-      0.55 * Math.sin(2 * Math.PI * f0 * t) +
-      0.30 * Math.sin(2 * Math.PI * (f0 * 2) * t) +
-      0.15 * Math.sin(2 * Math.PI * (f0 * 3) * t) +
-      0.05 * (Math.random() * 2 - 1); // Subtle breathiness
+  if (ctxType === 'crop' || cropId || diseaseId) {
+    // -------------------------------------------------------------
+    // CROP SOUND SYNTHESIZER: Individual sonic signature per crop
+    // -------------------------------------------------------------
+    let baseF0 = 220; // Default A3
+    let harmonic2Weight = 0.35;
+    let harmonic3Weight = 0.15;
+    let vibratoRate = 4.0;
+    let vibratoDepth = 6.0;
+    let subHarmonicWeight = 0.0;
+    let rusticNoise = 0.02;
 
-    samples[i] = wave * envelope * 0.45;
+    if (cropId.includes('onion') || cropId === 'albasa') {
+      // Onion (Albasa): Crisp 220Hz with bright odd harmonics (allium sharpness)
+      baseF0 = 220.0;
+      harmonic2Weight = 0.45;
+      harmonic3Weight = 0.3;
+      vibratoRate = 5.2;
+      vibratoDepth = 8.0;
+      rusticNoise = 0.03;
+    } else if (cropId.includes('maize') || cropId === 'masara' || cropId.includes('corn')) {
+      // Maize (Masara): Deep golden harvest tone (130.8Hz C3) with rich 65.4Hz sub-bass
+      baseF0 = 130.8;
+      harmonic2Weight = 0.4;
+      harmonic3Weight = 0.18;
+      subHarmonicWeight = 0.35;
+      vibratoRate = 3.2;
+      vibratoDepth = 5.0;
+    } else if (cropId.includes('tomato') || cropId === 'tumatur') {
+      // Tomato (Tumatir): Lush vibrant garden tone (246.9Hz B3) with warm vibrato
+      baseF0 = 246.9;
+      harmonic2Weight = 0.38;
+      harmonic3Weight = 0.12;
+      vibratoRate = 4.6;
+      vibratoDepth = 10.0;
+    } else if (cropId.includes('rice') || cropId === 'shinkafa') {
+      // Rice (Shinkafa): Tranquil shimmer (293.7Hz D4) like flooded paddies
+      baseF0 = 293.7;
+      harmonic2Weight = 0.25;
+      harmonic3Weight = 0.35; // Higher sparkling overtone
+      vibratoRate = 3.8;
+      vibratoDepth = 7.0;
+      rusticNoise = 0.04;
+    } else if (cropId.includes('sorghum') || cropId === 'dawa') {
+      // Sorghum (Dawa): Resonant savanna stalk timbre (146.8Hz D3)
+      baseF0 = 146.8;
+      harmonic2Weight = 0.35;
+      harmonic3Weight = 0.22;
+      subHarmonicWeight = 0.2;
+      vibratoRate = 3.0;
+      vibratoDepth = 6.0;
+    } else if (cropId.includes('millet') || cropId === 'gero') {
+      // Millet (Gero): Earthy Sahelian cereal tone (174.6Hz F3) with tremolo
+      baseF0 = 174.6;
+      harmonic2Weight = 0.3;
+      harmonic3Weight = 0.2;
+      vibratoRate = 6.0;
+      vibratoDepth = 9.0;
+    } else if (cropId.includes('cowpea') || cropId === 'wake' || cropId.includes('bean')) {
+      // Cowpea / Beans (Wake): Dual-tone legume warmth (196.0Hz G3)
+      baseF0 = 196.0;
+      harmonic2Weight = 0.42;
+      harmonic3Weight = 0.15;
+      subHarmonicWeight = 0.15;
+    } else if (cropId.includes('groundnut') || cropId === 'gyada' || cropId.includes('peanut')) {
+      // Groundnut (Gyada): Grounded subterranean resonance (123.5Hz B2)
+      baseF0 = 123.5;
+      harmonic2Weight = 0.38;
+      subHarmonicWeight = 0.3;
+    } else if (cropId.includes('cassava') || cropId === 'rogo') {
+      // Cassava (Rogo): Deep rooted tuber acoustic resonance (110.0Hz A2)
+      baseF0 = 110.0;
+      harmonic2Weight = 0.3;
+      subHarmonicWeight = 0.4;
+    } else if (cropId.includes('yam') || cropId === 'doya') {
+      // Yam (Doya): Full-bodied rich tuber harmony (116.5Hz Bb2)
+      baseF0 = 116.5;
+      harmonic2Weight = 0.35;
+      subHarmonicWeight = 0.35;
+    } else if (cropId.includes('pepper') || cropId === 'barkono') {
+      // Pepper (Barkono): Bright, lively, zesty rapid harmonic pulse (329.6Hz E4)
+      baseF0 = 329.6;
+      harmonic2Weight = 0.45;
+      harmonic3Weight = 0.3;
+      vibratoRate = 7.0;
+      vibratoDepth = 12.0;
+    } else if (cropId.includes('wheat') || cropId === 'alkama') {
+      // Wheat (Alkama): Sweeping golden grain acoustic swell (261.6Hz C4)
+      baseF0 = 261.6;
+      harmonic2Weight = 0.32;
+      harmonic3Weight = 0.25;
+      rusticNoise = 0.05;
+    } else if (cropId.includes('soybean')) {
+      // Soybeans (Waken Soya): Balanced protein grain harmonic (185.0Hz F#3)
+      baseF0 = 185.0;
+      harmonic2Weight = 0.36;
+      harmonic3Weight = 0.18;
+    }
+
+    // Specific crop disease acoustic modulation
+    const isRust = diseaseId.includes('rust') || diseaseId.includes('tsatsa');
+    const isBlight = diseaseId.includes('blight') || diseaseId.includes('cuta');
+    const isBlast = diseaseId.includes('blast');
+    const isAlternaria = diseaseId.includes('alternaria') || diseaseId.includes('purple');
+    const isMosaicOrCurl = diseaseId.includes('mosaic') || diseaseId.includes('curl');
+    const isPest = diseaseId.includes('caterpillar') || diseaseId.includes('borer') || diseaseId.includes('tsutsa');
+
+    for (let i = 0; i < numSamples; i++) {
+      const t = i / sampleRate;
+      let f0 = baseF0 + Math.sin(2 * Math.PI * vibratoRate * t) * vibratoDepth;
+
+      if (isMosaicOrCurl) {
+        // Wavy sinusoidal contour
+        f0 += Math.sin(2 * Math.PI * 1.5 * t) * 22;
+      } else if (isAlternaria) {
+        // Two-tone alternating purple shimmer
+        f0 += Math.sin(2 * Math.PI * 3.0 * t) > 0 ? 18 : -14;
+      }
+
+      // Smooth attack and release envelope
+      const env = Math.sin((Math.PI * i) / numSamples);
+
+      // Synthesis with harmonics
+      let wave =
+        0.5 * Math.sin(2 * Math.PI * f0 * t) +
+        harmonic2Weight * Math.sin(2 * Math.PI * (f0 * 2) * t) +
+        harmonic3Weight * Math.sin(2 * Math.PI * (f0 * 3) * t);
+
+      if (subHarmonicWeight > 0) {
+        wave += subHarmonicWeight * Math.sin(2 * Math.PI * (f0 * 0.5) * t);
+      }
+
+      if (isBlight) {
+        // Cautionary minor-third overtone inflection
+        wave += 0.22 * Math.sin(2 * Math.PI * (f0 * 1.189) * t);
+      }
+
+      if (isRust) {
+        // Rustling granular noise
+        wave += (Math.random() * 2 - 1) * 0.1;
+      } else if (rusticNoise > 0) {
+        wave += (Math.random() * 2 - 1) * rusticNoise;
+      }
+
+      if (isPest) {
+        // 8Hz flutter tremolo
+        wave *= 0.75 + 0.25 * Math.sin(2 * Math.PI * 8.0 * t);
+      } else if (isBlast) {
+        // Staccato pulsing
+        wave *= 0.6 + 0.4 * Math.abs(Math.sin(2 * Math.PI * 4.0 * t));
+      }
+
+      samples[i] = wave * env * 0.42;
+    }
+  } else if (ctxType === 'health' || healthId) {
+    // -------------------------------------------------------------
+    // HEALTH SOUND SYNTHESIZER: Distinct clinical & diagnostic tones
+    // -------------------------------------------------------------
+    for (let i = 0; i < numSamples; i++) {
+      const t = i / sampleRate;
+      const env = Math.sin((Math.PI * i) / numSamples);
+      let wave = 0;
+
+      if (healthId.includes('malaria') || healthId.includes('sauro')) {
+        // Malaria (Fever): 329.6Hz (E4) with rhythmic 75 BPM cardiac pulse heartbeat modulation ("lub-dub")
+        const heartPeriod = t % 0.8;
+        let heartPulse = 0.35;
+        if (heartPeriod < 0.12) {
+          heartPulse = 1.0; // Lub
+        } else if (heartPeriod >= 0.18 && heartPeriod < 0.3) {
+          heartPulse = 0.8; // Dub
+        }
+        const f0 = 329.6 + Math.sin(2 * Math.PI * 2.0 * t) * 6;
+        wave =
+          (0.6 * Math.sin(2 * Math.PI * f0 * t) +
+            0.25 * Math.sin(2 * Math.PI * (f0 * 2) * t) +
+            0.15 * Math.sin(2 * Math.PI * (f0 * 3) * t)) *
+          heartPulse;
+      } else if (healthId.includes('cholera') || healthId.includes('diarrhea') || healthId.includes('kwalara') || healthId.includes('gudawa')) {
+        // Cholera & Diarrhea: Fluid water-drop cascading acoustic harmonics (392Hz G4 with smooth restorative ripple)
+        const ripple = Math.sin(2 * Math.PI * 4.5 * t);
+        const f0 = 392.0 + ripple * 20;
+        wave =
+          0.6 * Math.sin(2 * Math.PI * f0 * t) +
+          0.3 * Math.sin(2 * Math.PI * (f0 * 1.5) * t) +
+          0.1 * Math.sin(2 * Math.PI * (f0 * 2.5) * t);
+      } else if (healthId.includes('typhoid') || healthId.includes('taifot')) {
+        // Typhoid: Step-ladder rising 3-note melodic sequence (D4 -> F#4 -> A4)
+        const step = Math.floor((t * 2.2) % 3);
+        const notes = [293.7, 370.0, 440.0];
+        const f0 = notes[step];
+        wave =
+          0.6 * Math.sin(2 * Math.PI * f0 * t) +
+          0.28 * Math.sin(2 * Math.PI * (f0 * 2) * t) +
+          0.12 * Math.sin(2 * Math.PI * (f0 * 3) * t);
+      } else if (healthId.includes('snake') || healthId.includes('maciji')) {
+        // Snakebite: Urgent clinical attention two-tone chime (440Hz -> 330Hz)
+        const step = Math.floor((t * 3.0) % 2);
+        const f0 = step === 0 ? 440.0 : 330.0;
+        wave =
+          0.65 * Math.sin(2 * Math.PI * f0 * t) +
+          0.25 * Math.sin(2 * Math.PI * (f0 * 2) * t) +
+          0.1 * Math.sin(2 * Math.PI * (f0 * 3) * t);
+      } else if (healthId.includes('pneumonia') || healthId.includes('nimoniya') || healthId.includes('respiratory')) {
+        // Pneumonia: 220Hz (A3) with respiratory breath-swell acoustic modulation (gentle in-and-out swell)
+        const breathSwell = 0.5 + 0.5 * Math.sin(2 * Math.PI * 0.45 * t);
+        const f0 = 220.0 + breathSwell * 8;
+        wave =
+          (0.6 * Math.sin(2 * Math.PI * f0 * t) +
+            0.25 * Math.sin(2 * Math.PI * (f0 * 2) * t) +
+            0.08 * (Math.random() * 2 - 1)) *
+          (0.4 + 0.6 * breathSwell);
+      } else if (healthId.includes('measles') || healthId.includes('kyanda')) {
+        // Measles: Pediatric soothing bell chime (349.2Hz F4)
+        const f0 = 349.2;
+        wave =
+          0.65 * Math.sin(2 * Math.PI * f0 * t) +
+          0.25 * Math.sin(2 * Math.PI * (f0 * 2) * t) +
+          0.1 * Math.sin(2 * Math.PI * (f0 * 4) * t);
+      } else if (healthId.includes('meningitis') || healthId.includes('sankarau')) {
+        // Meningitis: Focused clinical diagnostic tone (370.0Hz F#4)
+        const f0 = 370.0;
+        wave =
+          0.6 * Math.sin(2 * Math.PI * f0 * t) +
+          0.3 * Math.sin(2 * Math.PI * (f0 * 2) * t) +
+          0.1 * Math.sin(2 * Math.PI * (f0 * 3) * t);
+      } else if (healthId.includes('heat') || healthId.includes('zafi')) {
+        // Heat exhaustion: Cooling shimmering tremolo (277.2Hz C#4)
+        const shimmer = 0.7 + 0.3 * Math.sin(2 * Math.PI * 6.5 * t);
+        const f0 = 277.2 + Math.sin(2 * Math.PI * 2.0 * t) * 8;
+        wave =
+          (0.65 * Math.sin(2 * Math.PI * f0 * t) +
+            0.25 * Math.sin(2 * Math.PI * (f0 * 2) * t)) *
+          shimmer;
+      } else if (healthId.includes('dehydration') || healthId.includes('kishirwa')) {
+        // Severe dehydration: Fluid droplet revival cadence (415.3Hz G#4)
+        const f0 = 415.3 + Math.sin(2 * Math.PI * 3.5 * t) * 15;
+        wave =
+          0.6 * Math.sin(2 * Math.PI * f0 * t) +
+          0.3 * Math.sin(2 * Math.PI * (f0 * 2) * t);
+      } else if (healthId.includes('skin') || healthId.includes('scabies') || healthId.includes('kazuwa') || healthId.includes('fata')) {
+        // Skin / Scabies: Gentle dermatologic soothing wave (207.6Hz G#3)
+        const f0 = 207.6 + Math.sin(2 * Math.PI * 2.5 * t) * 6;
+        wave =
+          0.65 * Math.sin(2 * Math.PI * f0 * t) +
+          0.25 * Math.sin(2 * Math.PI * (f0 * 2) * t) +
+          0.1 * Math.sin(2 * Math.PI * (f0 * 3) * t);
+      } else {
+        // General clinical tone (330Hz E4)
+        const f0 = 330.0 + Math.sin(2 * Math.PI * 3.0 * t) * 8;
+        wave =
+          0.6 * Math.sin(2 * Math.PI * f0 * t) +
+          0.28 * Math.sin(2 * Math.PI * (f0 * 2) * t) +
+          0.12 * Math.sin(2 * Math.PI * (f0 * 3) * t);
+      }
+
+      samples[i] = wave * env * 0.42;
+    }
+  } else if (ctxType === 'livestock') {
+    // Livestock: Warm pastoral bell harmonics (196.0Hz G3)
+    for (let i = 0; i < numSamples; i++) {
+      const t = i / sampleRate;
+      const env = Math.sin((Math.PI * i) / numSamples);
+      const f0 = 196.0 + Math.sin(2 * Math.PI * 2.5 * t) * 5;
+      const wave =
+        0.5 * Math.sin(2 * Math.PI * f0 * t) +
+        0.3 * Math.sin(2 * Math.PI * (f0 * 2) * t) +
+        0.2 * Math.sin(2 * Math.PI * (f0 * 3) * t);
+      samples[i] = wave * env * 0.42;
+    }
+  } else if (ctxType === 'water') {
+    // Water: Crystal water droplet chime (523.2Hz C5)
+    for (let i = 0; i < numSamples; i++) {
+      const t = i / sampleRate;
+      const env = Math.sin((Math.PI * i) / numSamples);
+      const f0 = 523.2 + Math.sin(2 * Math.PI * 5.0 * t) * 12;
+      const wave =
+        0.65 * Math.sin(2 * Math.PI * f0 * t) +
+        0.25 * Math.sin(2 * Math.PI * (f0 * 2) * t) +
+        0.1 * Math.sin(2 * Math.PI * (f0 * 3) * t);
+      samples[i] = wave * env * 0.4;
+    }
+  } else {
+    // General / Home: Harmonic major chord greeting (A4 440Hz -> C#5 554.4Hz -> E5 659.3Hz)
+    for (let i = 0; i < numSamples; i++) {
+      const t = i / sampleRate;
+      const env = Math.sin((Math.PI * i) / numSamples);
+      const step = Math.floor((t * 2.5) % 3);
+      const notes = [440.0, 554.4, 659.3];
+      const f0 = notes[step];
+      const wave =
+        0.6 * Math.sin(2 * Math.PI * f0 * t) +
+        0.25 * Math.sin(2 * Math.PI * (f0 * 2) * t) +
+        0.15 * Math.sin(2 * Math.PI * (f0 * 3) * t);
+      samples[i] = wave * env * 0.42;
+    }
   }
 
   return encodeWav(samples, sampleRate);
@@ -138,6 +437,26 @@ export const voiceService = {
 
   getLastRecording(): VoiceRecordingResult | null {
     return lastRecordedAudio;
+  },
+
+  // Generates or retrieves on-demand distinctive audio for any crop, disease, or health condition
+  getCropOrHealthAudio(context: VoiceContext, durationSeconds = 2.4): VoiceRecordingResult {
+    const blob = generateSyntheticVoiceBlob(durationSeconds, context);
+    const url = URL.createObjectURL(blob);
+    return {
+      url,
+      blob,
+      durationMs: Math.round(durationSeconds * 1000),
+      isSimulated: true,
+      timestamp: Date.now(),
+      context,
+    };
+  },
+
+  // Directly plays the distinctive sound of any crop, disease, or health condition
+  async playContextSound(context: VoiceContext, durationSeconds = 2.4): Promise<void> {
+    const audioRes = this.getCropOrHealthAudio(context, durationSeconds);
+    await this.playAudioUrl(audioRes.url);
   },
 
   // Grandma Voice: Store trained voice samples in Hausa
@@ -221,7 +540,7 @@ export const voiceService = {
   },
 
   // Play a soft auditory chime to indicate listening/recording started or completed
-  playAudioCue(type: 'start' | 'stop' | 'success'): void {
+  playAudioCue(type: 'start' | 'stop' | 'success', contextType: 'crop' | 'health' | 'general' = 'general'): void {
     try {
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
       if (!AudioCtx) return;
@@ -240,27 +559,78 @@ export const voiceService = {
       gain.connect(ctx.destination);
 
       const now = ctx.currentTime;
-      if (type === 'start') {
-        osc.frequency.setValueAtTime(440, now);
-        osc.frequency.exponentialRampToValueAtTime(660, now + 0.12);
-        gain.gain.setValueAtTime(0.12, now);
-        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.18);
-        osc.start(now);
-        osc.stop(now + 0.18);
-      } else if (type === 'stop') {
-        osc.frequency.setValueAtTime(660, now);
-        osc.frequency.exponentialRampToValueAtTime(330, now + 0.14);
-        gain.gain.setValueAtTime(0.1, now);
-        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.16);
-        osc.start(now);
-        osc.stop(now + 0.16);
+      // Tone customization based on context
+      if (contextType === 'crop') {
+        // Earthy warm wooden/marimba chime
+        if (type === 'start') {
+          osc.frequency.setValueAtTime(260, now);
+          osc.frequency.exponentialRampToValueAtTime(390, now + 0.14);
+          gain.gain.setValueAtTime(0.14, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+          osc.start(now);
+          osc.stop(now + 0.2);
+        } else if (type === 'stop') {
+          osc.frequency.setValueAtTime(390, now);
+          osc.frequency.exponentialRampToValueAtTime(220, now + 0.14);
+          gain.gain.setValueAtTime(0.12, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.18);
+          osc.start(now);
+          osc.stop(now + 0.18);
+        } else {
+          osc.frequency.setValueAtTime(330, now);
+          osc.frequency.exponentialRampToValueAtTime(520, now + 0.18);
+          gain.gain.setValueAtTime(0.14, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.24);
+          osc.start(now);
+          osc.stop(now + 0.24);
+        }
+      } else if (contextType === 'health') {
+        // Gentle clinical/diagnostic bell chime
+        if (type === 'start') {
+          osc.frequency.setValueAtTime(440, now);
+          osc.frequency.exponentialRampToValueAtTime(660, now + 0.12);
+          gain.gain.setValueAtTime(0.12, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.18);
+          osc.start(now);
+          osc.stop(now + 0.18);
+        } else if (type === 'stop') {
+          osc.frequency.setValueAtTime(660, now);
+          osc.frequency.exponentialRampToValueAtTime(330, now + 0.14);
+          gain.gain.setValueAtTime(0.1, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.16);
+          osc.start(now);
+          osc.stop(now + 0.16);
+        } else {
+          osc.frequency.setValueAtTime(520, now);
+          osc.frequency.exponentialRampToValueAtTime(780, now + 0.18);
+          gain.gain.setValueAtTime(0.12, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.22);
+          osc.start(now);
+          osc.stop(now + 0.22);
+        }
       } else {
-        osc.frequency.setValueAtTime(520, now);
-        osc.frequency.exponentialRampToValueAtTime(780, now + 0.18);
-        gain.gain.setValueAtTime(0.12, now);
-        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.22);
-        osc.start(now);
-        osc.stop(now + 0.22);
+        if (type === 'start') {
+          osc.frequency.setValueAtTime(440, now);
+          osc.frequency.exponentialRampToValueAtTime(580, now + 0.12);
+          gain.gain.setValueAtTime(0.1, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.16);
+          osc.start(now);
+          osc.stop(now + 0.16);
+        } else if (type === 'stop') {
+          osc.frequency.setValueAtTime(580, now);
+          osc.frequency.exponentialRampToValueAtTime(330, now + 0.14);
+          gain.gain.setValueAtTime(0.1, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.16);
+          osc.start(now);
+          osc.stop(now + 0.16);
+        } else {
+          osc.frequency.setValueAtTime(440, now);
+          osc.frequency.exponentialRampToValueAtTime(660, now + 0.18);
+          gain.gain.setValueAtTime(0.12, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.22);
+          osc.start(now);
+          osc.stop(now + 0.22);
+        }
       }
     } catch {}
   },
@@ -276,7 +646,8 @@ export const voiceService = {
     localeId: string,
     onResult: (text: string, recording?: VoiceRecordingResult) => void,
     onError?: (err: string) => void,
-    onEnd?: (recording?: VoiceRecordingResult) => void
+    onEnd?: (recording?: VoiceRecordingResult) => void,
+    context?: VoiceContext
   ): boolean {
     // If already recording, stop first
     if (isCurrentlyRecording) {
@@ -287,9 +658,11 @@ export const voiceService = {
     isSimulatedRecording = false;
     recordedChunks = [];
     recordingStartTime = Date.now();
+    activeRecordingContext = context;
     let latestTranscript = '';
 
-    this.playAudioCue('start');
+    const cueCategory = context?.type === 'crop' ? 'crop' : context?.type === 'health' ? 'health' : 'general';
+    this.playAudioCue('start', cueCategory);
 
     // 1. Attempt SpeechRecognition in parallel if available
     const win = window as unknown as IWindow;
@@ -314,7 +687,6 @@ export const voiceService = {
         };
 
         recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-          // Do not abort voice recording on recognition network/not-allowed events
           console.warn('SpeechRecognition event:', event.error);
         };
 
@@ -335,7 +707,6 @@ export const voiceService = {
         .getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } })
         .then((stream) => {
           if (!isCurrentlyRecording) {
-            // Already stopped before stream resolved
             stream.getTracks().forEach((track) => track.stop());
             return;
           }
@@ -367,6 +738,7 @@ export const voiceService = {
                 transcript: latestTranscript || undefined,
                 isSimulated: false,
                 timestamp: Date.now(),
+                context: activeRecordingContext,
               };
 
               lastRecordedAudio = result;
@@ -383,14 +755,13 @@ export const voiceService = {
               onEnd?.(result);
             };
 
-            recorder.start(100); // 100ms chunk intervals
+            recorder.start(100);
           } catch (recError) {
             console.warn('MediaRecorder error, falling back to audio generator:', recError);
             isSimulatedRecording = true;
           }
         })
         .catch((micErr) => {
-          // In an iframe sandbox (e.g. preview) where microphone permission is blocked by parent policy:
           console.warn('Microphone permission blocked or unavailable, using preview voice simulator:', micErr);
           isSimulatedRecording = true;
         });
@@ -411,7 +782,8 @@ export const voiceService = {
         return;
       }
 
-      this.playAudioCue('stop');
+      const cueCategory = activeRecordingContext?.type === 'crop' ? 'crop' : activeRecordingContext?.type === 'health' ? 'health' : 'general';
+      this.playAudioCue('stop', cueCategory);
       isCurrentlyRecording = false;
 
       // Stop speech recognition
@@ -424,8 +796,8 @@ export const voiceService = {
 
       // If simulated preview recording (e.g. preview iframe sandbox)
       if (isSimulatedRecording || !activeMediaRecorder || activeMediaRecorder.state === 'inactive') {
-        const durationSec = Math.max(1.0, (Date.now() - recordingStartTime) / 1000);
-        const synthBlob = generateSyntheticVoiceBlob(durationSec);
+        const durationSec = Math.max(1.5, (Date.now() - recordingStartTime) / 1000);
+        const synthBlob = generateSyntheticVoiceBlob(durationSec, activeRecordingContext);
         const synthUrl = URL.createObjectURL(synthBlob);
 
         const result: VoiceRecordingResult = {
@@ -434,6 +806,7 @@ export const voiceService = {
           durationMs: Math.round(durationSec * 1000),
           isSimulated: true,
           timestamp: Date.now(),
+          context: activeRecordingContext,
         };
 
         lastRecordedAudio = result;

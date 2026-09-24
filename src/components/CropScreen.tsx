@@ -133,6 +133,13 @@ export const CropScreen: React.FC<CropScreenProps> = ({
     setShowManualModal(false);
     setModalStep(1);
 
+    // Update voice audio to this crop's unique sound
+    const cropAudio = voiceService.getCropOrHealthAudio({
+      type: 'crop',
+      cropId,
+    });
+    setRecordedVoiceUrl(cropAudio.url);
+
     const crop = CROP_REFERENCE_DATA.find((c) => c.id === cropId);
     showToast(
       locale === 'ha'
@@ -148,6 +155,14 @@ export const CropScreen: React.FC<CropScreenProps> = ({
     setResult(null); // Clear previous results so user can click Analyze
     setShowManualModal(false);
     setModalStep(1);
+
+    // Update voice audio to this specific crop disease's unique sound
+    const diseaseAudio = voiceService.getCropOrHealthAudio({
+      type: 'crop',
+      cropId: crop.id,
+      diseaseId: disease.id,
+    });
+    setRecordedVoiceUrl(diseaseAudio.url);
 
     showToast(
       locale === 'ha'
@@ -197,6 +212,15 @@ export const CropScreen: React.FC<CropScreenProps> = ({
 
       setResult(r);
 
+      // Update recorded voice URL to the diagnosed crop disease sound
+      const diseaseId = r.referenceDetail?.id || selectedDisease?.id;
+      const diagAudio = voiceService.getCropOrHealthAudio({
+        type: 'crop',
+        cropId: selectedCropId,
+        diseaseId,
+      });
+      setRecordedVoiceUrl(diagAudio.url);
+
       const topPred = r.predictions[0] || { label: 'unknown', confidence: 0 };
       const formattedTitle = r.referenceDetail
         ? `${selectedCropCategory.crop}: ${r.referenceDetail.name}`
@@ -231,6 +255,13 @@ export const CropScreen: React.FC<CropScreenProps> = ({
 
   // Voice-to-Text & Voice Recording: Listen to describe crop problem
   const handleVoiceListen = async () => {
+    const currentCropContext = {
+      type: 'crop' as const,
+      cropId: selectedCropId,
+      diseaseId: selectedDisease?.id || result?.referenceDetail?.id,
+      label: selectedCropCategory.hausa_name || selectedCropCategory.crop,
+    };
+
     if (isListening) {
       const rec = await voiceService.stopListening();
       setIsListening(false);
@@ -258,6 +289,9 @@ export const CropScreen: React.FC<CropScreenProps> = ({
         setSpokenTranscript(recognizedText);
         if (rec?.url) {
           setRecordedVoiceUrl(rec.url);
+        } else {
+          const cropAudio = voiceService.getCropOrHealthAudio(currentCropContext);
+          setRecordedVoiceUrl(cropAudio.url);
         }
         showToast(
           locale === 'ha'
@@ -273,7 +307,8 @@ export const CropScreen: React.FC<CropScreenProps> = ({
         if (rec?.url) {
           setRecordedVoiceUrl(rec.url);
         }
-      }
+      },
+      currentCropContext
     );
 
     if (started) {
@@ -462,6 +497,21 @@ export const CropScreen: React.FC<CropScreenProps> = ({
 
             <div className="flex items-center space-x-1.5 shrink-0">
               <button
+                type="button"
+                onClick={() => {
+                  voiceService.playContextSound({
+                    type: 'crop',
+                    cropId: selectedCropId,
+                    diseaseId: selectedDisease?.id || result?.referenceDetail?.id,
+                  });
+                }}
+                className="flex items-center space-x-1 px-2.5 py-1.5 bg-white hover:bg-emerald-50 border border-emerald-300 text-emerald-900 rounded-xl text-xs font-bold cursor-pointer transition-all shadow-2xs active:scale-95"
+                title={locale === 'ha' ? `Saurari sautin ${selectedCropCategory.hausa_name}` : `Listen to ${selectedCropCategory.crop} sound`}
+              >
+                <Volume2 className="w-3.5 h-3.5 text-emerald-700" />
+                <span className="hidden sm:inline">{locale === 'ha' ? 'Sautin Shuka' : 'Crop Sound'}</span>
+              </button>
+              <button
                 onClick={() => {
                   setModalStep(2);
                   setShowManualModal(true);
@@ -511,23 +561,26 @@ export const CropScreen: React.FC<CropScreenProps> = ({
               )}
             </div>
 
-            {spokenTranscript && (
+            {(spokenTranscript || recordedVoiceUrl) && (
               <div className="mt-3 p-2.5 bg-emerald-50 rounded-xl border border-emerald-200 text-xs text-slate-800 flex items-center justify-between">
                 <div className="flex items-center space-x-2">
                   <span className="font-bold text-emerald-900">
-                    {locale === 'ha' ? 'Abin da ka faɗa: ' : 'Your speech: '}
+                    {locale === 'ha' ? 'Muryar Shuka: ' : 'Crop Voice: '}
                   </span>
-                  <span>"{spokenTranscript}"</span>
+                  <span className="truncate max-w-[200px] sm:max-w-xs">
+                    {spokenTranscript ? `"${spokenTranscript}"` : `${selectedCropCategory.crop} (${selectedDisease ? selectedDisease.name : 'Crop Sound'})`}
+                  </span>
                 </div>
-                <div className="flex items-center space-x-1.5 ml-2">
+                <div className="flex items-center space-x-2 ml-2 shrink-0">
                   {recordedVoiceUrl && (
                     <button
                       type="button"
                       onClick={() => voiceService.playAudioUrl(recordedVoiceUrl)}
-                      className="p-1.5 rounded-full bg-emerald-200/80 hover:bg-emerald-300 text-emerald-900 transition-colors cursor-pointer"
-                      title={locale === 'ha' ? 'Saurari muryar' : 'Play recorded voice'}
+                      className="flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-200 hover:bg-emerald-300 text-emerald-900 transition-colors cursor-pointer"
+                      title={locale === 'ha' ? 'Saurari muryar shuka' : 'Play recorded crop voice'}
                     >
                       <Volume2 className="w-3.5 h-3.5" />
+                      <span>{locale === 'ha' ? 'Saurari Murya' : 'Play Voice'}</span>
                     </button>
                   )}
                   <button

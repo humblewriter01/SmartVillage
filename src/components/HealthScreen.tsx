@@ -72,6 +72,21 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
   };
 
   // Voice-to-Text & Voice Recording: Speak symptoms aloud
+  const getActiveHealthConditionId = (condName?: string, symText?: string): string => {
+    const textToCheck = (condName || result?.condition || symText || symptoms || '').toLowerCase();
+    if (textToCheck.includes('malaria') || textToCheck.includes('sauro')) return 'malaria';
+    if (textToCheck.includes('cholera') || textToCheck.includes('diarrhea') || textToCheck.includes('kwalara') || textToCheck.includes('gudawa') || textToCheck.includes('zawayi')) return 'cholera_diarrhea';
+    if (textToCheck.includes('typhoid') || textToCheck.includes('taifot')) return 'typhoid_fever';
+    if (textToCheck.includes('snake') || textToCheck.includes('maciji') || textToCheck.includes('cizo')) return 'snakebite';
+    if (textToCheck.includes('pneumonia') || textToCheck.includes('nimoniya') || textToCheck.includes('tari') || textToCheck.includes('numfashi')) return 'pneumonia';
+    if (textToCheck.includes('measles') || textToCheck.includes('kyanda')) return 'measles';
+    if (textToCheck.includes('meningitis') || textToCheck.includes('sankarau')) return 'meningitis';
+    if (textToCheck.includes('heat') || textToCheck.includes('zafin rana')) return 'heat_exhaustion';
+    if (textToCheck.includes('dehydration') || textToCheck.includes('kishirwa')) return 'severe_dehydration';
+    if (textToCheck.includes('skin') || textToCheck.includes('scabies') || textToCheck.includes('kazuwa') || textToCheck.includes('kuraje')) return 'scabies_skin';
+    return 'malaria';
+  };
+
   const toggleListening = async () => {
     if (listening) {
       const rec = await voiceService.stopListening();
@@ -86,6 +101,12 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
           setSymptoms(fallbackSym);
           const res = analyzeHealth(fallbackSym, Boolean(photoUrl));
           setResult(res);
+          const condId = getActiveHealthConditionId(res.condition, fallbackSym);
+          const healthAudio = voiceService.getCropOrHealthAudio({
+            type: 'health',
+            healthId: condId,
+          });
+          setRecordedVoiceUrl(healthAudio.url);
         }
         showToast(
           locale === 'ha'
@@ -96,6 +117,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
       return;
     }
 
+    const currentHealthId = getActiveHealthConditionId();
     const started = voiceService.startListening(
       locale === 'ha' ? 'ha-NG' : 'en-NG',
       (recognizedText, rec) => {
@@ -110,6 +132,12 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
         // Automatically run instant analysis on the spoken words
         const res = analyzeHealth(recognizedText, Boolean(photoUrl));
         setResult(res);
+        const condId = getActiveHealthConditionId(res.condition, recognizedText);
+        const healthAudio = voiceService.getCropOrHealthAudio({
+          type: 'health',
+          healthId: condId,
+        });
+        setRecordedVoiceUrl(healthAudio.url);
       },
       (err) => {
         setListening(false);
@@ -119,6 +147,10 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
         if (rec?.url) {
           setRecordedVoiceUrl(rec.url);
         }
+      },
+      {
+        type: 'health',
+        healthId: currentHealthId,
       }
     );
 
@@ -137,6 +169,13 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
     setTimeout(() => {
       const r = analyzeHealth(symptoms, Boolean(photoUrl));
       setResult(r);
+
+      const condId = getActiveHealthConditionId(r.condition, symptoms);
+      const healthAudio = voiceService.getCropOrHealthAudio({
+        type: 'health',
+        healthId: condId,
+      });
+      setRecordedVoiceUrl(healthAudio.url);
 
       // Save to local database / history
       historyService.insert({
@@ -171,6 +210,13 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
     setSymptoms(locale === 'ha' ? cond.symptomsHausa : cond.symptoms);
     setResult(res);
     setShowManualModal(false);
+
+    // Set distinctive sound for this selected health condition
+    const healthAudio = voiceService.getCropOrHealthAudio({
+      type: 'health',
+      healthId: cond.id,
+    });
+    setRecordedVoiceUrl(healthAudio.url);
 
     historyService.insert({
       type: 'health',
