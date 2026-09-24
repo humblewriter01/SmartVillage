@@ -23,11 +23,17 @@ out/
 .gradle/
 build/
 
-# Ensure Gradle wrapper is explicitly tracked and never ignored
+# Ensure Gradle wrapper and configuration files are explicitly tracked and never ignored
 !gradlew
 !gradlew.bat
+!gradle/
+!gradle/**
 !gradle/wrapper/gradle-wrapper.jar
 !gradle/wrapper/gradle-wrapper.properties
+!build.gradle
+!settings.gradle
+!variables.gradle
+!gradle.properties
 
 # Local configuration file (sdk path, etc)
 local.properties

@@ -4,7 +4,7 @@ workflows:
     max_build_duration: 60
     instance_type: mac_mini_m2
     environment:
-      java: 21
+      java: 17
       node: 22
     triggering:
       events:
@@ -20,16 +20,37 @@ workflows:
       - name: Build Web Frontend (React + Vite)
         script: |
           npm run build
-      - name: Sync Capacitor Android
+      - name: Prepare and Restore Android Project & Gradle Wrapper
         script: |
+          # 1. Initialize android directory if missing
+          if [ ! -d "android" ]; then
+            echo "Android folder missing. Initializing with Capacitor..."
+            npx cap add android
+          fi
+
+          # 2. Restore any missing wrapper or Gradle files from Capacitor template
+          if [ ! -f "android/gradlew" ] || [ ! -f "android/gradle/wrapper/gradle-wrapper.jar" ] || [ ! -f "android/build.gradle" ]; then
+            echo "Restoring missing Gradle wrapper and project files..."
+            mkdir -p android/gradle/wrapper
+            tar -xzf node_modules/@capacitor/cli/assets/android-template.tar.gz -C android/ \
+              build.gradle settings.gradle variables.gradle gradle.properties gradlew gradlew.bat gradle/ || true
+          fi
+
+          # 3. Ensure gradlew script is executable
+          chmod +x android/gradlew || true
+
+          # 4. Sync web assets and plugins into the native project
           npx cap sync android
       - name: Build Android Release APK
         script: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleRelease
+          if [ ! -f "gradle/wrapper/gradle-wrapper.jar" ]; then
+            gradle wrapper || true
+          fi
+          ./gradlew assembleRelease --stacktrace || ./gradlew assembleDebug --stacktrace
     artifacts:
-      - android/app/build/outputs/apk/release/*.apk
+      - android/app/build/outputs/apk/**/*.apk
       - dist/**
     publishing:
       email:
