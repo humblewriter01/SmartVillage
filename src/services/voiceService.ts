@@ -50,6 +50,8 @@ let isCurrentlyRecording = false;
 let isSimulatedRecording = false;
 let activeRecordingContext: VoiceContext | undefined = undefined;
 let lastRecordedAudio: VoiceRecordingResult | null = null;
+const permissionDeniedListeners = new Set<() => void>();
+const permissionGrantedListeners = new Set<() => void>();
 
 // PCM 16-bit WAV file generator (100% browser & mobile compatible)
 function encodeWav(samples: Float32Array, sampleRate: number): Blob {
@@ -539,6 +541,118 @@ export const voiceService = {
     );
   },
 
+  onPermissionDenied(cb: () => void): () => void {
+    permissionDeniedListeners.add(cb);
+    return () => permissionDeniedListeners.delete(cb);
+  },
+
+  onPermissionGranted(cb: () => void): () => void {
+    permissionGrantedListeners.add(cb);
+    return () => permissionGrantedListeners.delete(cb);
+  },
+
+  notifyPermissionDenied(): void {
+    permissionDeniedListeners.forEach((cb) => {
+      try {
+        cb();
+      } catch (e) {
+        console.warn('Error notifying permission denied:', e);
+      }
+    });
+  },
+
+  notifyPermissionGranted(): void {
+    permissionGrantedListeners.forEach((cb) => {
+      try {
+        cb();
+      } catch (e) {
+        console.warn('Error notifying permission granted:', e);
+      }
+    });
+  },
+
+  /**
+   * Check browser microphone permission state.
+   * If 'granted', the browser will never prompt again.
+   */
+  async checkMicrophonePermission(): Promise<'granted' | 'denied' | 'prompt' | 'unknown'> {
+    try {
+      if (navigator.permissions && navigator.permissions.query) {
+        const status = await navigator.permissions.query({ name: 'microphone' as PermissionName });
+        if (status.state === 'granted') {
+          try {
+            localStorage.setItem('smartvillage.mic_permission', 'granted');
+          } catch {}
+        } else if (status.state === 'denied') {
+          try {
+            localStorage.setItem('smartvillage.mic_permission', 'denied');
+          } catch {}
+        }
+
+        status.onchange = () => {
+          if (status.state === 'granted') {
+            try {
+              localStorage.setItem('smartvillage.mic_permission', 'granted');
+            } catch {}
+            this.notifyPermissionGranted();
+          } else if (status.state === 'denied') {
+            try {
+              localStorage.setItem('smartvillage.mic_permission', 'denied');
+            } catch {}
+            this.notifyPermissionDenied();
+          }
+        };
+
+        return status.state;
+      }
+    } catch {
+      // Browser doesn't support querying microphone permission
+    }
+
+    try {
+      const stored = localStorage.getItem('smartvillage.mic_permission');
+      if (stored === 'granted') return 'granted';
+      if (stored === 'denied') return 'denied';
+    } catch {}
+
+    return 'unknown';
+  },
+
+  /**
+   * Request microphone permission explicitly via user gesture.
+   * If user previously blocked it in their address bar, this tests whether they've
+   * now unblocked it or prompts the browser.
+   */
+  async requestMicrophonePermission(): Promise<boolean> {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      return false;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Immediately stop the temporary test tracks
+      stream.getTracks().forEach((track) => track.stop());
+      try {
+        localStorage.setItem('smartvillage.mic_permission', 'granted');
+      } catch {}
+      this.notifyPermissionGranted();
+      return true;
+    } catch (err: any) {
+      const isDenied =
+        err?.name === 'NotAllowedError' ||
+        err?.name === 'PermissionDeniedError' ||
+        err?.message?.includes?.('Permission denied') ||
+        err?.message?.includes?.('denied');
+
+      if (isDenied) {
+        try {
+          localStorage.setItem('smartvillage.mic_permission', 'denied');
+        } catch {}
+        this.notifyPermissionDenied();
+      }
+      return false;
+    }
+  },
+
   // Play a soft auditory chime to indicate listening/recording started or completed
   playAudioCue(type: 'start' | 'stop' | 'success', contextType: 'crop' | 'health' | 'general' = 'general'): void {
     try {
@@ -706,6 +820,11 @@ export const voiceService = {
       navigator.mediaDevices
         .getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } })
         .then((stream) => {
+          try {
+            localStorage.setItem('smartvillage.mic_permission', 'granted');
+          } catch {}
+          this.notifyPermissionGranted();
+
           if (!isCurrentlyRecording) {
             stream.getTracks().forEach((track) => track.stop());
             return;
@@ -761,8 +880,22 @@ export const voiceService = {
             isSimulatedRecording = true;
           }
         })
-        .catch((micErr) => {
-          console.warn('Microphone permission blocked or unavailable, using preview voice simulator:', micErr);
+        .catch((micErr: any) => {
+          console.warn('Microphone permission blocked or unavailable:', micErr);
+          const isDenied =
+            micErr?.name === 'NotAllowedError' ||
+            micErr?.name === 'PermissionDeniedError' ||
+            micErr?.message?.includes?.('Permission denied') ||
+            micErr?.message?.includes?.('denied');
+
+          if (isDenied) {
+            try {
+              localStorage.setItem('smartvillage.mic_permission', 'denied');
+            } catch {}
+            this.notifyPermissionDenied();
+            onError?.('Microphone access blocked. Please enable microphone permission in browser settings.');
+          }
+
           isSimulatedRecording = true;
         });
     } else {

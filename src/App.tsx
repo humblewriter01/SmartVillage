@@ -32,6 +32,7 @@ import { OfflineMapScreen } from './components/OfflineMapScreen';
 import { PlantingCalendarScreen } from './components/PlantingCalendarScreen';
 import { CropReferenceLibraryScreen } from './components/CropReferenceLibraryScreen';
 import { SoilHealthScreen } from './components/SoilHealthScreen';
+import { MicrophonePermissionModal } from './components/MicrophonePermissionModal';
 import {
   CropCategoryReference,
   CropDiseaseReference,
@@ -48,6 +49,7 @@ export function App() {
   const [historyRecords, setHistoryRecords] = useState<HistoryRecord[]>([]);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [showMicPermissionModal, setShowMicPermissionModal] = useState(false);
 
   // Selected crop/disease passed from Reference Library into CropScreen
   const [selectedLibraryCrop, setSelectedLibraryCrop] = useState<CropCategoryReference | undefined>();
@@ -133,7 +135,29 @@ export function App() {
   useEffect(() => {
     loadWeather();
     loadHistory();
+
+    // Check microphone permission state on startup and register listeners
+    voiceService.checkMicrophonePermission();
+
+    const unsubDenied = voiceService.onPermissionDenied(() => {
+      setShowMicPermissionModal(true);
+    });
+
+    const unsubGranted = voiceService.onPermissionGranted(() => {
+      setShowMicPermissionModal(false);
+    });
+
+    return () => {
+      unsubDenied();
+      unsubGranted();
+    };
   }, []);
+
+  const handleMicPermissionGranted = () => {
+    setShowMicPermissionModal(false);
+    setToastMessage(t(locale, 'micPermissionSuccess'));
+    setTimeout(() => setToastMessage(null), 3500);
+  };
 
   // Primary bottom navigation items
   const navItems = [
@@ -310,6 +334,14 @@ export function App() {
           </div>
         </div>
       </nav>
+
+      {/* Global One-Time Microphone Permission Recovery Modal */}
+      <MicrophonePermissionModal
+        isOpen={showMicPermissionModal}
+        onClose={() => setShowMicPermissionModal(false)}
+        locale={locale}
+        onPermissionGranted={handleMicPermissionGranted}
+      />
     </div>
   );
 }

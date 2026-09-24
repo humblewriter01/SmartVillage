@@ -142,6 +142,13 @@ export const translations: Record<Language, Record<string, string>> = {
     firstAidHomeCare: 'First Aid & Safe Home Care',
     cropSpeechHint: 'E.g., "Onion purple blotch spots", "Maize armyworm eating leaves", "Tomato leaf curl"…',
     healthSpeechHint: 'E.g., "High fever with chills and headache", "Watery diarrhea and vomiting", "Snakebite on leg"…',
+    micPermissionTitle: 'Microphone Access Blocked',
+    micPermissionDesc: 'Microphone permission was previously denied. To record your voice, please enable it in your browser settings once.',
+    micPermissionStep1: 'Tap the Lock 🔒 or Settings icon in your browser address bar',
+    micPermissionStep2: 'Change Microphone permission to "Allow"',
+    micPermissionStep3: 'Tap "Allow Microphone Now" below',
+    allowMicNow: 'Allow Microphone Now',
+    micPermissionSuccess: 'Microphone access granted! You can now record anytime.',
   },
   ha: {
     appName: 'SmartVillage',
@@ -284,6 +291,13 @@ export const translations: Record<Language, Record<string, string>> = {
     firstAidHomeCare: 'Taimakon Farko da Kula a Gida',
     cropSpeechHint: 'Misali: "Duhun ganye mai ruwan hoda a albasa", "Tsutsa a masara", "Lankwashewar ganyen tumatir"…',
     healthSpeechHint: 'Misali: "Zazzabi mai zafi da sanyi da ciwon kai", "Zawo da amai", "Cizon maciji a kafa"…',
+    micPermissionTitle: 'An Toshe Damar Murya',
+    micPermissionDesc: 'An hana damar murya a baya. Domin ɗaukar muryarka, don Allah bada izini a burauzarku sau ɗaya.',
+    micPermissionStep1: 'Danna alamar Kwado 🔒 ko Saiti a saman burauza kusa da adireshi',
+    micPermissionStep2: 'Canza damar Lasifika/Murya (Microphone) zuwa "Allow"',
+    micPermissionStep3: 'Danna "Bada Damar Murya" a ƙasa',
+    allowMicNow: 'Bada Damar Murya Yanzu',
+    micPermissionSuccess: 'An bada damar murya! Yanzu zaka iya ɗaukar murya a kowane lokaci.',
   },
 };
 
