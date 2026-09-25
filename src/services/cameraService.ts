@@ -59,22 +59,46 @@ export function pickImageFromWeb(source: 'camera' | 'photos' = 'camera'): Promis
   });
 }
 
-// Function to open the CAMERA directly
+// Function to open the CAMERA directly with explicit runtime permission checks
 export async function takePhotoWithCamera(): Promise<string | null> {
   try {
     if (Capacitor.isNativePlatform()) {
+      // Step 1: Check current permissions
+      let permissions = await Camera.checkPermissions();
+
+      // Step 2: Request permissions if not granted
+      if (permissions.camera !== 'granted') {
+        permissions = await Camera.requestPermissions({ permissions: ['camera'] });
+      }
+
+      // Step 3: If still not granted, show error and return
+      if (permissions.camera !== 'granted') {
+        alert('Ba a iya buɗe kyamara ba. Don Allah ka ba da izinin kyamara a saitunan waya.');
+        return null;
+      }
+
+      // Step 4: Open the camera
       const photo = await Camera.getPhoto({
         quality: 90,
         allowEditing: false,
         resultType: CameraResultType.Base64,
-        source: CameraSource.Camera, // <--- This forces the Camera app
+        source: CameraSource.Camera,
       });
       return photo.base64String || null;
     } else {
       // Web fallback (browser only)
       return await pickImageFromWeb('camera');
     }
-  } catch (error) {
+  } catch (error: any) {
+    const msg = String(error?.message || error);
+    if (
+      msg.includes('cancelled') ||
+      msg.includes('canceled') ||
+      msg.includes('User cancelled') ||
+      msg.includes('TakePhotoCancelled')
+    ) {
+      return null;
+    }
     console.error('Camera error:', error);
     alert('Ba a iya buɗe kyamara ba. Don Allah ka ba da izinin kyamara a saitunan waya.');
     return null;
@@ -85,6 +109,11 @@ export async function takePhotoWithCamera(): Promise<string | null> {
 export async function pickPhotoFromGallery(): Promise<string | null> {
   try {
     if (Capacitor.isNativePlatform()) {
+      let permissions = await Camera.checkPermissions();
+      if (permissions.photos !== 'granted') {
+        permissions = await Camera.requestPermissions({ permissions: ['photos'] });
+      }
+
       const photo = await Camera.getPhoto({
         quality: 90,
         allowEditing: false,
@@ -95,7 +124,16 @@ export async function pickPhotoFromGallery(): Promise<string | null> {
     } else {
       return await pickImageFromWeb('photos');
     }
-  } catch (error) {
+  } catch (error: any) {
+    const msg = String(error?.message || error);
+    if (
+      msg.includes('cancelled') ||
+      msg.includes('canceled') ||
+      msg.includes('User cancelled') ||
+      msg.includes('TakePhotoCancelled')
+    ) {
+      return null;
+    }
     console.error('Gallery error:', error);
     return null;
   }
