@@ -68,23 +68,34 @@ export async function takePhotoWithCamera(): Promise<string | null> {
 
       // Step 2: Request permissions if not granted
       if (permissions.camera !== 'granted') {
-        permissions = await Camera.requestPermissions({ permissions: ['camera'] });
+        try {
+          permissions = await Camera.requestPermissions({ permissions: ['camera'] });
+        } catch {
+          permissions = await Camera.requestPermissions();
+        }
       }
 
-      // Step 3: If still not granted, show error and return
-      if (permissions.camera !== 'granted') {
-        alert('Ba a iya buɗe kyamara ba. Don Allah ka ba da izinin kyamara a saitunan waya.');
-        return null;
+      // Step 3: If camera permission is granted or ready, open with Capacitor Camera
+      if (permissions.camera === 'granted') {
+        const photo = await Camera.getPhoto({
+          quality: 90,
+          allowEditing: false,
+          resultType: CameraResultType.Base64,
+          source: CameraSource.Camera,
+        });
+        return photo.base64String || null;
       }
 
-      // Step 4: Open the camera
-      const photo = await Camera.getPhoto({
-        quality: 90,
-        allowEditing: false,
-        resultType: CameraResultType.Base64,
-        source: CameraSource.Camera,
-      });
-      return photo.base64String || null;
+      // If Capacitor Camera permission is still not granted (e.g. system restriction),
+      // seamlessly fallback to Android WebView's native camera capture!
+      console.warn('Capacitor camera permission not granted, trying system camera capture fallback...');
+      const fallbackPhoto = await pickImageFromWeb('camera');
+      if (fallbackPhoto) {
+        return fallbackPhoto;
+      }
+
+      alert('Ba a iya buɗe kyamara ba. Don Allah ka ba da izinin kyamara a saitunan waya.');
+      return null;
     } else {
       // Web fallback (browser only)
       return await pickImageFromWeb('camera');
@@ -99,7 +110,18 @@ export async function takePhotoWithCamera(): Promise<string | null> {
     ) {
       return null;
     }
-    console.error('Camera error:', error);
+    console.warn('Camera error, trying fallback capture:', error);
+
+    // Fallback: If Capacitor Camera plugin threw an unexpected error, attempt webview camera capture
+    try {
+      const fallbackPhoto = await pickImageFromWeb('camera');
+      if (fallbackPhoto) {
+        return fallbackPhoto;
+      }
+    } catch (fallbackErr) {
+      console.error('Fallback camera error:', fallbackErr);
+    }
+
     alert('Ba a iya buɗe kyamara ba. Don Allah ka ba da izinin kyamara a saitunan waya.');
     return null;
   }
@@ -134,8 +156,12 @@ export async function pickPhotoFromGallery(): Promise<string | null> {
     ) {
       return null;
     }
-    console.error('Gallery error:', error);
-    return null;
+    console.warn('Native gallery encountered an issue, trying web file picker fallback:', error);
+    try {
+      return await pickImageFromWeb('photos');
+    } catch {
+      return null;
+    }
   }
 }
 
