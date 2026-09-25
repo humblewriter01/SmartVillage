@@ -25,6 +25,7 @@ import {
 } from '../services/healthService';
 import { voiceService } from '../services/voiceService';
 import { historyService } from '../services/historyService';
+import { cameraService } from '../services/cameraService';
 
 interface HealthScreenProps {
   locale: Language;
@@ -69,6 +70,41 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
       setPhotoUrl(url);
       setResult(null);
     }
+    e.target.value = '';
+  };
+
+  const handleTakePhoto = async () => {
+    if (cameraService.isNative()) {
+      try {
+        const photo = await cameraService.capturePhoto({ locale });
+        if (photo) {
+          setPhotoUrl(photo);
+          setResult(null);
+          showToast(locale === 'ha' ? 'An ɗauki hoto!' : 'Photo captured!');
+          return;
+        }
+      } catch (err) {
+        console.warn('Health camera fallback:', err);
+      }
+    }
+    cameraInputRef.current?.click();
+  };
+
+  const handlePickGallery = async () => {
+    if (cameraService.isNative()) {
+      try {
+        const photo = await cameraService.pickFromGallery(locale);
+        if (photo) {
+          setPhotoUrl(photo);
+          setResult(null);
+          showToast(locale === 'ha' ? 'An loda hoto daga gallery!' : 'Photo loaded!');
+          return;
+        }
+      } catch (err) {
+        console.warn('Health gallery fallback:', err);
+      }
+    }
+    fileInputRef.current?.click();
   };
 
   // Voice-to-Text & Voice Recording: Speak symptoms aloud
@@ -118,7 +154,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
     }
 
     const currentHealthId = getActiveHealthConditionId();
-    const started = voiceService.startListening(
+    const started = await voiceService.startListening(
       locale === 'ha' ? 'ha-NG' : 'en-NG',
       (recognizedText, rec) => {
         if (rec?.url) {
@@ -444,14 +480,14 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
             </p>
             <div className="flex justify-center gap-2 pt-1">
               <button
-                onClick={() => cameraInputRef.current?.click()}
+                onClick={handleTakePhoto}
                 className="py-1.5 px-3 border border-red-300 text-red-800 bg-white hover:bg-red-50 rounded-lg font-bold text-xs cursor-pointer shadow-2xs"
               >
                 <Camera className="w-3.5 h-3.5 inline mr-1 text-red-700" />
                 <span>{t(locale, 'takePhoto')}</span>
               </button>
               <button
-                onClick={() => fileInputRef.current?.click()}
+                onClick={handlePickGallery}
                 className="py-1.5 px-3 border border-red-300 text-red-800 bg-white hover:bg-red-50 rounded-lg font-bold text-xs cursor-pointer shadow-2xs"
               >
                 <ImageIcon className="w-3.5 h-3.5 inline mr-1 text-red-700" />

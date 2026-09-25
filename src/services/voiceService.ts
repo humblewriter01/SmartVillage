@@ -1,4 +1,9 @@
 // Advanced Offline & Web Speech Voice & Audio Recording Service for SmartVillage
+// Integrates Capacitor VoiceRecorder plugin with native APK support and seamless Web fallback.
+
+import { VoiceRecorder } from 'capacitor-voice-recorder';
+import { Capacitor } from '@capacitor/core';
+import { speakText, stopSpeakingText } from './ttsService';
 
 export type VoiceMode = 'developer' | 'system';
 export type VoiceCategory = 'greeting' | 'crop' | 'health';
@@ -10,6 +15,7 @@ export interface VoiceContext {
   healthId?: string;
   conditionId?: string;
   livestockType?: string;
+  animalId?: string;
   label?: string;
 }
 
@@ -48,12 +54,13 @@ let recordedChunks: Blob[] = [];
 let recordingStartTime = 0;
 let isCurrentlyRecording = false;
 let isSimulatedRecording = false;
+let isCapacitorRecording = false;
 let activeRecordingContext: VoiceContext | undefined = undefined;
 let lastRecordedAudio: VoiceRecordingResult | null = null;
 const permissionDeniedListeners = new Set<() => void>();
 const permissionGrantedListeners = new Set<() => void>();
 
-// PCM 16-bit WAV file generator (100% browser & mobile compatible)
+// PCM 16-bit WAV file generator
 function encodeWav(samples: Float32Array, sampleRate: number): Blob {
   const buffer = new ArrayBuffer(44 + samples.length * 2);
   const view = new DataView(buffer);
@@ -71,19 +78,18 @@ function encodeWav(samples: Float32Array, sampleRate: number): Blob {
 
   /* fmt sub-chunk */
   writeString(12, 'fmt ');
-  view.setUint32(16, 16, true); // Subchunk1Size (16 for PCM)
-  view.setUint16(20, 1, true); // AudioFormat (1 for PCM)
-  view.setUint16(22, 1, true); // NumChannels (1 mono)
-  view.setUint32(24, sampleRate, true); // SampleRate
-  view.setUint32(28, sampleRate * 2, true); // ByteRate (SampleRate * NumChannels * BitsPerSample/8)
-  view.setUint16(32, 2, true); // BlockAlign (NumChannels * BitsPerSample/8)
-  view.setUint16(34, 16, true); // BitsPerSample (16 bits)
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
 
   /* data sub-chunk */
   writeString(36, 'data');
   view.setUint32(40, samples.length * 2, true);
 
-  // Write PCM samples
   let offset = 44;
   for (let i = 0; i < samples.length; i++, offset += 2) {
     const s = Math.max(-1, Math.min(1, samples[i]));
@@ -93,22 +99,164 @@ function encodeWav(samples: Float32Array, sampleRate: number): Blob {
   return new Blob([view], { type: 'audio/wav' });
 }
 
-// Generate distinct sound waveforms for each crop, crop disease, and health condition
-function generateSyntheticVoiceBlob(durationSeconds: number, context?: VoiceContext): Blob {
+/**
+ * Generate distinct realistic sound waveforms:
+ * 1. Specific animal sounds for each of the 9 animals (Cow, Goat, Sheep, Chicken, Donkey, Camel, Pig, Duck, Turkey)
+ * 2. Specific crop sounds for plant problems
+ * 3. Diagnostic sounds for clinical conditions
+ */
+export function generateSyntheticVoiceBlob(durationSeconds: number, context?: VoiceContext): Blob {
   const sampleRate = 22050;
-  const numSamples = Math.floor(sampleRate * Math.max(1.5, Math.min(durationSeconds, 4.5)));
+  const numSamples = Math.floor(sampleRate * Math.max(1.2, Math.min(durationSeconds, 4.0)));
   const samples = new Float32Array(numSamples);
 
   const ctxType = context?.type || 'general';
+  const animalId = (context?.animalId || context?.livestockType || '').toLowerCase();
   const cropId = (context?.cropId || '').toLowerCase();
   const diseaseId = (context?.diseaseId || '').toLowerCase();
   const healthId = (context?.healthId || context?.conditionId || '').toLowerCase();
 
+  // -------------------------------------------------------------
+  // 1. LIVESTOCK ANIMAL SOUNDS (Exclusive to Animals / Dabbobi)
+  // -------------------------------------------------------------
+  if (ctxType === 'livestock' || animalId) {
+    if (animalId.includes('cow') || animalId.includes('cattle') || animalId.includes('saniya')) {
+      // COW / CATTLE: Low resonant "Moooo" (110Hz to 85Hz smooth dip with warm overtones)
+      for (let i = 0; i < numSamples; i++) {
+        const t = i / sampleRate;
+        const progress = i / numSamples;
+        const f0 = 108 - Math.sin(progress * Math.PI) * 22;
+        const env = Math.sin(progress * Math.PI) ** 0.8;
+        const wave =
+          0.6 * Math.sin(2 * Math.PI * f0 * t) +
+          0.3 * Math.sin(2 * Math.PI * (f0 * 2) * t) +
+          0.15 * Math.sin(2 * Math.PI * (f0 * 3) * t);
+        samples[i] = wave * env * 0.45;
+      }
+    } else if (animalId.includes('goat') || animalId.includes('akuya')) {
+      // GOAT: High vibrato bleat "Meh-eh-eh-eh" (250Hz with 12Hz rapid flutter)
+      for (let i = 0; i < numSamples; i++) {
+        const t = i / sampleRate;
+        const env = Math.sin((Math.PI * i) / numSamples);
+        const tremolo = 0.5 + 0.5 * Math.sin(2 * Math.PI * 12.0 * t);
+        const f0 = 240 + Math.sin(2 * Math.PI * 12.0 * t) * 15;
+        const wave =
+          (0.6 * Math.sin(2 * Math.PI * f0 * t) +
+            0.35 * Math.sin(2 * Math.PI * (f0 * 2) * t)) *
+          (0.4 + 0.6 * tremolo);
+        samples[i] = wave * env * 0.42;
+      }
+    } else if (animalId.includes('sheep') || animalId.includes('tinkiya')) {
+      // SHEEP: Warm resonant "Baa-aa-aa" (185Hz with 7.5Hz tremolo)
+      for (let i = 0; i < numSamples; i++) {
+        const t = i / sampleRate;
+        const env = Math.sin((Math.PI * i) / numSamples);
+        const tremolo = 0.5 + 0.5 * Math.sin(2 * Math.PI * 7.5 * t);
+        const f0 = 180 + Math.sin(2 * Math.PI * 7.5 * t) * 10;
+        const wave =
+          (0.65 * Math.sin(2 * Math.PI * f0 * t) +
+            0.28 * Math.sin(2 * Math.PI * (f0 * 2) * t)) *
+          (0.4 + 0.6 * tremolo);
+        samples[i] = wave * env * 0.44;
+      }
+    } else if (animalId.includes('chicken') || animalId.includes('kaza')) {
+      // CHICKEN: Rhythmic clucking "Bok-bok-ba-gawk"
+      for (let i = 0; i < numSamples; i++) {
+        const t = i / sampleRate;
+        const env = Math.sin((Math.PI * i) / numSamples);
+        const pulse = Math.abs(Math.sin(2 * Math.PI * 4.5 * t)) ** 3;
+        const f0 = 360 + pulse * 120;
+        const wave =
+          (0.6 * Math.sin(2 * Math.PI * f0 * t) +
+            0.3 * Math.sin(2 * Math.PI * (f0 * 2) * t)) *
+          pulse;
+        samples[i] = wave * env * 0.42;
+      }
+    } else if (animalId.includes('donkey') || animalId.includes('jaki')) {
+      // DONKEY: Alternating "Hee-Haw" (High 450Hz bray followed by raspy low 170Hz)
+      for (let i = 0; i < numSamples; i++) {
+        const t = i / sampleRate;
+        const env = Math.sin((Math.PI * i) / numSamples);
+        const phase = Math.sin(2 * Math.PI * 1.8 * t) > 0;
+        const f0 = phase ? 440 : 175;
+        const noise = (Math.random() * 2 - 1) * 0.08;
+        const wave =
+          (0.6 * Math.sin(2 * Math.PI * f0 * t) +
+            0.3 * Math.sin(2 * Math.PI * (f0 * 2) * t) +
+            noise);
+        samples[i] = wave * env * 0.4;
+      }
+    } else if (animalId.includes('camel') || animalId.includes('rakumi')) {
+      // CAMEL: Throaty deep desert rumble & grumble (72Hz sub-resonance)
+      for (let i = 0; i < numSamples; i++) {
+        const t = i / sampleRate;
+        const env = Math.sin((Math.PI * i) / numSamples);
+        const f0 = 72 + Math.sin(2 * Math.PI * 3.0 * t) * 6;
+        const grit = (Math.random() * 2 - 1) * 0.09;
+        const wave =
+          0.7 * Math.sin(2 * Math.PI * f0 * t) +
+          0.3 * Math.sin(2 * Math.PI * (f0 * 3) * t) +
+          grit;
+        samples[i] = wave * env * 0.46;
+      }
+    } else if (animalId.includes('pig') || animalId.includes('alade')) {
+      // PIG: Snorting "Oink / Grunt" (140Hz formant shift with staccato attack)
+      for (let i = 0; i < numSamples; i++) {
+        const t = i / sampleRate;
+        const env = Math.sin((Math.PI * i) / numSamples);
+        const pulse = Math.abs(Math.sin(2 * Math.PI * 5.0 * t)) ** 2;
+        const f0 = 135 + pulse * 40;
+        const wave =
+          (0.65 * Math.sin(2 * Math.PI * f0 * t) +
+            0.3 * Math.sin(2 * Math.PI * (f0 * 2) * t)) *
+          pulse;
+        samples[i] = wave * env * 0.44;
+      }
+    } else if (animalId.includes('duck') || animalId.includes('agwagwa')) {
+      // DUCK: Nasal "Quack-quack" (310Hz with double harmonics)
+      for (let i = 0; i < numSamples; i++) {
+        const t = i / sampleRate;
+        const env = Math.sin((Math.PI * i) / numSamples);
+        const pulse = Math.abs(Math.sin(2 * Math.PI * 3.8 * t)) ** 2;
+        const f0 = 310;
+        const wave =
+          (0.55 * Math.sin(2 * Math.PI * f0 * t) +
+            0.35 * Math.sin(2 * Math.PI * (f0 * 1.5) * t) +
+            0.15 * Math.sin(2 * Math.PI * (f0 * 2.5) * t)) *
+          pulse;
+        samples[i] = wave * env * 0.42;
+      }
+    } else if (animalId.includes('turkey') || animalId.includes('talotalo')) {
+      // TURKEY: Rapid "Gobble-gobble-gobble" (18Hz warbling frequency modulation)
+      for (let i = 0; i < numSamples; i++) {
+        const t = i / sampleRate;
+        const env = Math.sin((Math.PI * i) / numSamples);
+        const f0 = 420 + Math.sin(2 * Math.PI * 18.0 * t) * 90;
+        const wave =
+          0.6 * Math.sin(2 * Math.PI * f0 * t) +
+          0.3 * Math.sin(2 * Math.PI * (f0 * 2) * t);
+        samples[i] = wave * env * 0.42;
+      }
+    } else {
+      // Generic Pastoral Bell Tone
+      for (let i = 0; i < numSamples; i++) {
+        const t = i / sampleRate;
+        const env = Math.sin((Math.PI * i) / numSamples);
+        const f0 = 196.0;
+        const wave =
+          0.6 * Math.sin(2 * Math.PI * f0 * t) +
+          0.3 * Math.sin(2 * Math.PI * (f0 * 2) * t);
+        samples[i] = wave * env * 0.4;
+      }
+    }
+    return encodeWav(samples, sampleRate);
+  }
+
+  // -------------------------------------------------------------
+  // 2. CROPS SOUND SYNTHESIZER (Soil & Plant Timbre)
+  // -------------------------------------------------------------
   if (ctxType === 'crop' || cropId || diseaseId) {
-    // -------------------------------------------------------------
-    // CROP SOUND SYNTHESIZER: Individual sonic signature per crop
-    // -------------------------------------------------------------
-    let baseF0 = 220; // Default A3
+    let baseF0 = 220;
     let harmonic2Weight = 0.35;
     let harmonic3Weight = 0.15;
     let vibratoRate = 4.0;
@@ -117,15 +265,13 @@ function generateSyntheticVoiceBlob(durationSeconds: number, context?: VoiceCont
     let rusticNoise = 0.02;
 
     if (cropId.includes('onion') || cropId === 'albasa') {
-      // Onion (Albasa): Crisp 220Hz with bright odd harmonics (allium sharpness)
       baseF0 = 220.0;
       harmonic2Weight = 0.45;
       harmonic3Weight = 0.3;
       vibratoRate = 5.2;
       vibratoDepth = 8.0;
       rusticNoise = 0.03;
-    } else if (cropId.includes('maize') || cropId === 'masara' || cropId.includes('corn')) {
-      // Maize (Masara): Deep golden harvest tone (130.8Hz C3) with rich 65.4Hz sub-bass
+    } else if (cropId.includes('maize') || cropId === 'masara') {
       baseF0 = 130.8;
       harmonic2Weight = 0.4;
       harmonic3Weight = 0.18;
@@ -133,100 +279,43 @@ function generateSyntheticVoiceBlob(durationSeconds: number, context?: VoiceCont
       vibratoRate = 3.2;
       vibratoDepth = 5.0;
     } else if (cropId.includes('tomato') || cropId === 'tumatur') {
-      // Tomato (Tumatir): Lush vibrant garden tone (246.9Hz B3) with warm vibrato
       baseF0 = 246.9;
       harmonic2Weight = 0.38;
       harmonic3Weight = 0.12;
       vibratoRate = 4.6;
       vibratoDepth = 10.0;
     } else if (cropId.includes('rice') || cropId === 'shinkafa') {
-      // Rice (Shinkafa): Tranquil shimmer (293.7Hz D4) like flooded paddies
       baseF0 = 293.7;
       harmonic2Weight = 0.25;
-      harmonic3Weight = 0.35; // Higher sparkling overtone
+      harmonic3Weight = 0.35;
       vibratoRate = 3.8;
       vibratoDepth = 7.0;
       rusticNoise = 0.04;
     } else if (cropId.includes('sorghum') || cropId === 'dawa') {
-      // Sorghum (Dawa): Resonant savanna stalk timbre (146.8Hz D3)
       baseF0 = 146.8;
       harmonic2Weight = 0.35;
       harmonic3Weight = 0.22;
       subHarmonicWeight = 0.2;
       vibratoRate = 3.0;
       vibratoDepth = 6.0;
-    } else if (cropId.includes('millet') || cropId === 'gero') {
-      // Millet (Gero): Earthy Sahelian cereal tone (174.6Hz F3) with tremolo
-      baseF0 = 174.6;
-      harmonic2Weight = 0.3;
-      harmonic3Weight = 0.2;
-      vibratoRate = 6.0;
-      vibratoDepth = 9.0;
-    } else if (cropId.includes('cowpea') || cropId === 'wake' || cropId.includes('bean')) {
-      // Cowpea / Beans (Wake): Dual-tone legume warmth (196.0Hz G3)
+    } else if (cropId.includes('cowpea') || cropId === 'wake') {
       baseF0 = 196.0;
       harmonic2Weight = 0.42;
       harmonic3Weight = 0.15;
-      subHarmonicWeight = 0.15;
-    } else if (cropId.includes('groundnut') || cropId === 'gyada' || cropId.includes('peanut')) {
-      // Groundnut (Gyada): Grounded subterranean resonance (123.5Hz B2)
-      baseF0 = 123.5;
-      harmonic2Weight = 0.38;
-      subHarmonicWeight = 0.3;
-    } else if (cropId.includes('cassava') || cropId === 'rogo') {
-      // Cassava (Rogo): Deep rooted tuber acoustic resonance (110.0Hz A2)
-      baseF0 = 110.0;
-      harmonic2Weight = 0.3;
-      subHarmonicWeight = 0.4;
-    } else if (cropId.includes('yam') || cropId === 'doya') {
-      // Yam (Doya): Full-bodied rich tuber harmony (116.5Hz Bb2)
-      baseF0 = 116.5;
-      harmonic2Weight = 0.35;
-      subHarmonicWeight = 0.35;
-    } else if (cropId.includes('pepper') || cropId === 'barkono') {
-      // Pepper (Barkono): Bright, lively, zesty rapid harmonic pulse (329.6Hz E4)
-      baseF0 = 329.6;
-      harmonic2Weight = 0.45;
-      harmonic3Weight = 0.3;
-      vibratoRate = 7.0;
-      vibratoDepth = 12.0;
-    } else if (cropId.includes('wheat') || cropId === 'alkama') {
-      // Wheat (Alkama): Sweeping golden grain acoustic swell (261.6Hz C4)
-      baseF0 = 261.6;
-      harmonic2Weight = 0.32;
-      harmonic3Weight = 0.25;
-      rusticNoise = 0.05;
     } else if (cropId.includes('soybean')) {
-      // Soybeans (Waken Soya): Balanced protein grain harmonic (185.0Hz F#3)
       baseF0 = 185.0;
       harmonic2Weight = 0.36;
       harmonic3Weight = 0.18;
     }
 
-    // Specific crop disease acoustic modulation
     const isRust = diseaseId.includes('rust') || diseaseId.includes('tsatsa');
     const isBlight = diseaseId.includes('blight') || diseaseId.includes('cuta');
-    const isBlast = diseaseId.includes('blast');
-    const isAlternaria = diseaseId.includes('alternaria') || diseaseId.includes('purple');
-    const isMosaicOrCurl = diseaseId.includes('mosaic') || diseaseId.includes('curl');
-    const isPest = diseaseId.includes('caterpillar') || diseaseId.includes('borer') || diseaseId.includes('tsutsa');
 
     for (let i = 0; i < numSamples; i++) {
       const t = i / sampleRate;
       let f0 = baseF0 + Math.sin(2 * Math.PI * vibratoRate * t) * vibratoDepth;
-
-      if (isMosaicOrCurl) {
-        // Wavy sinusoidal contour
-        f0 += Math.sin(2 * Math.PI * 1.5 * t) * 22;
-      } else if (isAlternaria) {
-        // Two-tone alternating purple shimmer
-        f0 += Math.sin(2 * Math.PI * 3.0 * t) > 0 ? 18 : -14;
-      }
-
-      // Smooth attack and release envelope
       const env = Math.sin((Math.PI * i) / numSamples);
 
-      // Synthesis with harmonics
       let wave =
         0.5 * Math.sin(2 * Math.PI * f0 * t) +
         harmonic2Weight * Math.sin(2 * Math.PI * (f0 * 2) * t) +
@@ -235,177 +324,49 @@ function generateSyntheticVoiceBlob(durationSeconds: number, context?: VoiceCont
       if (subHarmonicWeight > 0) {
         wave += subHarmonicWeight * Math.sin(2 * Math.PI * (f0 * 0.5) * t);
       }
-
       if (isBlight) {
-        // Cautionary minor-third overtone inflection
         wave += 0.22 * Math.sin(2 * Math.PI * (f0 * 1.189) * t);
       }
-
-      if (isRust) {
-        // Rustling granular noise
-        wave += (Math.random() * 2 - 1) * 0.1;
-      } else if (rusticNoise > 0) {
-        wave += (Math.random() * 2 - 1) * rusticNoise;
-      }
-
-      if (isPest) {
-        // 8Hz flutter tremolo
-        wave *= 0.75 + 0.25 * Math.sin(2 * Math.PI * 8.0 * t);
-      } else if (isBlast) {
-        // Staccato pulsing
-        wave *= 0.6 + 0.4 * Math.abs(Math.sin(2 * Math.PI * 4.0 * t));
+      if (isRust || rusticNoise > 0) {
+        wave += (Math.random() * 2 - 1) * (isRust ? 0.08 : rusticNoise);
       }
 
       samples[i] = wave * env * 0.42;
     }
-  } else if (ctxType === 'health' || healthId) {
-    // -------------------------------------------------------------
-    // HEALTH SOUND SYNTHESIZER: Distinct clinical & diagnostic tones
-    // -------------------------------------------------------------
-    for (let i = 0; i < numSamples; i++) {
-      const t = i / sampleRate;
-      const env = Math.sin((Math.PI * i) / numSamples);
-      let wave = 0;
-
-      if (healthId.includes('malaria') || healthId.includes('sauro')) {
-        // Malaria (Fever): 329.6Hz (E4) with rhythmic 75 BPM cardiac pulse heartbeat modulation ("lub-dub")
-        const heartPeriod = t % 0.8;
-        let heartPulse = 0.35;
-        if (heartPeriod < 0.12) {
-          heartPulse = 1.0; // Lub
-        } else if (heartPeriod >= 0.18 && heartPeriod < 0.3) {
-          heartPulse = 0.8; // Dub
-        }
-        const f0 = 329.6 + Math.sin(2 * Math.PI * 2.0 * t) * 6;
-        wave =
-          (0.6 * Math.sin(2 * Math.PI * f0 * t) +
-            0.25 * Math.sin(2 * Math.PI * (f0 * 2) * t) +
-            0.15 * Math.sin(2 * Math.PI * (f0 * 3) * t)) *
-          heartPulse;
-      } else if (healthId.includes('cholera') || healthId.includes('diarrhea') || healthId.includes('kwalara') || healthId.includes('gudawa')) {
-        // Cholera & Diarrhea: Fluid water-drop cascading acoustic harmonics (392Hz G4 with smooth restorative ripple)
-        const ripple = Math.sin(2 * Math.PI * 4.5 * t);
-        const f0 = 392.0 + ripple * 20;
-        wave =
-          0.6 * Math.sin(2 * Math.PI * f0 * t) +
-          0.3 * Math.sin(2 * Math.PI * (f0 * 1.5) * t) +
-          0.1 * Math.sin(2 * Math.PI * (f0 * 2.5) * t);
-      } else if (healthId.includes('typhoid') || healthId.includes('taifot')) {
-        // Typhoid: Step-ladder rising 3-note melodic sequence (D4 -> F#4 -> A4)
-        const step = Math.floor((t * 2.2) % 3);
-        const notes = [293.7, 370.0, 440.0];
-        const f0 = notes[step];
-        wave =
-          0.6 * Math.sin(2 * Math.PI * f0 * t) +
-          0.28 * Math.sin(2 * Math.PI * (f0 * 2) * t) +
-          0.12 * Math.sin(2 * Math.PI * (f0 * 3) * t);
-      } else if (healthId.includes('snake') || healthId.includes('maciji')) {
-        // Snakebite: Urgent clinical attention two-tone chime (440Hz -> 330Hz)
-        const step = Math.floor((t * 3.0) % 2);
-        const f0 = step === 0 ? 440.0 : 330.0;
-        wave =
-          0.65 * Math.sin(2 * Math.PI * f0 * t) +
-          0.25 * Math.sin(2 * Math.PI * (f0 * 2) * t) +
-          0.1 * Math.sin(2 * Math.PI * (f0 * 3) * t);
-      } else if (healthId.includes('pneumonia') || healthId.includes('nimoniya') || healthId.includes('respiratory')) {
-        // Pneumonia: 220Hz (A3) with respiratory breath-swell acoustic modulation (gentle in-and-out swell)
-        const breathSwell = 0.5 + 0.5 * Math.sin(2 * Math.PI * 0.45 * t);
-        const f0 = 220.0 + breathSwell * 8;
-        wave =
-          (0.6 * Math.sin(2 * Math.PI * f0 * t) +
-            0.25 * Math.sin(2 * Math.PI * (f0 * 2) * t) +
-            0.08 * (Math.random() * 2 - 1)) *
-          (0.4 + 0.6 * breathSwell);
-      } else if (healthId.includes('measles') || healthId.includes('kyanda')) {
-        // Measles: Pediatric soothing bell chime (349.2Hz F4)
-        const f0 = 349.2;
-        wave =
-          0.65 * Math.sin(2 * Math.PI * f0 * t) +
-          0.25 * Math.sin(2 * Math.PI * (f0 * 2) * t) +
-          0.1 * Math.sin(2 * Math.PI * (f0 * 4) * t);
-      } else if (healthId.includes('meningitis') || healthId.includes('sankarau')) {
-        // Meningitis: Focused clinical diagnostic tone (370.0Hz F#4)
-        const f0 = 370.0;
-        wave =
-          0.6 * Math.sin(2 * Math.PI * f0 * t) +
-          0.3 * Math.sin(2 * Math.PI * (f0 * 2) * t) +
-          0.1 * Math.sin(2 * Math.PI * (f0 * 3) * t);
-      } else if (healthId.includes('heat') || healthId.includes('zafi')) {
-        // Heat exhaustion: Cooling shimmering tremolo (277.2Hz C#4)
-        const shimmer = 0.7 + 0.3 * Math.sin(2 * Math.PI * 6.5 * t);
-        const f0 = 277.2 + Math.sin(2 * Math.PI * 2.0 * t) * 8;
-        wave =
-          (0.65 * Math.sin(2 * Math.PI * f0 * t) +
-            0.25 * Math.sin(2 * Math.PI * (f0 * 2) * t)) *
-          shimmer;
-      } else if (healthId.includes('dehydration') || healthId.includes('kishirwa')) {
-        // Severe dehydration: Fluid droplet revival cadence (415.3Hz G#4)
-        const f0 = 415.3 + Math.sin(2 * Math.PI * 3.5 * t) * 15;
-        wave =
-          0.6 * Math.sin(2 * Math.PI * f0 * t) +
-          0.3 * Math.sin(2 * Math.PI * (f0 * 2) * t);
-      } else if (healthId.includes('skin') || healthId.includes('scabies') || healthId.includes('kazuwa') || healthId.includes('fata')) {
-        // Skin / Scabies: Gentle dermatologic soothing wave (207.6Hz G#3)
-        const f0 = 207.6 + Math.sin(2 * Math.PI * 2.5 * t) * 6;
-        wave =
-          0.65 * Math.sin(2 * Math.PI * f0 * t) +
-          0.25 * Math.sin(2 * Math.PI * (f0 * 2) * t) +
-          0.1 * Math.sin(2 * Math.PI * (f0 * 3) * t);
-      } else {
-        // General clinical tone (330Hz E4)
-        const f0 = 330.0 + Math.sin(2 * Math.PI * 3.0 * t) * 8;
-        wave =
-          0.6 * Math.sin(2 * Math.PI * f0 * t) +
-          0.28 * Math.sin(2 * Math.PI * (f0 * 2) * t) +
-          0.12 * Math.sin(2 * Math.PI * (f0 * 3) * t);
-      }
-
-      samples[i] = wave * env * 0.42;
-    }
-  } else if (ctxType === 'livestock') {
-    // Livestock: Warm pastoral bell harmonics (196.0Hz G3)
-    for (let i = 0; i < numSamples; i++) {
-      const t = i / sampleRate;
-      const env = Math.sin((Math.PI * i) / numSamples);
-      const f0 = 196.0 + Math.sin(2 * Math.PI * 2.5 * t) * 5;
-      const wave =
-        0.5 * Math.sin(2 * Math.PI * f0 * t) +
-        0.3 * Math.sin(2 * Math.PI * (f0 * 2) * t) +
-        0.2 * Math.sin(2 * Math.PI * (f0 * 3) * t);
-      samples[i] = wave * env * 0.42;
-    }
-  } else if (ctxType === 'water') {
-    // Water: Crystal water droplet chime (523.2Hz C5)
-    for (let i = 0; i < numSamples; i++) {
-      const t = i / sampleRate;
-      const env = Math.sin((Math.PI * i) / numSamples);
-      const f0 = 523.2 + Math.sin(2 * Math.PI * 5.0 * t) * 12;
-      const wave =
-        0.65 * Math.sin(2 * Math.PI * f0 * t) +
-        0.25 * Math.sin(2 * Math.PI * (f0 * 2) * t) +
-        0.1 * Math.sin(2 * Math.PI * (f0 * 3) * t);
-      samples[i] = wave * env * 0.4;
-    }
-  } else {
-    // General / Home: Harmonic major chord greeting (A4 440Hz -> C#5 554.4Hz -> E5 659.3Hz)
-    for (let i = 0; i < numSamples; i++) {
-      const t = i / sampleRate;
-      const env = Math.sin((Math.PI * i) / numSamples);
-      const step = Math.floor((t * 2.5) % 3);
-      const notes = [440.0, 554.4, 659.3];
-      const f0 = notes[step];
-      const wave =
-        0.6 * Math.sin(2 * Math.PI * f0 * t) +
-        0.25 * Math.sin(2 * Math.PI * (f0 * 2) * t) +
-        0.15 * Math.sin(2 * Math.PI * (f0 * 3) * t);
-      samples[i] = wave * env * 0.42;
-    }
+    return encodeWav(samples, sampleRate);
   }
 
+  // -------------------------------------------------------------
+  // 3. HEALTH & CLINICAL SYNTHESIZER
+  // -------------------------------------------------------------
+  if (ctxType === 'health' || healthId) {
+    for (let i = 0; i < numSamples; i++) {
+      const t = i / sampleRate;
+      const env = Math.sin((Math.PI * i) / numSamples);
+      const f0 = 330.0 + Math.sin(2 * Math.PI * 3.0 * t) * 8;
+      const wave =
+        0.6 * Math.sin(2 * Math.PI * f0 * t) +
+        0.28 * Math.sin(2 * Math.PI * (f0 * 2) * t);
+      samples[i] = wave * env * 0.42;
+    }
+    return encodeWav(samples, sampleRate);
+  }
+
+  // General Tone
+  for (let i = 0; i < numSamples; i++) {
+    const t = i / sampleRate;
+    const env = Math.sin((Math.PI * i) / numSamples);
+    const step = Math.floor((t * 2.5) % 3);
+    const notes = [440.0, 554.4, 659.3];
+    const f0 = notes[step];
+    const wave =
+      0.6 * Math.sin(2 * Math.PI * f0 * t) +
+      0.25 * Math.sin(2 * Math.PI * (f0 * 2) * t);
+    samples[i] = wave * env * 0.42;
+  }
   return encodeWav(samples, sampleRate);
 }
 
-// Check which audio MIME types the device's MediaRecorder supports
 function getSupportedMimeType(): string {
   if (typeof MediaRecorder === 'undefined') return '';
   const candidateTypes = [
@@ -441,7 +402,6 @@ export const voiceService = {
     return lastRecordedAudio;
   },
 
-  // Generates or retrieves on-demand distinctive audio for any crop, disease, or health condition
   getCropOrHealthAudio(context: VoiceContext, durationSeconds = 2.4): VoiceRecordingResult {
     const blob = generateSyntheticVoiceBlob(durationSeconds, context);
     const url = URL.createObjectURL(blob);
@@ -455,13 +415,34 @@ export const voiceService = {
     };
   },
 
-  // Directly plays the distinctive sound of any crop, disease, or health condition
+  getAnimalSoundAudio(animalId: string, durationSeconds = 2.0): VoiceRecordingResult {
+    const context: VoiceContext = {
+      type: 'livestock',
+      animalId,
+      label: `Animal Sound: ${animalId}`,
+    };
+    const blob = generateSyntheticVoiceBlob(durationSeconds, context);
+    const url = URL.createObjectURL(blob);
+    return {
+      url,
+      blob,
+      durationMs: Math.round(durationSeconds * 1000),
+      isSimulated: true,
+      timestamp: Date.now(),
+      context,
+    };
+  },
+
+  async playAnimalSound(animalId: string): Promise<void> {
+    const res = this.getAnimalSoundAudio(animalId);
+    await this.playAudioUrl(res.url);
+  },
+
   async playContextSound(context: VoiceContext, durationSeconds = 2.4): Promise<void> {
     const audioRes = this.getCropOrHealthAudio(context, durationSeconds);
     await this.playAudioUrl(audioRes.url);
   },
 
-  // Grandma Voice: Store trained voice samples in Hausa
   saveTrainedVoice(category: VoiceCategory, audioDataUrl: string): void {
     try {
       localStorage.setItem(`smartvillage.grandma_voice.${category}`, audioDataUrl);
@@ -486,17 +467,6 @@ export const voiceService = {
     );
   },
 
-  clearTrainedVoice(category?: VoiceCategory): void {
-    if (category) {
-      localStorage.removeItem(`smartvillage.grandma_voice.${category}`);
-    } else {
-      localStorage.removeItem('smartvillage.grandma_voice.greeting');
-      localStorage.removeItem('smartvillage.grandma_voice.crop');
-      localStorage.removeItem('smartvillage.grandma_voice.health');
-    }
-  },
-
-  // Play audio url directly
   playAudioUrl(url: string): Promise<void> {
     return new Promise((resolve) => {
       this.stopSpeaking();
@@ -521,23 +491,11 @@ export const voiceService = {
     });
   },
 
-  playLastRecording(): Promise<void> {
-    if (lastRecordedAudio?.url) {
-      return this.playAudioUrl(lastRecordedAudio.url);
-    }
-    return Promise.resolve();
-  },
-
-  isSpeechRecognitionSupported(): boolean {
-    const win = window as unknown as IWindow;
-    return Boolean(win.SpeechRecognition || win.webkitSpeechRecognition);
-  },
-
   isMicrophoneSupported(): boolean {
     return Boolean(
       (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) ||
       (navigator as any).getUserMedia ||
-      (navigator as any).webkitGetUserMedia
+      Capacitor.isNativePlatform()
     );
   },
 
@@ -571,10 +529,361 @@ export const voiceService = {
     });
   },
 
+  playAudioCue(type: 'start' | 'stop' | 'success', contextType: 'crop' | 'health' | 'general' = 'general'): void {
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+      if (!currentAudioContext) {
+        currentAudioContext = new AudioCtx();
+      }
+      if (currentAudioContext.state === 'suspended') {
+        currentAudioContext.resume();
+      }
+
+      const ctx = currentAudioContext;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      const now = ctx.currentTime;
+      if (type === 'start') {
+        osc.frequency.setValueAtTime(320, now);
+        osc.frequency.exponentialRampToValueAtTime(520, now + 0.12);
+        gain.gain.setValueAtTime(0.12, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.18);
+        osc.start(now);
+        osc.stop(now + 0.18);
+      } else if (type === 'stop') {
+        osc.frequency.setValueAtTime(520, now);
+        osc.frequency.exponentialRampToValueAtTime(260, now + 0.12);
+        gain.gain.setValueAtTime(0.12, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.18);
+        osc.start(now);
+        osc.stop(now + 0.18);
+      }
+    } catch {}
+  },
+
   /**
-   * Check browser microphone permission state.
-   * If 'granted', the browser will never prompt again.
+   * Start listening & recording the user's voice.
+   * Completely wrapped in try/catch to NEVER CRASH.
+   * Uses Capacitor VoiceRecorder on mobile/native, with MediaRecorder / simulated fallback on web.
    */
+  async startListening(
+    localeId: string,
+    onResult: (text: string, recording?: VoiceRecordingResult) => void,
+    onError?: (err: string) => void,
+    onEnd?: (recording?: VoiceRecordingResult) => void,
+    context?: VoiceContext
+  ): Promise<boolean> {
+    try {
+      if (isCurrentlyRecording) {
+        await this.stopListening();
+      }
+
+      isCurrentlyRecording = true;
+      isSimulatedRecording = false;
+      isCapacitorRecording = false;
+      recordedChunks = [];
+      recordingStartTime = Date.now();
+      activeRecordingContext = context;
+      let latestTranscript = '';
+
+      const cueCategory = context?.type === 'crop' ? 'crop' : context?.type === 'health' ? 'health' : 'general';
+      this.playAudioCue('start', cueCategory);
+
+      // 1. Attempt Capacitor VoiceRecorder plugin (for Android APK and supported browsers)
+      try {
+        const canRecord = await VoiceRecorder.canDeviceVoiceRecord().catch(() => ({ value: false }));
+        if (canRecord.value) {
+          const perm = await VoiceRecorder.hasAudioRecordingPermission().catch(() => ({ value: false }));
+          let hasPerm = perm.value;
+          if (!hasPerm) {
+            const requested = await VoiceRecorder.requestAudioRecordingPermission().catch(() => ({ value: false }));
+            hasPerm = requested.value;
+          }
+
+          if (hasPerm) {
+            const started = await VoiceRecorder.startRecording().catch(() => ({ value: false }));
+            if (started.value) {
+              isCapacitorRecording = true;
+              this.notifyPermissionGranted();
+            }
+          } else {
+            console.warn('VoiceRecorder permission denied');
+            const isHausa = localeId === 'ha' || localeId === 'ha-NG';
+            alert(
+              isHausa
+                ? 'An hana izinin amfani da makirufo. Da fatan ka ba da izini a saitunan waya.'
+                : 'Microphone permission denied. Please grant microphone access in settings.'
+            );
+            this.notifyPermissionDenied();
+          }
+        }
+      } catch (pluginErr) {
+        console.warn('VoiceRecorder plugin not usable, falling back:', pluginErr);
+      }
+
+      // 2. Parallel SpeechRecognition for live transcription
+      try {
+        const win = window as unknown as IWindow;
+        const SpeechRec = win.SpeechRecognition || win.webkitSpeechRecognition;
+        if (SpeechRec) {
+          const recognition = new SpeechRec();
+          recognition.continuous = false;
+          recognition.interimResults = true;
+          recognition.lang = localeId === 'ha' || localeId === 'ha-NG' ? 'ha-NG' : 'en-NG';
+
+          recognition.onresult = (event: SpeechRecognitionEvent) => {
+            let transcript = '';
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+              transcript += event.results[i][0].transcript;
+            }
+            if (transcript.trim()) {
+              latestTranscript = transcript.trim();
+              onResult(latestTranscript, lastRecordedAudio || undefined);
+            }
+          };
+
+          recognition.onerror = (e: SpeechRecognitionErrorEvent) => {
+            console.warn('SpeechRecognition error:', e.error);
+          };
+
+          recognition.onend = () => {
+            activeRecognition = null;
+          };
+
+          recognition.start();
+          activeRecognition = recognition;
+        }
+      } catch (speechErr) {
+        console.warn('SpeechRecognition failed to start:', speechErr);
+      }
+
+      // 3. If Capacitor VoiceRecorder did not activate, fallback to MediaRecorder
+      if (!isCapacitorRecording && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        navigator.mediaDevices
+          .getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } })
+          .then((stream) => {
+            if (!isCurrentlyRecording) {
+              stream.getTracks().forEach((t) => t.stop());
+              return;
+            }
+            activeMediaStream = stream;
+            const mimeType = getSupportedMimeType();
+            const options = mimeType ? { mimeType } : undefined;
+
+            try {
+              const recorder = new MediaRecorder(stream, options);
+              activeMediaRecorder = recorder;
+              recorder.ondataavailable = (e) => {
+                if (e.data && e.data.size > 0) {
+                  recordedChunks.push(e.data);
+                }
+              };
+              recorder.onstop = () => {
+                const mime = recorder.mimeType || 'audio/webm';
+                const audioBlob = new Blob(recordedChunks, { type: mime });
+                const durationMs = Date.now() - recordingStartTime;
+                const audioUrl = URL.createObjectURL(audioBlob);
+
+                const result: VoiceRecordingResult = {
+                  url: audioUrl,
+                  blob: audioBlob,
+                  durationMs,
+                  transcript: latestTranscript || undefined,
+                  isSimulated: false,
+                  timestamp: Date.now(),
+                  context: activeRecordingContext,
+                };
+                lastRecordedAudio = result;
+                onEnd?.(result);
+              };
+              recorder.start(100);
+            } catch {
+              isSimulatedRecording = true;
+            }
+          })
+          .catch((err) => {
+            console.warn('getUserMedia error:', err);
+            isSimulatedRecording = true;
+          });
+      } else if (!isCapacitorRecording) {
+        isSimulatedRecording = true;
+      }
+
+      return true;
+    } catch (criticalErr) {
+      console.warn('Critical error in startListening caught safely:', criticalErr);
+      onError?.(String(criticalErr));
+      return false;
+    }
+  },
+
+  /**
+   * Stop voice listening and finalize the audio recording
+   * Wrapped in try/catch to NEVER CRASH.
+   */
+  async stopListening(): Promise<VoiceRecordingResult | null> {
+    try {
+      if (!isCurrentlyRecording) {
+        return lastRecordedAudio;
+      }
+
+      const cueCategory = activeRecordingContext?.type === 'crop' ? 'crop' : activeRecordingContext?.type === 'health' ? 'health' : 'general';
+      this.playAudioCue('stop', cueCategory);
+      isCurrentlyRecording = false;
+
+      // Stop speech recognition
+      if (activeRecognition) {
+        try {
+          activeRecognition.stop();
+        } catch {}
+        activeRecognition = null;
+      }
+
+      // If Capacitor VoiceRecorder was recording:
+      if (isCapacitorRecording) {
+        try {
+          const recording = await VoiceRecorder.stopRecording().catch(() => null);
+          isCapacitorRecording = false;
+          if (recording?.value?.recordDataBase64) {
+            const mime = recording.value.mimeType || 'audio/aac';
+            const dataUrl = `data:${mime};base64,${recording.value.recordDataBase64}`;
+            const byteChars = atob(recording.value.recordDataBase64);
+            const byteNums = new Array(byteChars.length);
+            for (let i = 0; i < byteChars.length; i++) {
+              byteNums[i] = byteChars.charCodeAt(i);
+            }
+            const byteArray = new Uint8Array(byteNums);
+            const blob = new Blob([byteArray], { type: mime });
+
+            const result: VoiceRecordingResult = {
+              url: dataUrl,
+              dataUrl,
+              blob,
+              durationMs: recording.value.msDuration || Date.now() - recordingStartTime,
+              isSimulated: false,
+              timestamp: Date.now(),
+              context: activeRecordingContext,
+            };
+            lastRecordedAudio = result;
+            return result;
+          }
+        } catch (capErr) {
+          console.warn('Capacitor stopRecording error:', capErr);
+        }
+      }
+
+      // If MediaRecorder was active:
+      if (activeMediaRecorder && activeMediaRecorder.state !== 'inactive') {
+        const recorder = activeMediaRecorder;
+        return new Promise((resolve) => {
+          recorder.onstop = () => {
+            const mime = recorder.mimeType || 'audio/webm';
+            const audioBlob = new Blob(recordedChunks, { type: mime });
+            const durationMs = Date.now() - recordingStartTime;
+            const audioUrl = URL.createObjectURL(audioBlob);
+
+            if (activeMediaStream) {
+              activeMediaStream.getTracks().forEach((track) => track.stop());
+              activeMediaStream = null;
+            }
+            activeMediaRecorder = null;
+
+            const result: VoiceRecordingResult = {
+              url: audioUrl,
+              blob: audioBlob,
+              durationMs,
+              isSimulated: false,
+              timestamp: Date.now(),
+              context: activeRecordingContext,
+            };
+            lastRecordedAudio = result;
+            resolve(result);
+          };
+          try {
+            recorder.stop();
+          } catch {
+            resolve(lastRecordedAudio);
+          }
+        });
+      }
+
+      if (activeMediaStream) {
+        activeMediaStream.getTracks().forEach((track) => track.stop());
+        activeMediaStream = null;
+      }
+
+      // Fallback: Generate clean audio so user gets valid playback and no blank/broken audio
+      const durationSec = Math.max(1.5, (Date.now() - recordingStartTime) / 1000);
+      const synthBlob = generateSyntheticVoiceBlob(durationSec, activeRecordingContext);
+      const synthUrl = URL.createObjectURL(synthBlob);
+
+      const result: VoiceRecordingResult = {
+        url: synthUrl,
+        blob: synthBlob,
+        durationMs: Math.round(durationSec * 1000),
+        isSimulated: true,
+        timestamp: Date.now(),
+        context: activeRecordingContext,
+      };
+
+      lastRecordedAudio = result;
+      return result;
+    } catch (err) {
+      console.warn('Error in stopListening safely handled:', err);
+      return lastRecordedAudio;
+    }
+  },
+
+  /**
+   * Speak aloud using TTS service with Hausa ('ha-NG') and English fallback ('en-NG')
+   */
+  async speak(
+    text: string,
+    language: string,
+    onWarning?: (warning: string) => void,
+    category?: VoiceCategory
+  ): Promise<void> {
+    const isHausa = language === 'ha' || language === 'ha-NG';
+
+    if (isHausa) {
+      const trainedAudio =
+        this.getTrainedVoice(category || 'greeting') || this.getTrainedVoice('greeting');
+      if (trainedAudio) {
+        try {
+          await this.playAudioUrl(trainedAudio);
+          return;
+        } catch {}
+      }
+    }
+
+    try {
+      await speakText(text, language);
+    } catch (e) {
+      console.warn('TTS execution caught in voiceService:', e);
+      onWarning?.(
+        isHausa
+          ? 'An kasa kunna sauti. Da fatan ka duba saitunan muryar wayarka.'
+          : 'Unable to speak text. Please check device audio settings.'
+      );
+    }
+  },
+
+  stopSpeaking(): void {
+    if (activeAudioPlayer) {
+      try {
+        activeAudioPlayer.pause();
+        activeAudioPlayer.currentTime = 0;
+      } catch {}
+      activeAudioPlayer = null;
+    }
+    stopSpeakingText().catch(() => {});
+  },
+
   async checkMicrophonePermission(): Promise<'granted' | 'denied' | 'prompt' | 'unknown'> {
     try {
       if (navigator.permissions && navigator.permissions.query) {
@@ -605,9 +914,7 @@ export const voiceService = {
 
         return status.state;
       }
-    } catch {
-      // Browser doesn't support querying microphone permission
-    }
+    } catch {}
 
     try {
       const stored = localStorage.getItem('smartvillage.mic_permission');
@@ -618,18 +925,12 @@ export const voiceService = {
     return 'unknown';
   },
 
-  /**
-   * Request microphone permission explicitly via user gesture.
-   * If user previously blocked it in their address bar, this tests whether they've
-   * now unblocked it or prompts the browser.
-   */
   async requestMicrophonePermission(): Promise<boolean> {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       return false;
     }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      // Immediately stop the temporary test tracks
       stream.getTracks().forEach((track) => track.stop());
       try {
         localStorage.setItem('smartvillage.mic_permission', 'granted');
@@ -653,447 +954,6 @@ export const voiceService = {
     }
   },
 
-  // Play a soft auditory chime to indicate listening/recording started or completed
-  playAudioCue(type: 'start' | 'stop' | 'success', contextType: 'crop' | 'health' | 'general' = 'general'): void {
-    try {
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-      if (!AudioCtx) return;
-      if (!currentAudioContext) {
-        currentAudioContext = new AudioCtx();
-      }
-      if (currentAudioContext.state === 'suspended') {
-        currentAudioContext.resume();
-      }
-
-      const ctx = currentAudioContext;
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-
-      const now = ctx.currentTime;
-      // Tone customization based on context
-      if (contextType === 'crop') {
-        // Earthy warm wooden/marimba chime
-        if (type === 'start') {
-          osc.frequency.setValueAtTime(260, now);
-          osc.frequency.exponentialRampToValueAtTime(390, now + 0.14);
-          gain.gain.setValueAtTime(0.14, now);
-          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
-          osc.start(now);
-          osc.stop(now + 0.2);
-        } else if (type === 'stop') {
-          osc.frequency.setValueAtTime(390, now);
-          osc.frequency.exponentialRampToValueAtTime(220, now + 0.14);
-          gain.gain.setValueAtTime(0.12, now);
-          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.18);
-          osc.start(now);
-          osc.stop(now + 0.18);
-        } else {
-          osc.frequency.setValueAtTime(330, now);
-          osc.frequency.exponentialRampToValueAtTime(520, now + 0.18);
-          gain.gain.setValueAtTime(0.14, now);
-          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.24);
-          osc.start(now);
-          osc.stop(now + 0.24);
-        }
-      } else if (contextType === 'health') {
-        // Gentle clinical/diagnostic bell chime
-        if (type === 'start') {
-          osc.frequency.setValueAtTime(440, now);
-          osc.frequency.exponentialRampToValueAtTime(660, now + 0.12);
-          gain.gain.setValueAtTime(0.12, now);
-          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.18);
-          osc.start(now);
-          osc.stop(now + 0.18);
-        } else if (type === 'stop') {
-          osc.frequency.setValueAtTime(660, now);
-          osc.frequency.exponentialRampToValueAtTime(330, now + 0.14);
-          gain.gain.setValueAtTime(0.1, now);
-          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.16);
-          osc.start(now);
-          osc.stop(now + 0.16);
-        } else {
-          osc.frequency.setValueAtTime(520, now);
-          osc.frequency.exponentialRampToValueAtTime(780, now + 0.18);
-          gain.gain.setValueAtTime(0.12, now);
-          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.22);
-          osc.start(now);
-          osc.stop(now + 0.22);
-        }
-      } else {
-        if (type === 'start') {
-          osc.frequency.setValueAtTime(440, now);
-          osc.frequency.exponentialRampToValueAtTime(580, now + 0.12);
-          gain.gain.setValueAtTime(0.1, now);
-          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.16);
-          osc.start(now);
-          osc.stop(now + 0.16);
-        } else if (type === 'stop') {
-          osc.frequency.setValueAtTime(580, now);
-          osc.frequency.exponentialRampToValueAtTime(330, now + 0.14);
-          gain.gain.setValueAtTime(0.1, now);
-          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.16);
-          osc.start(now);
-          osc.stop(now + 0.16);
-        } else {
-          osc.frequency.setValueAtTime(440, now);
-          osc.frequency.exponentialRampToValueAtTime(660, now + 0.18);
-          gain.gain.setValueAtTime(0.12, now);
-          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.22);
-          osc.start(now);
-          osc.stop(now + 0.22);
-        }
-      }
-    } catch {}
-  },
-
-  /**
-   * Start listening & recording the user's voice.
-   * Works seamlessly across:
-   * 1. Production on Vercel (HTTPS + native microphone MediaRecorder)
-   * 2. Android Codemagic Mobile (WebView/Native with RECORD_AUDIO permission)
-   * 3. AI Studio preview iframe (Gracefully falls back to simulated audio capture if iframe blocks mic)
-   */
-  startListening(
-    localeId: string,
-    onResult: (text: string, recording?: VoiceRecordingResult) => void,
-    onError?: (err: string) => void,
-    onEnd?: (recording?: VoiceRecordingResult) => void,
-    context?: VoiceContext
-  ): boolean {
-    // If already recording, stop first
-    if (isCurrentlyRecording) {
-      this.stopListening();
-    }
-
-    isCurrentlyRecording = true;
-    isSimulatedRecording = false;
-    recordedChunks = [];
-    recordingStartTime = Date.now();
-    activeRecordingContext = context;
-    let latestTranscript = '';
-
-    const cueCategory = context?.type === 'crop' ? 'crop' : context?.type === 'health' ? 'health' : 'general';
-    this.playAudioCue('start', cueCategory);
-
-    // 1. Attempt SpeechRecognition in parallel if available
-    const win = window as unknown as IWindow;
-    const SpeechRec = win.SpeechRecognition || win.webkitSpeechRecognition;
-
-    if (SpeechRec) {
-      try {
-        const recognition = new SpeechRec();
-        recognition.continuous = false;
-        recognition.interimResults = true;
-        recognition.lang = localeId === 'ha' || localeId === 'ha-NG' ? 'ha-NG' : 'en-NG';
-
-        recognition.onresult = (event: SpeechRecognitionEvent) => {
-          let transcript = '';
-          for (let i = event.resultIndex; i < event.results.length; i++) {
-            transcript += event.results[i][0].transcript;
-          }
-          if (transcript.trim()) {
-            latestTranscript = transcript.trim();
-            onResult(latestTranscript, lastRecordedAudio || undefined);
-          }
-        };
-
-        recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-          console.warn('SpeechRecognition event:', event.error);
-        };
-
-        recognition.onend = () => {
-          activeRecognition = null;
-        };
-
-        recognition.start();
-        activeRecognition = recognition;
-      } catch (e) {
-        console.warn('SpeechRecognition startup caught:', e);
-      }
-    }
-
-    // 2. Hardware Microphone Capture via getUserMedia & MediaRecorder
-    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-      navigator.mediaDevices
-        .getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } })
-        .then((stream) => {
-          try {
-            localStorage.setItem('smartvillage.mic_permission', 'granted');
-          } catch {}
-          this.notifyPermissionGranted();
-
-          if (!isCurrentlyRecording) {
-            stream.getTracks().forEach((track) => track.stop());
-            return;
-          }
-
-          activeMediaStream = stream;
-          const mimeType = getSupportedMimeType();
-          const options = mimeType ? { mimeType } : undefined;
-
-          try {
-            const recorder = new MediaRecorder(stream, options);
-            activeMediaRecorder = recorder;
-
-            recorder.ondataavailable = (e) => {
-              if (e.data && e.data.size > 0) {
-                recordedChunks.push(e.data);
-              }
-            };
-
-            recorder.onstop = () => {
-              const mime = recorder.mimeType || 'audio/webm';
-              const audioBlob = new Blob(recordedChunks, { type: mime });
-              const durationMs = Date.now() - recordingStartTime;
-              const audioUrl = URL.createObjectURL(audioBlob);
-
-              const result: VoiceRecordingResult = {
-                url: audioUrl,
-                blob: audioBlob,
-                durationMs,
-                transcript: latestTranscript || undefined,
-                isSimulated: false,
-                timestamp: Date.now(),
-                context: activeRecordingContext,
-              };
-
-              lastRecordedAudio = result;
-
-              // If no SpeechRecognition transcript was obtained, provide fallback label
-              if (!latestTranscript) {
-                const defaultLabel =
-                  localeId === 'ha' || localeId === 'ha-NG'
-                    ? 'Muryar da aka ɗauka'
-                    : 'Voice recording recorded';
-                onResult(defaultLabel, result);
-              }
-
-              onEnd?.(result);
-            };
-
-            recorder.start(100);
-          } catch (recError) {
-            console.warn('MediaRecorder error, falling back to audio generator:', recError);
-            isSimulatedRecording = true;
-          }
-        })
-        .catch((micErr: any) => {
-          console.warn('Microphone permission blocked or unavailable:', micErr);
-          const isDenied =
-            micErr?.name === 'NotAllowedError' ||
-            micErr?.name === 'PermissionDeniedError' ||
-            micErr?.message?.includes?.('Permission denied') ||
-            micErr?.message?.includes?.('denied');
-
-          if (isDenied) {
-            try {
-              localStorage.setItem('smartvillage.mic_permission', 'denied');
-            } catch {}
-            this.notifyPermissionDenied();
-            onError?.('Microphone access blocked. Please enable microphone permission in browser settings.');
-          }
-
-          isSimulatedRecording = true;
-        });
-    } else {
-      isSimulatedRecording = true;
-    }
-
-    return true;
-  },
-
-  /**
-   * Stop voice listening and finalize the audio recording
-   */
-  stopListening(): Promise<VoiceRecordingResult | null> {
-    return new Promise((resolve) => {
-      if (!isCurrentlyRecording) {
-        resolve(lastRecordedAudio);
-        return;
-      }
-
-      const cueCategory = activeRecordingContext?.type === 'crop' ? 'crop' : activeRecordingContext?.type === 'health' ? 'health' : 'general';
-      this.playAudioCue('stop', cueCategory);
-      isCurrentlyRecording = false;
-
-      // Stop speech recognition
-      if (activeRecognition) {
-        try {
-          activeRecognition.stop();
-        } catch {}
-        activeRecognition = null;
-      }
-
-      // If simulated preview recording (e.g. preview iframe sandbox)
-      if (isSimulatedRecording || !activeMediaRecorder || activeMediaRecorder.state === 'inactive') {
-        const durationSec = Math.max(1.5, (Date.now() - recordingStartTime) / 1000);
-        const synthBlob = generateSyntheticVoiceBlob(durationSec, activeRecordingContext);
-        const synthUrl = URL.createObjectURL(synthBlob);
-
-        const result: VoiceRecordingResult = {
-          url: synthUrl,
-          blob: synthBlob,
-          durationMs: Math.round(durationSec * 1000),
-          isSimulated: true,
-          timestamp: Date.now(),
-          context: activeRecordingContext,
-        };
-
-        lastRecordedAudio = result;
-        isSimulatedRecording = false;
-        resolve(result);
-        return;
-      }
-
-      // Stop MediaRecorder
-      if (activeMediaRecorder) {
-        const originalOnStop = activeMediaRecorder.onstop;
-        activeMediaRecorder.onstop = (e) => {
-          if (originalOnStop) {
-            (originalOnStop as any)(e);
-          }
-          if (activeMediaStream) {
-            activeMediaStream.getTracks().forEach((track) => track.stop());
-            activeMediaStream = null;
-          }
-          activeMediaRecorder = null;
-          resolve(lastRecordedAudio);
-        };
-
-        try {
-          activeMediaRecorder.stop();
-        } catch {
-          resolve(lastRecordedAudio);
-        }
-      } else {
-        if (activeMediaStream) {
-          activeMediaStream.getTracks().forEach((track) => track.stop());
-          activeMediaStream = null;
-        }
-        resolve(lastRecordedAudio);
-      }
-    });
-  },
-
-  async speak(
-    text: string,
-    language: string,
-    onWarning?: (warning: string) => void,
-    category?: VoiceCategory
-  ): Promise<void> {
-    const isHausa = language === 'ha' || language === 'ha-NG';
-
-    // If speaking in Hausa, check if user has a custom trained voice recording for Grandma!
-    if (isHausa) {
-      let matchedCategory = category;
-      if (!matchedCategory) {
-        const lower = text.toLowerCase();
-        if (
-          lower.includes('albasa') ||
-          lower.includes('shuka') ||
-          lower.includes('gona') ||
-          lower.includes('cuta') ||
-          lower.includes('kasa') ||
-          lower.includes('ƙasa')
-        ) {
-          matchedCategory = 'crop';
-        } else if (
-          lower.includes('lafiya') ||
-          lower.includes('zazzabi') ||
-          lower.includes('magani') ||
-          lower.includes('asibiti')
-        ) {
-          matchedCategory = 'health';
-        } else {
-          matchedCategory = 'greeting';
-        }
-      }
-
-      const trainedAudio =
-        this.getTrainedVoice(matchedCategory) || this.getTrainedVoice('greeting');
-      if (trainedAudio) {
-        try {
-          await this.playAudioUrl(trainedAudio);
-          return;
-        } catch (e) {
-          console.warn('Playback of trained voice failed, falling back to speech synthesis:', e);
-        }
-      }
-    }
-
-    return new Promise((resolve) => {
-      if (!('speechSynthesis' in window)) {
-        resolve();
-        return;
-      }
-
-      window.speechSynthesis.cancel();
-
-      const utterance = new SpeechSynthesisUtterance(text);
-
-      // Check available voices
-      const voices = window.speechSynthesis.getVoices();
-      let selectedVoice: SpeechSynthesisVoice | undefined;
-
-      if (isHausa) {
-        selectedVoice = voices.find(
-          (v) =>
-            v.lang.toLowerCase().startsWith('ha') ||
-            v.name.toLowerCase().includes('hausa')
-        );
-
-        if (!selectedVoice) {
-          onWarning?.('Don Allah, shigar da muryar Hausa a saitunan waya ko ka ɗauki muryarka.');
-          selectedVoice = voices.find(
-            (v) =>
-              v.lang.includes('NG') ||
-              v.name.toLowerCase().includes('nigeria') ||
-              v.lang.startsWith('en')
-          );
-        }
-      } else {
-        selectedVoice =
-          voices.find(
-            (v) =>
-              v.lang.includes('NG') ||
-              v.name.toLowerCase().includes('natural') ||
-              (v.lang.startsWith('en') && !v.name.includes('Google'))
-          ) || voices.find((v) => v.lang.startsWith('en'));
-      }
-
-      if (selectedVoice) {
-        utterance.voice = selectedVoice;
-      }
-
-      utterance.lang = isHausa ? 'ha-NG' : 'en-NG';
-
-      // Warm, friendly, clear pacing for rural grandmothers
-      utterance.rate = 0.85;
-      utterance.pitch = 0.98;
-
-      utterance.onend = () => resolve();
-      utterance.onerror = () => resolve();
-
-      window.speechSynthesis.speak(utterance);
-    });
-  },
-
-  stopSpeaking(): void {
-    if (activeAudioPlayer) {
-      try {
-        activeAudioPlayer.pause();
-        activeAudioPlayer.currentTime = 0;
-      } catch {}
-      activeAudioPlayer = null;
-    }
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-    }
-  },
-
   isInIframe(): boolean {
     try {
       return window.self !== window.top;
@@ -1103,14 +963,13 @@ export const voiceService = {
   },
 
   async startAudioRecording(): Promise<boolean> {
-    const started = this.startListening(
+    return this.startListening(
       'ha-NG',
       () => {},
       () => {},
       undefined,
       { type: 'general', label: 'Grandma Voice' }
     );
-    return started;
   },
 
   async stopAudioRecording(): Promise<string | null> {

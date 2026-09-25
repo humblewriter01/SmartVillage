@@ -4,12 +4,11 @@ import {
   Volume2,
   CheckCircle2,
   Sparkles,
-  Info,
   ShieldAlert,
-  ChevronRight,
   RotateCcw,
   Mic,
   MicOff,
+  Music,
 } from 'lucide-react';
 import { Language, t } from '../utils/translations';
 import {
@@ -35,6 +34,7 @@ export const LivestockScreen: React.FC<LivestockScreenProps> = ({
   const [result, setResult] = useState<LivestockCheckResult | null>(null);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const [playingAnimalId, setPlayingAnimalId] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
@@ -54,6 +54,18 @@ export const LivestockScreen: React.FC<LivestockScreenProps> = ({
     setSelectedAnimal(animal);
     setCheckedSymptoms([]);
     setResult(null);
+  };
+
+  const handlePlayAnimalSound = async (animal: LivestockAnimal, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setPlayingAnimalId(animal.id);
+    try {
+      await voiceService.playAnimalSound(animal.id);
+    } catch (err) {
+      console.warn('Audio playback error:', err);
+    } finally {
+      setPlayingAnimalId(null);
+    }
   };
 
   const handleDiagnose = () => {
@@ -100,46 +112,60 @@ export const LivestockScreen: React.FC<LivestockScreenProps> = ({
     const preventionText = locale === 'ha' ? dis.prevention_hausa : dis.prevention;
     const textToSpeak = `${diseaseName}. ${treatmentText}. ${preventionText}`;
 
-    await voiceService.speak(textToSpeak, locale, (warning) => {
-      showToast(warning);
-    });
-    setIsSpeaking(false);
+    try {
+      await voiceService.speak(textToSpeak, locale, (warning) => {
+        showToast(warning);
+      });
+    } catch (err) {
+      console.warn('TTS speak error:', err);
+    } finally {
+      setIsSpeaking(false);
+    }
   };
 
-  const handleVoiceListen = () => {
+  const handleVoiceListen = async () => {
     if (isListening) {
-      voiceService.stopListening();
+      await voiceService.stopListening();
       setIsListening(false);
       return;
     }
 
-    const started = voiceService.startListening(
-      locale,
-      (text) => {
-        showToast(`Heard: "${text}"`);
-        // Check if user named an animal
-        const lower = text.toLowerCase();
-        for (const a of LIVESTOCK_ANIMALS) {
-          if (
-            lower.includes(a.name.toLowerCase()) ||
-            lower.includes(a.hausa_name.toLowerCase())
-          ) {
-            handleSelectAnimal(a);
-            break;
+    try {
+      const started = await voiceService.startListening(
+        locale,
+        (text) => {
+          showToast(`Heard: "${text}"`);
+          const lower = text.toLowerCase();
+          for (const a of LIVESTOCK_ANIMALS) {
+            if (
+              lower.includes(a.name.toLowerCase()) ||
+              lower.includes(a.hausa_name.toLowerCase())
+            ) {
+              handleSelectAnimal(a);
+              break;
+            }
           }
+        },
+        (err) => {
+          showToast(err);
+          setIsListening(false);
+        },
+        () => {
+          setIsListening(false);
+        },
+        {
+          type: 'livestock',
+          animalId: selectedAnimal.id,
+          label: selectedAnimal.name,
         }
-      },
-      (err) => {
-        showToast(err);
-        setIsListening(false);
-      },
-      () => {
-        setIsListening(false);
-      }
-    );
+      );
 
-    if (started) {
-      setIsListening(true);
+      if (started) {
+        setIsListening(true);
+      }
+    } catch (err) {
+      console.warn('Voice listen error caught:', err);
+      setIsListening(false);
     }
   };
 
@@ -147,8 +173,9 @@ export const LivestockScreen: React.FC<LivestockScreenProps> = ({
     <div className="max-w-2xl mx-auto px-4 py-6 space-y-5">
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white text-xs sm:text-sm px-4 py-2.5 rounded-xl shadow-lg border border-slate-700 animate-fade-in">
-          {toastMessage}
+        <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white text-xs sm:text-sm px-4 py-2.5 rounded-xl shadow-lg border border-slate-700 animate-fade-in flex items-center gap-2">
+          <Sparkles className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>{toastMessage}</span>
         </div>
       )}
 
@@ -162,7 +189,7 @@ export const LivestockScreen: React.FC<LivestockScreenProps> = ({
           <p className="text-xs text-slate-500 mt-0.5">{t(locale, 'livestockSubtitle')}</p>
         </div>
 
-        {/* Grandma Voice Mic Button */}
+        {/* Voice Note Button */}
         <button
           onClick={handleVoiceListen}
           className={`p-2.5 rounded-xl transition-all cursor-pointer ${
@@ -176,31 +203,83 @@ export const LivestockScreen: React.FC<LivestockScreenProps> = ({
         </button>
       </div>
 
-      {/* Animal Selection Grid (9 Animals) */}
+      {/* Animal Selection Grid (9 Animals) with Individual Sound Buttons */}
       <div className="bg-white rounded-2xl p-4 sm:p-5 border border-emerald-100 shadow-sm space-y-3">
-        <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
-          {t(locale, 'selectAnimalPrompt')}
-        </label>
+        <div className="flex items-center justify-between">
+          <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
+            {t(locale, 'selectAnimalPrompt')}
+          </label>
+          <span className="text-[11px] text-emerald-800 font-semibold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 flex items-center gap-1">
+            <Music className="w-3 h-3 text-emerald-600" />
+            <span>{locale === 'ha' ? 'Sautin dabbobi 9' : '9 Animal Sounds'}</span>
+          </span>
+        </div>
+
         <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
           {LIVESTOCK_ANIMALS.map((animal) => {
             const isSelected = selectedAnimal.id === animal.id;
+            const isPlayingThis = playingAnimalId === animal.id;
+
             return (
-              <button
+              <div
                 key={animal.id}
                 onClick={() => handleSelectAnimal(animal)}
-                className={`flex flex-col items-center p-2.5 rounded-xl border transition-all cursor-pointer ${
+                className={`flex flex-col items-center p-2 rounded-xl border transition-all cursor-pointer relative group ${
                   isSelected
                     ? 'bg-emerald-700 text-white border-emerald-700 shadow-2xs scale-[1.02]'
                     : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
                 }`}
               >
                 <span className="text-2xl mb-1">{animal.emoji}</span>
-                <span className="text-xs font-bold text-center leading-tight">
+                <span className="text-xs font-bold text-center leading-tight mb-1">
                   {locale === 'ha' ? animal.hausa_name : animal.name}
                 </span>
-              </button>
+
+                {/* Individual Sound Button for every animal */}
+                <button
+                  type="button"
+                  onClick={(e) => handlePlayAnimalSound(animal, e)}
+                  className={`mt-1 flex items-center justify-center space-x-1 px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all shadow-xs cursor-pointer ${
+                    isSelected
+                      ? 'bg-emerald-800 hover:bg-emerald-900 text-emerald-100 border border-emerald-600'
+                      : 'bg-white hover:bg-emerald-50 text-emerald-800 border border-slate-200'
+                  } ${isPlayingThis ? 'animate-pulse ring-2 ring-emerald-400' : ''}`}
+                  title={locale === 'ha' ? `Saurari kukan ${animal.hausa_name}` : `Play ${animal.name} sound`}
+                >
+                  <Volume2 className="w-3 h-3 text-emerald-600" />
+                  <span>{isPlayingThis ? '...' : (locale === 'ha' ? 'Kuka' : 'Sound')}</span>
+                </button>
+              </div>
             );
           })}
+        </div>
+
+        {/* Selected Animal Audio Banner */}
+        <div className="bg-emerald-50/70 border border-emerald-200 rounded-xl p-3 flex items-center justify-between">
+          <div className="flex items-center space-x-2.5">
+            <span className="text-2xl">{selectedAnimal.emoji}</span>
+            <div>
+              <span className="text-[10px] font-bold uppercase text-emerald-700 block">
+                {locale === 'ha' ? 'Dabbar da aka zaɓa' : 'Selected Animal'}
+              </span>
+              <span className="font-extrabold text-sm text-slate-800">
+                {locale === 'ha' ? selectedAnimal.hausa_name : selectedAnimal.name}
+              </span>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => handlePlayAnimalSound(selectedAnimal)}
+            className="flex items-center space-x-1.5 px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer active:scale-95 transition-all"
+          >
+            <Volume2 className="w-3.5 h-3.5 text-emerald-200" />
+            <span>
+              {locale === 'ha'
+                ? `Saurari Kukan ${selectedAnimal.hausa_name}`
+                : `Play ${selectedAnimal.name} Sound`}
+            </span>
+          </button>
         </div>
       </div>
 

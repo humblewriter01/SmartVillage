@@ -58,7 +58,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       return;
     }
 
-    const started = voiceService.startListening(
+    const started = await voiceService.startListening(
       locale,
       (text, rec) => {
         if (rec?.url) {

@@ -34,6 +34,7 @@ import {
   CropDiseaseReference,
 } from '../data/cropReferenceData';
 import { HarvestCountdownCard } from './HarvestCountdownCard';
+import { cameraService } from '../services/cameraService';
 
 interface CropScreenProps {
   locale: Language;
@@ -183,6 +184,7 @@ export const CropScreen: React.FC<CropScreenProps> = ({
           : 'Photo loaded! Click \'Analyze Crop\' below.'
       );
     }
+    e.target.value = '';
   };
 
   const handleSelectSample = (uri: string) => {
@@ -195,6 +197,40 @@ export const CropScreen: React.FC<CropScreenProps> = ({
     );
   };
 
+  const handleTakePhoto = async () => {
+    if (cameraService.isNative()) {
+      try {
+        const photo = await cameraService.capturePhoto({ locale });
+        if (photo) {
+          setPhotoUrl(photo);
+          setResult(null);
+          showToast(locale === 'ha' ? 'An ɗauki hoto!' : 'Photo captured!');
+          return;
+        }
+      } catch (err) {
+        console.warn('Native camera capture fallback:', err);
+      }
+    }
+    cameraInputRef.current?.click();
+  };
+
+  const handlePickGallery = async () => {
+    if (cameraService.isNative()) {
+      try {
+        const photo = await cameraService.pickFromGallery(locale);
+        if (photo) {
+          setPhotoUrl(photo);
+          setResult(null);
+          showToast(locale === 'ha' ? 'An loda hoto daga gallery!' : 'Photo loaded from gallery!');
+          return;
+        }
+      } catch (err) {
+        console.warn('Gallery pick fallback:', err);
+      }
+    }
+    fileInputRef.current?.click();
+  };
+
   // Perform Analysis: Triggered ONLY when the user clicks the "Analyze Crop" button!
   const handlePerformAnalysis = async () => {
     setBusy(true);
@@ -204,13 +240,23 @@ export const CropScreen: React.FC<CropScreenProps> = ({
 
       if (photoUrl) {
         // Offline vision analysis prioritized for the selected crop
-        r = await analyzeCropImage(photoUrl, selectedCropId);
+        r = await analyzeCropImage(photoUrl, selectedCropId, spokenTranscript);
       } else {
         // Diagnosis based on selected crop, optional suspected disease, and spoken symptoms
         r = diagnoseCropSelection(selectedCropId, selectedDisease?.id, spokenTranscript);
       }
 
       setResult(r);
+
+      if (r.needsCropSelection) {
+        showToast(
+          locale === 'ha'
+            ? 'Don Allah zaɓi shukarka da farko domin tabbatar da daidaiton bincike.'
+            : 'Please select your specific crop first for accurate diagnosis.'
+        );
+        setShowManualModal(true);
+        return;
+      }
 
       // Update recorded voice URL to the diagnosed crop disease sound
       const diseaseId = r.referenceDetail?.id || selectedDisease?.id;
@@ -283,7 +329,7 @@ export const CropScreen: React.FC<CropScreenProps> = ({
       return;
     }
 
-    const started = voiceService.startListening(
+    const started = await voiceService.startListening(
       locale === 'ha' ? 'ha-NG' : 'en-NG',
       (recognizedText, rec) => {
         setSpokenTranscript(recognizedText);
@@ -546,10 +592,14 @@ export const CropScreen: React.FC<CropScreenProps> = ({
                 </button>
                 <div>
                   <h2 className="font-extrabold text-xs sm:text-sm text-slate-800">
-                    {isListening ? t(locale, 'listeningNow') : t(locale, 'speakDescribeCrop')}
+                    {isListening
+                      ? (locale === 'ha' ? 'Ana sauraron bayanin shuka...' : 'Listening to crop description...')
+                      : (locale === 'ha' ? 'Taɓa domin faɗin matsalar shuka da murya' : 'Tap to speak your crop problem aloud')}
                   </h2>
                   <p className="text-[11px] text-slate-500 mt-0.5">
-                    {t(locale, 'cropSpeechHint')}
+                    {locale === 'ha'
+                      ? 'Misali: "Duhun ganye mai ruwan hoda a albasa", "Tsutsa a masara", "Lankwashewar ganyen tumatir"...'
+                      : 'E.g., "Onion purple blotch spots", "Maize armyworm eating leaves", "Tomato leaf curl"...'}
                   </p>
                 </div>
               </div>
@@ -565,7 +615,7 @@ export const CropScreen: React.FC<CropScreenProps> = ({
               <div className="mt-3 p-2.5 bg-emerald-50 rounded-xl border border-emerald-200 text-xs text-slate-800 flex items-center justify-between">
                 <div className="flex items-center space-x-2">
                   <span className="font-bold text-emerald-900">
-                    {locale === 'ha' ? 'Muryar Shuka: ' : 'Crop Voice: '}
+                    {locale === 'ha' ? 'Bayanin Shuka da Murya: ' : 'Crop Voice Note: '}
                   </span>
                   <span className="truncate max-w-[200px] sm:max-w-xs">
                     {spokenTranscript ? `"${spokenTranscript}"` : `${selectedCropCategory.crop} (${selectedDisease ? selectedDisease.name : 'Crop Sound'})`}
@@ -577,10 +627,10 @@ export const CropScreen: React.FC<CropScreenProps> = ({
                       type="button"
                       onClick={() => voiceService.playAudioUrl(recordedVoiceUrl)}
                       className="flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-200 hover:bg-emerald-300 text-emerald-900 transition-colors cursor-pointer"
-                      title={locale === 'ha' ? 'Saurari muryar shuka' : 'Play recorded crop voice'}
+                      title={locale === 'ha' ? 'Saurari bayanin shuka' : 'Play recorded crop voice note'}
                     >
                       <Volume2 className="w-3.5 h-3.5" />
-                      <span>{locale === 'ha' ? 'Saurari Murya' : 'Play Voice'}</span>
+                      <span>{locale === 'ha' ? 'Saurari Bayanin Shuka' : 'Play Crop Note'}</span>
                     </button>
                   )}
                   <button
@@ -638,14 +688,14 @@ export const CropScreen: React.FC<CropScreenProps> = ({
           {/* Camera / Gallery Buttons */}
           <div className="grid grid-cols-2 gap-3">
             <button
-              onClick={() => cameraInputRef.current?.click()}
+              onClick={handleTakePhoto}
               className="flex items-center justify-center space-x-2 py-3 px-3 border border-emerald-600 text-emerald-800 bg-white hover:bg-emerald-50 rounded-xl font-bold text-xs sm:text-sm transition-colors cursor-pointer shadow-2xs"
             >
               <Camera className="w-4 h-4 text-emerald-700" />
               <span>{t(locale, 'takePhoto')}</span>
             </button>
             <button
-              onClick={() => fileInputRef.current?.click()}
+              onClick={handlePickGallery}
               className="flex items-center justify-center space-x-2 py-3 px-3 border border-emerald-600 text-emerald-800 bg-white hover:bg-emerald-50 rounded-xl font-bold text-xs sm:text-sm transition-colors cursor-pointer shadow-2xs"
             >
               <ImageIcon className="w-4 h-4 text-emerald-700" />
@@ -700,8 +750,35 @@ export const CropScreen: React.FC<CropScreenProps> = ({
             </button>
           </div>
 
-          {/* DIAGNOSTIC RESULT CARD: Only displayed AFTER clicking Analyze! */}
-          {result && (
+          {/* PROMPT TO SELECT CROP IF UNVERIFIED */}
+          {result?.needsCropSelection && (
+            <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-4 text-center space-y-2 animate-scale-up">
+              <AlertTriangle className="w-6 h-6 text-amber-600 mx-auto" />
+              <h4 className="font-extrabold text-sm text-amber-950">
+                {locale === 'ha'
+                  ? 'Da fatan zaɓi ainihin shukarka'
+                  : 'Please Select Your Specific Crop'}
+              </h4>
+              <p className="text-xs text-amber-800">
+                {locale === 'ha'
+                  ? 'Domin tabbatar da cewa cututtukan da aka nuna sun dace da shukarka, don Allah zaɓi nau\'in shukar da farko.'
+                  : 'To ensure accurate results and avoid mixing plant diseases, please choose your specific crop first.'}
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setModalStep(1);
+                  setShowManualModal(true);
+                }}
+                className="mt-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs cursor-pointer shadow-xs"
+              >
+                {locale === 'ha' ? 'Zaɓi Shuka Yanzu' : 'Select Crop Now'}
+              </button>
+            </div>
+          )}
+
+          {/* DIAGNOSTIC RESULT CARD: Only displayed AFTER clicking Analyze and crop is confirmed! */}
+          {result && !result.needsCropSelection && (
             <div
               ref={resultRef}
               className="bg-white rounded-2xl border-2 border-emerald-400 p-5 shadow-sm space-y-4 animate-scale-up"

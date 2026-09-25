@@ -18,6 +18,7 @@ import { Language, t } from '../utils/translations';
 import { waterQualityService, WaterQualityResult } from '../services/waterQualityService';
 import { voiceService } from '../services/voiceService';
 import { historyService } from '../services/historyService';
+import { cameraService } from '../services/cameraService';
 
 interface WaterQualityScreenProps {
   locale: Language;
@@ -69,6 +70,41 @@ export const WaterQualityScreen: React.FC<WaterQualityScreenProps> = ({
       setPhotoUrl(url);
       setResult(null);
     }
+    e.target.value = '';
+  };
+
+  const handleTakePhoto = async () => {
+    if (cameraService.isNative()) {
+      try {
+        const photo = await cameraService.capturePhoto({ locale });
+        if (photo) {
+          setPhotoUrl(photo);
+          setResult(null);
+          showToast(locale === 'ha' ? 'An ɗauki hoto!' : 'Photo captured!');
+          return;
+        }
+      } catch (err) {
+        console.warn('Water camera fallback:', err);
+      }
+    }
+    cameraInputRef.current?.click();
+  };
+
+  const handlePickGallery = async () => {
+    if (cameraService.isNative()) {
+      try {
+        const photo = await cameraService.pickFromGallery(locale);
+        if (photo) {
+          setPhotoUrl(photo);
+          setResult(null);
+          showToast(locale === 'ha' ? 'An loda hoto daga gallery!' : 'Photo loaded!');
+          return;
+        }
+      } catch (err) {
+        console.warn('Water gallery fallback:', err);
+      }
+    }
+    fileInputRef.current?.click();
   };
 
   const handleAnalyze = async () => {
@@ -119,14 +155,14 @@ export const WaterQualityScreen: React.FC<WaterQualityScreenProps> = ({
     setIsSpeaking(false);
   };
 
-  const handleVoiceListen = () => {
+  const handleVoiceListen = async () => {
     if (isListening) {
-      voiceService.stopListening();
+      await voiceService.stopListening();
       setIsListening(false);
       return;
     }
 
-    const started = voiceService.startListening(
+    const started = await voiceService.startListening(
       locale,
       (text) => {
         showToast(`Heard: "${text}"`);
@@ -237,14 +273,14 @@ export const WaterQualityScreen: React.FC<WaterQualityScreenProps> = ({
         {/* Capture / Select Action Buttons */}
         <div className="grid grid-cols-2 gap-3">
           <button
-            onClick={() => cameraInputRef.current?.click()}
+            onClick={handleTakePhoto}
             className="flex items-center justify-center space-x-2 py-3 px-4 rounded-xl bg-sky-600 hover:bg-sky-700 active:scale-98 transition-all text-white font-semibold text-sm cursor-pointer shadow-xs"
           >
             <Camera className="w-4 h-4" />
             <span>{t(locale, 'takePhoto')}</span>
           </button>
           <button
-            onClick={() => fileInputRef.current?.click()}
+            onClick={handlePickGallery}
             className="flex items-center justify-center space-x-2 py-3 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-sm cursor-pointer transition-colors"
           >
             <ImageIcon className="w-4 h-4" />
