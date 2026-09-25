@@ -34,7 +34,7 @@ import {
   CropDiseaseReference,
 } from '../data/cropReferenceData';
 import { HarvestCountdownCard } from './HarvestCountdownCard';
-import { cameraService } from '../services/cameraService';
+import { takePhotoWithCamera, pickPhotoFromGallery, cameraService } from '../services/cameraService';
 
 interface CropScreenProps {
   locale: Language;
@@ -101,6 +101,7 @@ export const CropScreen: React.FC<CropScreenProps> = ({
   // Manual Selector Modal state
   const [showManualModal, setShowManualModal] = useState(false);
   const [modalStep, setModalStep] = useState<1 | 2>(1);
+  const [photoSourceMode, setPhotoSourceMode] = useState<'camera' | 'gallery'>('camera');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -198,37 +199,33 @@ export const CropScreen: React.FC<CropScreenProps> = ({
   };
 
   const handleTakePhoto = async () => {
-    if (cameraService.isNative()) {
-      try {
-        const photo = await cameraService.capturePhoto({ locale });
-        if (photo) {
-          setPhotoUrl(photo);
-          setResult(null);
-          showToast(locale === 'ha' ? 'An ɗauki hoto!' : 'Photo captured!');
-          return;
-        }
-      } catch (err) {
-        console.warn('Native camera capture fallback:', err);
+    try {
+      const photo = await takePhotoWithCamera();
+      if (photo) {
+        const formatted = photo.startsWith('data:') ? photo : `data:image/jpeg;base64,${photo}`;
+        setPhotoUrl(formatted);
+        setResult(null);
+        showToast(locale === 'ha' ? 'An ɗauki hoto!' : 'Photo captured!');
       }
+    } catch (err) {
+      console.warn('Native camera capture fallback:', err);
+      cameraInputRef.current?.click();
     }
-    cameraInputRef.current?.click();
   };
 
   const handlePickGallery = async () => {
-    if (cameraService.isNative()) {
-      try {
-        const photo = await cameraService.pickFromGallery(locale);
-        if (photo) {
-          setPhotoUrl(photo);
-          setResult(null);
-          showToast(locale === 'ha' ? 'An loda hoto daga gallery!' : 'Photo loaded from gallery!');
-          return;
-        }
-      } catch (err) {
-        console.warn('Gallery pick fallback:', err);
+    try {
+      const photo = await pickPhotoFromGallery();
+      if (photo) {
+        const formatted = photo.startsWith('data:') ? photo : `data:image/jpeg;base64,${photo}`;
+        setPhotoUrl(formatted);
+        setResult(null);
+        showToast(locale === 'ha' ? 'An loda hoto daga gallery!' : 'Photo loaded from gallery!');
       }
+    } catch (err) {
+      console.warn('Gallery pick fallback:', err);
+      fileInputRef.current?.click();
     }
-    fileInputRef.current?.click();
   };
 
   // Perform Analysis: Triggered ONLY when the user clicks the "Analyze Crop" button!
@@ -685,22 +682,64 @@ export const CropScreen: React.FC<CropScreenProps> = ({
             )}
           </div>
 
-          {/* Camera / Gallery Buttons */}
-          <div className="grid grid-cols-2 gap-3">
-            <button
-              onClick={handleTakePhoto}
-              className="flex items-center justify-center space-x-2 py-3 px-3 border border-emerald-600 text-emerald-800 bg-white hover:bg-emerald-50 rounded-xl font-bold text-xs sm:text-sm transition-colors cursor-pointer shadow-2xs"
-            >
-              <Camera className="w-4 h-4 text-emerald-700" />
-              <span>{t(locale, 'takePhoto')}</span>
-            </button>
-            <button
-              onClick={handlePickGallery}
-              className="flex items-center justify-center space-x-2 py-3 px-3 border border-emerald-600 text-emerald-800 bg-white hover:bg-emerald-50 rounded-xl font-bold text-xs sm:text-sm transition-colors cursor-pointer shadow-2xs"
-            >
-              <ImageIcon className="w-4 h-4 text-emerald-700" />
-              <span>{t(locale, 'gallery')}</span>
-            </button>
+          {/* Camera / Gallery Toggle & Action */}
+          <div className="space-y-2.5">
+            <div className="flex items-center justify-between bg-slate-100/90 p-1.5 rounded-2xl border border-slate-200">
+              <span className="text-xs font-bold text-slate-700 px-2 flex items-center space-x-1.5">
+                <span>{locale === 'ha' ? 'Zaɓi Hanyar Hoto:' : 'Photo Mode:'}</span>
+              </span>
+              <div className="inline-flex p-0.5 bg-white rounded-xl border border-slate-200/90 shadow-2xs">
+                <button
+                  type="button"
+                  onClick={() => setPhotoSourceMode('camera')}
+                  className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    photoSourceMode === 'camera'
+                      ? 'bg-emerald-700 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                  }`}
+                >
+                  <Camera className="w-3.5 h-3.5" />
+                  <span>{t(locale, 'takePhoto')}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPhotoSourceMode('gallery')}
+                  className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    photoSourceMode === 'gallery'
+                      ? 'bg-emerald-700 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                  }`}
+                >
+                  <ImageIcon className="w-3.5 h-3.5" />
+                  <span>{t(locale, 'gallery')}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Primary Action Button based on selected toggle */}
+            {photoSourceMode === 'camera' ? (
+              <button
+                type="button"
+                onClick={handleTakePhoto}
+                className="w-full flex items-center justify-center space-x-2 py-3 px-4 bg-emerald-700 hover:bg-emerald-800 active:scale-[0.99] text-white rounded-xl font-bold text-xs sm:text-sm shadow-sm transition-all cursor-pointer"
+              >
+                <Camera className="w-4 h-4 text-emerald-200" />
+                <span>
+                  {locale === 'ha' ? 'Ɗauki Hoto da Kyamara' : 'Open Camera to Take Photo'}
+                </span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handlePickGallery}
+                className="w-full flex items-center justify-center space-x-2 py-3 px-4 bg-emerald-700 hover:bg-emerald-800 active:scale-[0.99] text-white rounded-xl font-bold text-xs sm:text-sm shadow-sm transition-all cursor-pointer"
+              >
+                <ImageIcon className="w-4 h-4 text-emerald-200" />
+                <span>
+                  {locale === 'ha' ? 'Zaɓi Hoto daga Taskar Hotuna' : 'Choose Photo from Gallery'}
+                </span>
+              </button>
+            )}
           </div>
 
           {/* Quick Test Samples */}

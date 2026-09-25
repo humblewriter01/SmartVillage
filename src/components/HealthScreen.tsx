@@ -25,7 +25,7 @@ import {
 } from '../services/healthService';
 import { voiceService } from '../services/voiceService';
 import { historyService } from '../services/historyService';
-import { cameraService } from '../services/cameraService';
+import { takePhotoWithCamera, pickPhotoFromGallery, cameraService } from '../services/cameraService';
 
 interface HealthScreenProps {
   locale: Language;
@@ -54,6 +54,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
   const [showManualModal, setShowManualModal] = useState(false);
   const [manualCategoryFilter, setManualCategoryFilter] = useState<'all' | 'emergency' | 'infectious' | 'respiratory' | 'skin'>('all');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [photoSourceMode, setPhotoSourceMode] = useState<'camera' | 'gallery'>('camera');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -74,37 +75,33 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
   };
 
   const handleTakePhoto = async () => {
-    if (cameraService.isNative()) {
-      try {
-        const photo = await cameraService.capturePhoto({ locale });
-        if (photo) {
-          setPhotoUrl(photo);
-          setResult(null);
-          showToast(locale === 'ha' ? 'An ɗauki hoto!' : 'Photo captured!');
-          return;
-        }
-      } catch (err) {
-        console.warn('Health camera fallback:', err);
+    try {
+      const photo = await takePhotoWithCamera();
+      if (photo) {
+        const formatted = photo.startsWith('data:') ? photo : `data:image/jpeg;base64,${photo}`;
+        setPhotoUrl(formatted);
+        setResult(null);
+        showToast(locale === 'ha' ? 'An ɗauki hoto!' : 'Photo captured!');
       }
+    } catch (err) {
+      console.warn('Health camera fallback:', err);
+      cameraInputRef.current?.click();
     }
-    cameraInputRef.current?.click();
   };
 
   const handlePickGallery = async () => {
-    if (cameraService.isNative()) {
-      try {
-        const photo = await cameraService.pickFromGallery(locale);
-        if (photo) {
-          setPhotoUrl(photo);
-          setResult(null);
-          showToast(locale === 'ha' ? 'An loda hoto daga gallery!' : 'Photo loaded!');
-          return;
-        }
-      } catch (err) {
-        console.warn('Health gallery fallback:', err);
+    try {
+      const photo = await pickPhotoFromGallery();
+      if (photo) {
+        const formatted = photo.startsWith('data:') ? photo : `data:image/jpeg;base64,${photo}`;
+        setPhotoUrl(formatted);
+        setResult(null);
+        showToast(locale === 'ha' ? 'An loda hoto daga gallery!' : 'Photo loaded!');
       }
+    } catch (err) {
+      console.warn('Health gallery fallback:', err);
+      fileInputRef.current?.click();
     }
-    fileInputRef.current?.click();
   };
 
   // Voice-to-Text & Voice Recording: Speak symptoms aloud
@@ -473,26 +470,58 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
             </button>
           </div>
         ) : (
-          <div className="text-center p-2 space-y-1.5">
+          <div className="text-center p-2 space-y-2">
             <ShieldAlert className="w-6 h-6 text-red-600 opacity-80 mx-auto" />
             <p className="text-slate-700 font-bold text-xs">
               {locale === 'ha' ? 'Hoton matsalar fata ko cizon maciji (Idan akwai)' : 'Optional photo for rash, bite, or visible wound'}
             </p>
-            <div className="flex justify-center gap-2 pt-1">
-              <button
-                onClick={handleTakePhoto}
-                className="py-1.5 px-3 border border-red-300 text-red-800 bg-white hover:bg-red-50 rounded-lg font-bold text-xs cursor-pointer shadow-2xs"
-              >
-                <Camera className="w-3.5 h-3.5 inline mr-1 text-red-700" />
-                <span>{t(locale, 'takePhoto')}</span>
-              </button>
-              <button
-                onClick={handlePickGallery}
-                className="py-1.5 px-3 border border-red-300 text-red-800 bg-white hover:bg-red-50 rounded-lg font-bold text-xs cursor-pointer shadow-2xs"
-              >
-                <ImageIcon className="w-3.5 h-3.5 inline mr-1 text-red-700" />
-                <span>{t(locale, 'gallery')}</span>
-              </button>
+            <div className="flex flex-col items-center gap-2 pt-1 max-w-xs mx-auto">
+              <div className="inline-flex p-0.5 bg-slate-100 rounded-xl border border-slate-200 shadow-2xs">
+                <button
+                  type="button"
+                  onClick={() => setPhotoSourceMode('camera')}
+                  className={`flex items-center space-x-1 px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    photoSourceMode === 'camera'
+                      ? 'bg-red-700 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <Camera className="w-3 h-3" />
+                  <span>{t(locale, 'takePhoto')}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPhotoSourceMode('gallery')}
+                  className={`flex items-center space-x-1 px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    photoSourceMode === 'gallery'
+                      ? 'bg-red-700 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <ImageIcon className="w-3 h-3" />
+                  <span>{t(locale, 'gallery')}</span>
+                </button>
+              </div>
+
+              {photoSourceMode === 'camera' ? (
+                <button
+                  type="button"
+                  onClick={handleTakePhoto}
+                  className="w-full py-2 px-3 bg-red-700 hover:bg-red-800 text-white rounded-lg font-bold text-xs cursor-pointer shadow-xs flex items-center justify-center space-x-1.5 active:scale-[0.99]"
+                >
+                  <Camera className="w-3.5 h-3.5 text-red-200" />
+                  <span>{locale === 'ha' ? 'Ɗauki Hoto da Kyamara' : 'Take Photo with Camera'}</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handlePickGallery}
+                  className="w-full py-2 px-3 bg-red-700 hover:bg-red-800 text-white rounded-lg font-bold text-xs cursor-pointer shadow-xs flex items-center justify-center space-x-1.5 active:scale-[0.99]"
+                >
+                  <ImageIcon className="w-3.5 h-3.5 text-red-200" />
+                  <span>{locale === 'ha' ? 'Zaɓi Hoto daga Taska' : 'Choose from Gallery'}</span>
+                </button>
+              )}
             </div>
           </div>
         )}

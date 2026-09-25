@@ -333,7 +333,10 @@ export async function analyzeCropImage(
     };
 
     if (typeof imageSource === 'string') {
-      img.src = imageSource;
+      img.src =
+        imageSource.startsWith('data:') || imageSource.startsWith('blob:') || imageSource.startsWith('http')
+          ? imageSource
+          : `data:image/jpeg;base64,${imageSource}`;
     } else {
       img.src = URL.createObjectURL(imageSource);
     }

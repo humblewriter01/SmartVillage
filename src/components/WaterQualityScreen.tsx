@@ -18,7 +18,7 @@ import { Language, t } from '../utils/translations';
 import { waterQualityService, WaterQualityResult } from '../services/waterQualityService';
 import { voiceService } from '../services/voiceService';
 import { historyService } from '../services/historyService';
-import { cameraService } from '../services/cameraService';
+import { takePhotoWithCamera, pickPhotoFromGallery, cameraService } from '../services/cameraService';
 
 interface WaterQualityScreenProps {
   locale: Language;
@@ -54,6 +54,7 @@ export const WaterQualityScreen: React.FC<WaterQualityScreenProps> = ({
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [photoSourceMode, setPhotoSourceMode] = useState<'camera' | 'gallery'>('camera');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -74,37 +75,33 @@ export const WaterQualityScreen: React.FC<WaterQualityScreenProps> = ({
   };
 
   const handleTakePhoto = async () => {
-    if (cameraService.isNative()) {
-      try {
-        const photo = await cameraService.capturePhoto({ locale });
-        if (photo) {
-          setPhotoUrl(photo);
-          setResult(null);
-          showToast(locale === 'ha' ? 'An ɗauki hoto!' : 'Photo captured!');
-          return;
-        }
-      } catch (err) {
-        console.warn('Water camera fallback:', err);
+    try {
+      const photo = await takePhotoWithCamera();
+      if (photo) {
+        const formatted = photo.startsWith('data:') ? photo : `data:image/jpeg;base64,${photo}`;
+        setPhotoUrl(formatted);
+        setResult(null);
+        showToast(locale === 'ha' ? 'An ɗauki hoto!' : 'Photo captured!');
       }
+    } catch (err) {
+      console.warn('Water camera fallback:', err);
+      cameraInputRef.current?.click();
     }
-    cameraInputRef.current?.click();
   };
 
   const handlePickGallery = async () => {
-    if (cameraService.isNative()) {
-      try {
-        const photo = await cameraService.pickFromGallery(locale);
-        if (photo) {
-          setPhotoUrl(photo);
-          setResult(null);
-          showToast(locale === 'ha' ? 'An loda hoto daga gallery!' : 'Photo loaded!');
-          return;
-        }
-      } catch (err) {
-        console.warn('Water gallery fallback:', err);
+    try {
+      const photo = await pickPhotoFromGallery();
+      if (photo) {
+        const formatted = photo.startsWith('data:') ? photo : `data:image/jpeg;base64,${photo}`;
+        setPhotoUrl(formatted);
+        setResult(null);
+        showToast(locale === 'ha' ? 'An loda hoto daga gallery!' : 'Photo loaded!');
       }
+    } catch (err) {
+      console.warn('Water gallery fallback:', err);
+      fileInputRef.current?.click();
     }
-    fileInputRef.current?.click();
   };
 
   const handleAnalyze = async () => {
@@ -270,22 +267,59 @@ export const WaterQualityScreen: React.FC<WaterQualityScreenProps> = ({
           </div>
         )}
 
-        {/* Capture / Select Action Buttons */}
-        <div className="grid grid-cols-2 gap-3">
-          <button
-            onClick={handleTakePhoto}
-            className="flex items-center justify-center space-x-2 py-3 px-4 rounded-xl bg-sky-600 hover:bg-sky-700 active:scale-98 transition-all text-white font-semibold text-sm cursor-pointer shadow-xs"
-          >
-            <Camera className="w-4 h-4" />
-            <span>{t(locale, 'takePhoto')}</span>
-          </button>
-          <button
-            onClick={handlePickGallery}
-            className="flex items-center justify-center space-x-2 py-3 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-sm cursor-pointer transition-colors"
-          >
-            <ImageIcon className="w-4 h-4" />
-            <span>{t(locale, 'gallery')}</span>
-          </button>
+        {/* Camera / Gallery Toggle & Action Button */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between bg-slate-100/90 p-1.5 rounded-2xl border border-slate-200">
+            <span className="text-xs font-bold text-slate-700 px-2 flex items-center space-x-1.5">
+              <span>{locale === 'ha' ? 'Zaɓi Hanyar Hoto:' : 'Photo Mode:'}</span>
+            </span>
+            <div className="inline-flex p-0.5 bg-white rounded-xl border border-slate-200 shadow-2xs">
+              <button
+                type="button"
+                onClick={() => setPhotoSourceMode('camera')}
+                className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  photoSourceMode === 'camera'
+                    ? 'bg-sky-600 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Camera className="w-3.5 h-3.5" />
+                <span>{t(locale, 'takePhoto')}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setPhotoSourceMode('gallery')}
+                className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  photoSourceMode === 'gallery'
+                    ? 'bg-sky-600 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <ImageIcon className="w-3.5 h-3.5" />
+                <span>{t(locale, 'gallery')}</span>
+              </button>
+            </div>
+          </div>
+
+          {photoSourceMode === 'camera' ? (
+            <button
+              type="button"
+              onClick={handleTakePhoto}
+              className="w-full flex items-center justify-center space-x-2 py-3 px-4 rounded-xl bg-sky-600 hover:bg-sky-700 active:scale-98 transition-all text-white font-semibold text-sm cursor-pointer shadow-xs"
+            >
+              <Camera className="w-4 h-4 text-sky-200" />
+              <span>{locale === 'ha' ? 'Ɗauki Hoto da Kyamara' : 'Open Camera to Take Photo'}</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handlePickGallery}
+              className="w-full flex items-center justify-center space-x-2 py-3 px-4 rounded-xl bg-sky-600 hover:bg-sky-700 active:scale-98 transition-all text-white font-semibold text-sm cursor-pointer shadow-xs"
+            >
+              <ImageIcon className="w-4 h-4 text-sky-200" />
+              <span>{locale === 'ha' ? 'Zaɓi Hoto daga Taskar Hotuna' : 'Choose Photo from Gallery'}</span>
+            </button>
+          )}
         </div>
 
         {/* Test Water Sample Chips */}

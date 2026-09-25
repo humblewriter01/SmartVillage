@@ -1,17 +1,8 @@
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { Capacitor } from '@capacitor/core';
 
-export interface CameraOptionsCustom {
-  locale?: string;
-  source?: 'camera' | 'photos';
-}
-
-/**
- * Fallback file picker for web browsers / iframe sandboxes.
- * Creates an input element on the fly to capture an image without triggering
- * pwa-camera-modal which fails with 'No camera found' in web previews.
- */
-function pickFromFilePicker(source?: 'camera' | 'photos'): Promise<string | null> {
+// Web fallback (browser only)
+export function pickImageFromWeb(source: 'camera' | 'photos' = 'camera'): Promise<string | null> {
   return new Promise((resolve) => {
     try {
       const input = document.createElement('input');
@@ -62,76 +53,63 @@ function pickFromFilePicker(source?: 'camera' | 'photos'): Promise<string | null
       document.body.appendChild(input);
       input.click();
     } catch (err) {
-      console.warn('File picker fallback error:', err);
+      console.warn('Web file picker error:', err);
       resolve(null);
     }
   });
 }
 
-export const cameraService = {
-  /**
-   * Capture a photo using @capacitor/camera on native Android/iOS,
-   * or native HTML5 file input on web/preview.
-   * Prevents the broken 'No camera found' PWA modal from showing on web.
-   */
-  async capturePhoto(options?: CameraOptionsCustom): Promise<string | null> {
-    const isNative = Capacitor.isNativePlatform();
-    const source = options?.source === 'photos' ? CameraSource.Photos : CameraSource.Camera;
-
-    // 1. Native platform (Android APK / iOS)
-    if (isNative) {
-      try {
-        const permStatus = await Camera.checkPermissions();
-        if (permStatus.camera !== 'granted' || (source === CameraSource.Photos && permStatus.photos !== 'granted')) {
-          const requested = await Camera.requestPermissions({
-            permissions: source === CameraSource.Photos ? ['camera', 'photos'] : ['camera'],
-          });
-
-          if (requested.camera === 'denied' || requested.photos === 'denied') {
-            console.warn('Camera permission was denied in native settings');
-            return null;
-          }
-        }
-
-        const image = await Camera.getPhoto({
-          quality: 85,
-          allowEditing: false,
-          resultType: CameraResultType.DataUrl,
-          source,
-          correctOrientation: true,
-        });
-
-        return image.dataUrl || (image.webPath ? image.webPath : null);
-      } catch (err: any) {
-        const errorMsg = String(err?.message || err);
-
-        // Handle user cancellation silently without crash
-        if (
-          errorMsg.includes('cancelled') ||
-          errorMsg.includes('canceled') ||
-          errorMsg.includes('User cancelled') ||
-          errorMsg.includes('TakePhotoCancelled')
-        ) {
-          return null;
-        }
-
-        console.warn('Capacitor camera captured error on native:', err);
-        return null;
-      }
+// Function to open the CAMERA directly
+export async function takePhotoWithCamera(): Promise<string | null> {
+  try {
+    if (Capacitor.isNativePlatform()) {
+      const photo = await Camera.getPhoto({
+        quality: 90,
+        allowEditing: false,
+        resultType: CameraResultType.Base64,
+        source: CameraSource.Camera, // <--- This forces the Camera app
+      });
+      return photo.base64String || null;
+    } else {
+      // Web fallback (browser only)
+      return await pickImageFromWeb('camera');
     }
+  } catch (error) {
+    console.error('Camera error:', error);
+    alert('Ba a iya buɗe kyamara ba. Don Allah ka ba da izinin kyamara a saitunan waya.');
+    return null;
+  }
+}
 
-    // 2. Web browser / Preview environment
-    // Never call Camera.getPhoto() on web because <pwa-camera-modal> displays 'No camera found'.
-    return await pickFromFilePicker(options?.source);
-  },
+// Function to open the GALLERY separately (optional)
+export async function pickPhotoFromGallery(): Promise<string | null> {
+  try {
+    if (Capacitor.isNativePlatform()) {
+      const photo = await Camera.getPhoto({
+        quality: 90,
+        allowEditing: false,
+        resultType: CameraResultType.Base64,
+        source: CameraSource.Photos, // <--- This opens the Gallery
+      });
+      return photo.base64String || null;
+    } else {
+      return await pickImageFromWeb('photos');
+    }
+  } catch (error) {
+    console.error('Gallery error:', error);
+    return null;
+  }
+}
 
-  async pickFromGallery(locale?: string): Promise<string | null> {
-    return this.capturePhoto({ locale, source: 'photos' });
+export const cameraService = {
+  takePhotoWithCamera,
+  pickPhotoFromGallery,
+  capturePhoto: async (options?: { locale?: string; source?: 'camera' | 'photos' }) => {
+    if (options?.source === 'photos') {
+      return pickPhotoFromGallery();
+    }
+    return takePhotoWithCamera();
   },
-
-  isNative(): boolean {
-    return Capacitor.isNativePlatform();
-  },
+  pickFromGallery: async () => pickPhotoFromGallery(),
+  isNative: () => Capacitor.isNativePlatform(),
 };
-
-
