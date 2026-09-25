@@ -1,4 +1,3 @@
-import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { Capacitor } from '@capacitor/core';
 
 // Web fallback (browser only)
@@ -59,110 +58,16 @@ export function pickImageFromWeb(source: 'camera' | 'photos' = 'camera'): Promis
   });
 }
 
-// Function to open the CAMERA directly with explicit runtime permission checks
+// Function to open the CAMERA directly using the HTML method (works on ALL Android phones including Tecno)
 export async function takePhotoWithCamera(): Promise<string | null> {
-  try {
-    if (Capacitor.isNativePlatform()) {
-      // Step 1: Check current permissions
-      let permissions = await Camera.checkPermissions();
-
-      // Step 2: Request permissions if not granted
-      if (permissions.camera !== 'granted') {
-        try {
-          permissions = await Camera.requestPermissions({ permissions: ['camera'] });
-        } catch {
-          permissions = await Camera.requestPermissions();
-        }
-      }
-
-      // Step 3: If camera permission is granted or ready, open with Capacitor Camera
-      if (permissions.camera === 'granted') {
-        const photo = await Camera.getPhoto({
-          quality: 90,
-          allowEditing: false,
-          resultType: CameraResultType.Base64,
-          source: CameraSource.Camera,
-        });
-        return photo.base64String || null;
-      }
-
-      // If Capacitor Camera permission is still not granted (e.g. system restriction),
-      // seamlessly fallback to Android WebView's native camera capture!
-      console.warn('Capacitor camera permission not granted, trying system camera capture fallback...');
-      const fallbackPhoto = await pickImageFromWeb('camera');
-      if (fallbackPhoto) {
-        return fallbackPhoto;
-      }
-
-      alert('Ba a iya buɗe kyamara ba. Don Allah ka ba da izinin kyamara a saitunan waya.');
-      return null;
-    } else {
-      // Web fallback (browser only)
-      return await pickImageFromWeb('camera');
-    }
-  } catch (error: any) {
-    const msg = String(error?.message || error);
-    if (
-      msg.includes('cancelled') ||
-      msg.includes('canceled') ||
-      msg.includes('User cancelled') ||
-      msg.includes('TakePhotoCancelled')
-    ) {
-      return null;
-    }
-    console.warn('Camera error, trying fallback capture:', error);
-
-    // Fallback: If Capacitor Camera plugin threw an unexpected error, attempt webview camera capture
-    try {
-      const fallbackPhoto = await pickImageFromWeb('camera');
-      if (fallbackPhoto) {
-        return fallbackPhoto;
-      }
-    } catch (fallbackErr) {
-      console.error('Fallback camera error:', fallbackErr);
-    }
-
-    alert('Ba a iya buɗe kyamara ba. Don Allah ka ba da izinin kyamara a saitunan waya.');
-    return null;
-  }
+  // Force HTML file input method on ALL platforms to bypass Tecno/HiOS restrictions
+  return await pickImageFromWeb('camera');
 }
 
-// Function to open the GALLERY separately (optional)
+// Function to open the GALLERY using the HTML method
 export async function pickPhotoFromGallery(): Promise<string | null> {
-  try {
-    if (Capacitor.isNativePlatform()) {
-      let permissions = await Camera.checkPermissions();
-      if (permissions.photos !== 'granted') {
-        permissions = await Camera.requestPermissions({ permissions: ['photos'] });
-      }
-
-      const photo = await Camera.getPhoto({
-        quality: 90,
-        allowEditing: false,
-        resultType: CameraResultType.Base64,
-        source: CameraSource.Photos, // <--- This opens the Gallery
-      });
-      return photo.base64String || null;
-    } else {
-      return await pickImageFromWeb('photos');
-    }
-  } catch (error: any) {
-    const msg = String(error?.message || error);
-    if (
-      msg.includes('cancelled') ||
-      msg.includes('canceled') ||
-      msg.includes('User cancelled') ||
-      msg.includes('TakePhotoCancelled')
-    ) {
-      return null;
-    }
-    console.warn('Native gallery encountered an issue, trying web file picker fallback:', error);
-    try {
-      return await pickImageFromWeb('photos');
-    } catch {
-      return null;
-    }
-  }
+  // Force HTML file input method on ALL platforms
+  return await pickImageFromWeb('photos');
 }
 
 export const cameraService = {
