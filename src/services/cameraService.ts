@@ -1,154 +1,228 @@
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { Capacitor } from '@capacitor/core';
 
-// Web fallback (browser only)
+/**
+ * Universal web and mobile file/camera picker fallback.
+ * Uses an invisible HTML <input type="file"> with focus and cancel guards
+ * to ensure promises never hang indefinitely even if cancelled or blocked.
+ */
 export function pickImageFromWeb(source: 'camera' | 'photos' = 'camera'): Promise<string | null> {
   return new Promise((resolve) => {
-    try {
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = 'image/*';
-      if (source === 'camera') {
-        input.capture = 'environment';
+    let resolved = false;
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    if (source === 'camera') {
+      input.capture = 'environment';
+    }
+    input.style.position = 'fixed';
+    input.style.top = '-10000px';
+    input.style.left = '-10000px';
+    input.style.opacity = '0';
+    input.style.pointerEvents = 'none';
+
+    const cleanup = (result: string | null) => {
+      if (resolved) return;
+      resolved = true;
+      window.removeEventListener('focus', onWindowFocus);
+      if (document.body.contains(input)) {
+        document.body.removeChild(input);
       }
-      input.style.position = 'fixed';
-      input.style.top = '-1000px';
-      input.style.opacity = '0';
+      resolve(result);
+    };
 
-      let resolved = false;
-      const cleanup = () => {
-        if (document.body.contains(input)) {
-          document.body.removeChild(input);
+    // When the file dialog closes without selection, window gets focus
+    const onWindowFocus = () => {
+      setTimeout(() => {
+        if (!resolved && (!input.files || input.files.length === 0)) {
+          cleanup(null);
         }
-      };
+      }, 700);
+    };
 
-      input.onchange = (e) => {
-        const file = (e.target as HTMLInputElement).files?.[0];
-        if (!file) {
-          if (!resolved) {
-            resolved = true;
-            cleanup();
-            resolve(null);
-          }
-          return;
-        }
-        const reader = new FileReader();
-        reader.onload = () => {
-          if (!resolved) {
-            resolved = true;
-            cleanup();
-            resolve(reader.result as string);
-          }
-        };
-        reader.onerror = () => {
-          if (!resolved) {
-            resolved = true;
-            cleanup();
-            resolve(null);
-          }
-        };
-        reader.readAsDataURL(file);
-      };
+    window.addEventListener('focus', onWindowFocus, { once: true });
 
-      document.body.appendChild(input);
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) {
+        cleanup(null);
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        cleanup(reader.result as string);
+      };
+      reader.onerror = () => {
+        cleanup(null);
+      };
+      reader.readAsDataURL(file);
+    };
+
+    // Modern browsers fire 'cancel' if the user aborts
+    input.addEventListener('cancel', () => {
+      cleanup(null);
+    });
+
+    document.body.appendChild(input);
+    try {
       input.click();
-    } catch (err) {
-      console.warn('Web file picker error:', err);
-      resolve(null);
+    } catch {
+      cleanup(null);
     }
   });
 }
 
-// Function to open the CAMERA directly with explicit runtime permission checks
+/**
+ * Open the camera directly.
+ * Optimized for Android/Tecno/Transsion phones with resolution capping to avoid OutOfMemory,
+ * safe permission requests, and multi-format return (dataUrl, base64, webPath).
+ */
 export async function takePhotoWithCamera(): Promise<string | null> {
-  try {
-    if (Capacitor.isNativePlatform()) {
-      // Proactively request camera permission if possible
+  if (Capacitor.isNativePlatform()) {
+    try {
+      // Step 1: Pre-check permissions cleanly without blocking if already prompt/granted
       try {
-        const check = await Camera.checkPermissions();
-        if (check.camera !== 'granted') {
-          await Camera.requestPermissions({ permissions: ['camera'] });
+        const permStatus = await Camera.checkPermissions().catch(() => null);
+        if (permStatus && permStatus.camera !== 'granted') {
+          await Camera.requestPermissions({ permissions: ['camera'] }).catch(() => null);
         }
       } catch (permErr) {
-        console.warn('Capacitor check/request permissions note:', permErr);
+        console.warn('Capacitor camera permission check notice:', permErr);
       }
 
-      // Open camera natively via Capacitor Camera
+      // Step 2: Open camera with downscaled width/height to avoid Tecno 50MP heap OutOfMemory
       const photo = await Camera.getPhoto({
-        quality: 90,
+        quality: 80,
+        width: 1280,
+        height: 1280,
         allowEditing: false,
-        resultType: CameraResultType.Base64,
+        resultType: CameraResultType.DataUrl,
         source: CameraSource.Camera,
+        correctOrientation: true,
+        saveToGallery: false,
       });
 
-      return photo.base64String || null;
-    } else {
-      // Web fallback (browser only)
-      return await pickImageFromWeb('camera');
-    }
-  } catch (error: any) {
-    const msg = String(error?.message || error);
-    // Ignore normal cancellation
-    if (
-      msg.includes('cancelled') ||
-      msg.includes('canceled') ||
-      msg.includes('User cancelled') ||
-      msg.includes('TakePhotoCancelled')
-    ) {
+      // Handle all possible output formats from Android Capacitor Camera plugin
+      if (photo.dataUrl) {
+        return photo.dataUrl;
+      }
+      if (photo.base64String) {
+        return photo.base64String.startsWith('data:')
+          ? photo.base64String
+          : `data:image/jpeg;base64,${photo.base64String}`;
+      }
+      if (photo.webPath) {
+        try {
+          const resp = await fetch(photo.webPath);
+          const blob = await resp.blob();
+          return await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.readAsDataURL(blob);
+          });
+        } catch {
+          return photo.webPath;
+        }
+      }
+
       return null;
+    } catch (error: any) {
+      const msg = String(error?.message || error).toLowerCase();
+      // If user purposely cancelled, do not trigger fallback or alert
+      if (
+        msg.includes('cancelled') ||
+        msg.includes('canceled') ||
+        msg.includes('user cancelled') ||
+        msg.includes('takephotocancelled')
+      ) {
+        return null;
+      }
+
+      console.warn('Native Camera.getPhoto error on device, falling back to web file capture:', error);
+
+      // Attempt web/HTML file capture fallback
+      try {
+        const fallback = await pickImageFromWeb('camera');
+        if (fallback) return fallback;
+      } catch (fallbackErr) {
+        console.warn('Fallback capture error:', fallbackErr);
+      }
+
+      // Re-throw so component catch can fire ref input if needed
+      throw error;
     }
-
-    console.warn('Native camera error, trying web/system input fallback:', error);
-
-    // Try webview file capture as seamless fallback
-    try {
-      const fallback = await pickImageFromWeb('camera');
-      if (fallback) return fallback;
-    } catch {
-      // ignore
-    }
-
-    // Only alert if there is a real permission denial that prevents any capture
-    alert('Ba a iya buɗe kyamara ba. Don Allah ka ba da izinin kyamara a saitunan waya.');
-    return null;
+  } else {
+    return await pickImageFromWeb('camera');
   }
 }
 
-// Function to open the GALLERY separately (optional)
+/**
+ * Open the device Gallery / Photo Library.
+ */
 export async function pickPhotoFromGallery(): Promise<string | null> {
-  try {
-    if (Capacitor.isNativePlatform()) {
-      let permissions = await Camera.checkPermissions();
-      if (permissions.photos !== 'granted') {
-        permissions = await Camera.requestPermissions({ permissions: ['photos'] });
+  if (Capacitor.isNativePlatform()) {
+    try {
+      try {
+        const permStatus = await Camera.checkPermissions().catch(() => null);
+        if (permStatus && permStatus.photos !== 'granted') {
+          await Camera.requestPermissions({ permissions: ['photos'] }).catch(() => null);
+        }
+      } catch (permErr) {
+        console.warn('Capacitor gallery permission check notice:', permErr);
       }
 
       const photo = await Camera.getPhoto({
-        quality: 90,
+        quality: 80,
+        width: 1280,
+        height: 1280,
         allowEditing: false,
-        resultType: CameraResultType.Base64,
-        source: CameraSource.Photos, // <--- This opens the Gallery
+        resultType: CameraResultType.DataUrl,
+        source: CameraSource.Photos,
+        correctOrientation: true,
       });
-      return photo.base64String || null;
-    } else {
-      return await pickImageFromWeb('photos');
-    }
-  } catch (error: any) {
-    const msg = String(error?.message || error);
-    if (
-      msg.includes('cancelled') ||
-      msg.includes('canceled') ||
-      msg.includes('User cancelled') ||
-      msg.includes('TakePhotoCancelled')
-    ) {
+
+      if (photo.dataUrl) {
+        return photo.dataUrl;
+      }
+      if (photo.base64String) {
+        return photo.base64String.startsWith('data:')
+          ? photo.base64String
+          : `data:image/jpeg;base64,${photo.base64String}`;
+      }
+      if (photo.webPath) {
+        try {
+          const resp = await fetch(photo.webPath);
+          const blob = await resp.blob();
+          return await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.readAsDataURL(blob);
+          });
+        } catch {
+          return photo.webPath;
+        }
+      }
+
       return null;
+    } catch (error: any) {
+      const msg = String(error?.message || error).toLowerCase();
+      if (
+        msg.includes('cancelled') ||
+        msg.includes('canceled') ||
+        msg.includes('user cancelled') ||
+        msg.includes('takephotocancelled')
+      ) {
+        return null;
+      }
+      console.warn('Native gallery error, trying fallback:', error);
+      try {
+        return await pickImageFromWeb('photos');
+      } catch {
+        return null;
+      }
     }
-    console.warn('Native gallery encountered an issue, trying web file picker fallback:', error);
-    try {
-      return await pickImageFromWeb('photos');
-    } catch {
-      return null;
-    }
+  } else {
+    return await pickImageFromWeb('photos');
   }
 }
 

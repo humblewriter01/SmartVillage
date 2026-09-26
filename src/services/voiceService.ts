@@ -579,6 +579,16 @@ export const voiceService = {
     context?: VoiceContext
   ): Promise<boolean> {
     try {
+      // Immediately halt any active TTS or audio playback so Android audio hardware is free
+      stopSpeakingText().catch(() => {});
+      if (activeAudioPlayer) {
+        try {
+          activeAudioPlayer.pause();
+          activeAudioPlayer.currentTime = 0;
+        } catch {}
+        activeAudioPlayer = null;
+      }
+
       if (isCurrentlyRecording) {
         await this.stopListening();
       }
@@ -591,40 +601,40 @@ export const voiceService = {
       activeRecordingContext = context;
       let latestTranscript = '';
 
-      const cueCategory = context?.type === 'crop' ? 'crop' : context?.type === 'health' ? 'health' : 'general';
-      this.playAudioCue('start', cueCategory);
-
       // 1. Attempt Capacitor VoiceRecorder plugin (for Android APK and supported browsers)
-      try {
-        const canRecord = await VoiceRecorder.canDeviceVoiceRecord().catch(() => ({ value: false }));
-        if (canRecord.value) {
-          const perm = await VoiceRecorder.hasAudioRecordingPermission().catch(() => ({ value: false }));
-          let hasPerm = perm.value;
-          if (!hasPerm) {
-            const requested = await VoiceRecorder.requestAudioRecordingPermission().catch(() => ({ value: false }));
-            hasPerm = requested.value;
-          }
-
-          if (hasPerm) {
-            const started = await VoiceRecorder.startRecording().catch(() => ({ value: false }));
-            if (started.value) {
-              isCapacitorRecording = true;
-              this.notifyPermissionGranted();
+      if (Capacitor.isNativePlatform()) {
+        try {
+          const canRecord = await VoiceRecorder.canDeviceVoiceRecord().catch(() => ({ value: false }));
+          if (canRecord && canRecord.value) {
+            let perm = await VoiceRecorder.hasAudioRecordingPermission().catch(() => ({ value: false }));
+            if (!perm || !perm.value) {
+              perm = await VoiceRecorder.requestAudioRecordingPermission().catch(() => ({ value: false }));
             }
-          } else {
-            console.warn('VoiceRecorder permission denied');
-            const isHausa = localeId === 'ha' || localeId === 'ha-NG';
-            alert(
-              isHausa
-                ? 'An hana izinin amfani da makirufo. Da fatan ka ba da izini a saitunan waya.'
-                : 'Microphone permission denied. Please grant microphone access in settings.'
-            );
-            this.notifyPermissionDenied();
+
+            if (perm && perm.value) {
+              const started = await VoiceRecorder.startRecording().catch((startErr) => {
+                console.warn('VoiceRecorder.startRecording failed:', startErr);
+                return { value: false };
+              });
+              if (started && started.value) {
+                isCapacitorRecording = true;
+                this.notifyPermissionGranted();
+              }
+            } else {
+              console.warn('VoiceRecorder permission not granted');
+              this.notifyPermissionDenied();
+            }
           }
+        } catch (pluginErr) {
+          console.warn('VoiceRecorder plugin not usable, falling back:', pluginErr);
         }
-      } catch (pluginErr) {
-        console.warn('VoiceRecorder plugin not usable, falling back:', pluginErr);
       }
+
+      // Soft non-blocking cue sound
+      try {
+        const cueCategory = context?.type === 'crop' ? 'crop' : context?.type === 'health' ? 'health' : 'general';
+        this.playAudioCue('start', cueCategory);
+      } catch {}
 
       // 2. Parallel SpeechRecognition for live transcription
       try {
@@ -885,6 +895,22 @@ export const voiceService = {
   },
 
   async checkMicrophonePermission(): Promise<'granted' | 'denied' | 'prompt' | 'unknown'> {
+    // 1. Native platform check via VoiceRecorder plugin
+    if (Capacitor.isNativePlatform()) {
+      try {
+        const perm = await VoiceRecorder.hasAudioRecordingPermission();
+        if (perm && perm.value) {
+          try {
+            localStorage.setItem('smartvillage.mic_permission', 'granted');
+          } catch {}
+          return 'granted';
+        }
+      } catch (err) {
+        console.warn('Native VoiceRecorder check permission error:', err);
+      }
+    }
+
+    // 2. Web browser check
     try {
       if (navigator.permissions && navigator.permissions.query) {
         const status = await navigator.permissions.query({ name: 'microphone' as PermissionName });
@@ -926,6 +952,23 @@ export const voiceService = {
   },
 
   async requestMicrophonePermission(): Promise<boolean> {
+    // 1. On native Android/Capacitor: request system permission directly
+    if (Capacitor.isNativePlatform()) {
+      try {
+        const perm = await VoiceRecorder.requestAudioRecordingPermission();
+        if (perm && perm.value) {
+          try {
+            localStorage.setItem('smartvillage.mic_permission', 'granted');
+          } catch {}
+          this.notifyPermissionGranted();
+          return true;
+        }
+      } catch (e) {
+        console.warn('VoiceRecorder native permission request error:', e);
+      }
+    }
+
+    // 2. Browser fallback via getUserMedia
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       return false;
     }

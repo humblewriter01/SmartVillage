@@ -54,7 +54,6 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
   const [showManualModal, setShowManualModal] = useState(false);
   const [manualCategoryFilter, setManualCategoryFilter] = useState<'all' | 'emergency' | 'infectious' | 'respiratory' | 'skin'>('all');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [photoSourceMode, setPhotoSourceMode] = useState<'camera' | 'gallery'>('camera');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -475,53 +474,26 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
             <p className="text-slate-700 font-bold text-xs">
               {locale === 'ha' ? 'Hoton matsalar fata ko cizon maciji (Idan akwai)' : 'Optional photo for rash, bite, or visible wound'}
             </p>
-            <div className="flex flex-col items-center gap-2 pt-1 max-w-xs mx-auto">
-              <div className="inline-flex p-0.5 bg-slate-100 rounded-xl border border-slate-200 shadow-2xs">
-                <button
-                  type="button"
-                  onClick={() => setPhotoSourceMode('camera')}
-                  className={`flex items-center space-x-1 px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    photoSourceMode === 'camera'
-                      ? 'bg-red-700 text-white shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  <Camera className="w-3 h-3" />
-                  <span>{t(locale, 'takePhoto')}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPhotoSourceMode('gallery')}
-                  className={`flex items-center space-x-1 px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    photoSourceMode === 'gallery'
-                      ? 'bg-red-700 text-white shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  <ImageIcon className="w-3 h-3" />
-                  <span>{t(locale, 'gallery')}</span>
-                </button>
-              </div>
+            <div className="space-y-2 pt-1 max-w-xs mx-auto w-full">
+              <button
+                type="button"
+                onClick={handleTakePhoto}
+                className="w-full py-3 px-4 bg-red-700 hover:bg-red-800 text-white rounded-2xl font-black text-xs sm:text-sm cursor-pointer shadow-sm flex items-center justify-center space-x-2 active:scale-[0.99] transition-all"
+              >
+                <Camera className="w-4 h-4 text-red-200" />
+                <span>{locale === 'ha' ? 'Ɗauki Hoto' : 'Take Photo'}</span>
+              </button>
 
-              {photoSourceMode === 'camera' ? (
-                <button
-                  type="button"
-                  onClick={handleTakePhoto}
-                  className="w-full py-2 px-3 bg-red-700 hover:bg-red-800 text-white rounded-lg font-bold text-xs cursor-pointer shadow-xs flex items-center justify-center space-x-1.5 active:scale-[0.99]"
-                >
-                  <Camera className="w-3.5 h-3.5 text-red-200" />
-                  <span>{locale === 'ha' ? 'Ɗauki Hoto da Kyamara' : 'Take Photo with Camera'}</span>
-                </button>
-              ) : (
+              <div className="flex items-center justify-center">
                 <button
                   type="button"
                   onClick={handlePickGallery}
-                  className="w-full py-2 px-3 bg-red-700 hover:bg-red-800 text-white rounded-lg font-bold text-xs cursor-pointer shadow-xs flex items-center justify-center space-x-1.5 active:scale-[0.99]"
+                  className="inline-flex items-center space-x-1.5 py-1 px-3 text-xs font-bold text-red-800 hover:text-red-950 hover:bg-red-50 rounded-xl transition-colors cursor-pointer"
                 >
-                  <ImageIcon className="w-3.5 h-3.5 text-red-200" />
-                  <span>{locale === 'ha' ? 'Zaɓi Hoto daga Taska' : 'Choose from Gallery'}</span>
+                  <ImageIcon className="w-3.5 h-3.5 text-red-600" />
+                  <span>{locale === 'ha' ? 'Zaɓi daga Gallery' : 'Choose from Gallery'}</span>
                 </button>
-              )}
+              </div>
             </div>
           </div>
         )}
