@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Mic, MicOff, Lock, CheckCircle2, X, RefreshCw, Volume2 } from 'lucide-react';
+import { Mic, MicOff, Lock, CheckCircle2, X, RefreshCw, Smartphone } from 'lucide-react';
 import { Language, t } from '../utils/translations';
 import { voiceService } from '../services/voiceService';
+import { Capacitor } from '@capacitor/core';
 
 interface MicrophonePermissionModalProps {
   isOpen: boolean;
@@ -21,6 +22,8 @@ export function MicrophonePermissionModal({
 
   if (!isOpen) return null;
 
+  const isNative = Capacitor.isNativePlatform();
+
   const handleRequestPermission = async () => {
     setIsRequesting(true);
     setErrorMsg(null);
@@ -31,16 +34,20 @@ export function MicrophonePermissionModal({
         onClose();
       } else {
         setErrorMsg(
-          locale === 'ha'
-            ? 'Har yanzu an toshe damar murya. Don Allah danna alamar kwado 🔒 a saman burauza ka canza shi zuwa "Allow".'
-            : 'Microphone is still blocked in browser settings. Please tap the 🔒 icon in your browser address bar and set Microphone to "Allow".'
+          isNative
+            ? (locale === 'ha'
+                ? 'Har yanzu an toshe makirufo. Don Allah buɗe Saitunan waya (Settings) > Apps > SmartVillage > Permissions > Microphone ka zaba "Allow".'
+                : 'Microphone is blocked. Please go to Phone Settings > Apps > SmartVillage > Permissions > Microphone and select "Allow".')
+            : (locale === 'ha'
+                ? 'Har yanzu an toshe damar murya. Don Allah danna alamar kwado 🔒 a saman burauza ka canza shi zuwa "Allow".'
+                : 'Microphone is still blocked in browser settings. Please tap the 🔒 icon in your browser address bar and set Microphone to "Allow".')
         );
       }
     } catch {
       setErrorMsg(
         locale === 'ha'
-          ? 'An sami matsala wajen neman izini. Don Allah canza a saitin burauza.'
-          : 'Unable to open microphone. Please change permission in your browser address bar.'
+          ? 'An sami matsala wajen neman izini. Don Allah canza a saitin waya.'
+          : 'Unable to open microphone. Please change permission in your device settings.'
       );
     } finally {
       setIsRequesting(false);
@@ -93,13 +100,17 @@ export function MicrophonePermissionModal({
                 </div>
                 <div className="flex-1">
                   <div className="flex items-center space-x-1 font-semibold text-slate-900">
-                    <Lock className="w-3.5 h-3.5 text-amber-800" />
-                    <span>{t(locale, 'micPermissionStep1')}</span>
+                    {isNative ? <Smartphone className="w-3.5 h-3.5 text-amber-800" /> : <Lock className="w-3.5 h-3.5 text-amber-800" />}
+                    <span>{isNative ? (locale === 'ha' ? 'Danna "Bada Dama Yanzu"' : 'Tap "Allow Microphone Now"') : t(locale, 'micPermissionStep1')}</span>
                   </div>
                   <span className="text-[11px] text-slate-500">
-                    {locale === 'ha'
-                      ? 'Duba sama kusa da adireshi a wayarka ko kwamfuta'
-                      : 'Look at the address bar near the top of your screen'}
+                    {isNative
+                      ? (locale === 'ha'
+                          ? 'Wannan zai nuna taga ta asali ta waya domin amincewa'
+                          : 'This will show the native Android permission prompt')
+                      : (locale === 'ha'
+                          ? 'Duba sama kusa da adireshi a wayarka ko kwamfuta'
+                          : 'Look at the address bar near the top of your screen')}
                   </span>
                 </div>
               </div>
@@ -111,12 +122,16 @@ export function MicrophonePermissionModal({
                 <div className="flex-1">
                   <div className="flex items-center space-x-1 font-semibold text-slate-900">
                     <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>{t(locale, 'micPermissionStep2')}</span>
+                    <span>{isNative ? (locale === 'ha' ? 'Zaɓi "While using the app"' : 'Select "While using the app"') : t(locale, 'micPermissionStep2')}</span>
                   </div>
                   <span className="text-[11px] text-slate-500">
-                    {locale === 'ha'
-                      ? 'A karkashin "Permissions" canza Microphone zuwa "Allow"'
-                      : 'Under Site Settings / Permissions, toggle Microphone to "Allow"'}
+                    {isNative
+                      ? (locale === 'ha'
+                          ? 'Ko buɗe Saitunan Waya > Apps > SmartVillage > Permissions'
+                          : 'Or open Phone Settings > Apps > SmartVillage > Permissions')
+                      : (locale === 'ha'
+                          ? 'A karkashin "Permissions" canza Microphone zuwa "Allow"'
+                          : 'Under Site Settings / Permissions, toggle Microphone to "Allow"')}
                   </span>
                 </div>
               </div>

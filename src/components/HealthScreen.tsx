@@ -25,6 +25,7 @@ import {
 } from '../services/healthService';
 import { voiceService } from '../services/voiceService';
 import { historyService } from '../services/historyService';
+import { takePhotoWithCamera, pickPhotoFromGallery, cameraService } from '../services/cameraService';
 
 interface HealthScreenProps {
   locale: Language;
@@ -68,6 +69,37 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
       const url = URL.createObjectURL(file);
       setPhotoUrl(url);
       setResult(null);
+    }
+    e.target.value = '';
+  };
+
+  const handleTakePhoto = async () => {
+    try {
+      const photo = await takePhotoWithCamera();
+      if (photo) {
+        const formatted = photo.startsWith('data:') ? photo : `data:image/jpeg;base64,${photo}`;
+        setPhotoUrl(formatted);
+        setResult(null);
+        showToast(locale === 'ha' ? 'An ɗauki hoto!' : 'Photo captured!');
+      }
+    } catch (err) {
+      console.warn('Health camera fallback:', err);
+      cameraInputRef.current?.click();
+    }
+  };
+
+  const handlePickGallery = async () => {
+    try {
+      const photo = await pickPhotoFromGallery();
+      if (photo) {
+        const formatted = photo.startsWith('data:') ? photo : `data:image/jpeg;base64,${photo}`;
+        setPhotoUrl(formatted);
+        setResult(null);
+        showToast(locale === 'ha' ? 'An loda hoto daga gallery!' : 'Photo loaded!');
+      }
+    } catch (err) {
+      console.warn('Health gallery fallback:', err);
+      fileInputRef.current?.click();
     }
   };
 
@@ -118,7 +150,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
     }
 
     const currentHealthId = getActiveHealthConditionId();
-    const started = voiceService.startListening(
+    const started = await voiceService.startListening(
       locale === 'ha' ? 'ha-NG' : 'en-NG',
       (recognizedText, rec) => {
         if (rec?.url) {
@@ -437,26 +469,31 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
             </button>
           </div>
         ) : (
-          <div className="text-center p-2 space-y-1.5">
+          <div className="text-center p-2 space-y-2">
             <ShieldAlert className="w-6 h-6 text-red-600 opacity-80 mx-auto" />
             <p className="text-slate-700 font-bold text-xs">
               {locale === 'ha' ? 'Hoton matsalar fata ko cizon maciji (Idan akwai)' : 'Optional photo for rash, bite, or visible wound'}
             </p>
-            <div className="flex justify-center gap-2 pt-1">
+            <div className="space-y-2 pt-1 max-w-xs mx-auto w-full">
               <button
-                onClick={() => cameraInputRef.current?.click()}
-                className="py-1.5 px-3 border border-red-300 text-red-800 bg-white hover:bg-red-50 rounded-lg font-bold text-xs cursor-pointer shadow-2xs"
+                type="button"
+                onClick={handleTakePhoto}
+                className="w-full py-3 px-4 bg-red-700 hover:bg-red-800 text-white rounded-2xl font-black text-xs sm:text-sm cursor-pointer shadow-sm flex items-center justify-center space-x-2 active:scale-[0.99] transition-all"
               >
-                <Camera className="w-3.5 h-3.5 inline mr-1 text-red-700" />
-                <span>{t(locale, 'takePhoto')}</span>
+                <Camera className="w-4 h-4 text-red-200" />
+                <span>{locale === 'ha' ? 'Ɗauki Hoto' : 'Take Photo'}</span>
               </button>
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="py-1.5 px-3 border border-red-300 text-red-800 bg-white hover:bg-red-50 rounded-lg font-bold text-xs cursor-pointer shadow-2xs"
-              >
-                <ImageIcon className="w-3.5 h-3.5 inline mr-1 text-red-700" />
-                <span>{t(locale, 'gallery')}</span>
-              </button>
+
+              <div className="flex items-center justify-center">
+                <button
+                  type="button"
+                  onClick={handlePickGallery}
+                  className="inline-flex items-center space-x-1.5 py-1 px-3 text-xs font-bold text-red-800 hover:text-red-950 hover:bg-red-50 rounded-xl transition-colors cursor-pointer"
+                >
+                  <ImageIcon className="w-3.5 h-3.5 text-red-600" />
+                  <span>{locale === 'ha' ? 'Zaɓi daga Gallery' : 'Choose from Gallery'}</span>
+                </button>
+              </div>
             </div>
           </div>
         )}

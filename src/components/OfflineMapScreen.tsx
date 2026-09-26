@@ -2,19 +2,20 @@ import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import {
   MapPin as MapPinIcon,
-  Plus,
   Navigation,
   Volume2,
   Filter,
   Trash2,
-  Info,
   CloudSun,
   Sprout,
   Droplets,
   AlertTriangle,
   X,
   Sparkles,
+  Loader2,
+  RotateCcw,
 } from 'lucide-react';
+import { Geolocation } from '@capacitor/geolocation';
 import { Language, t } from '../utils/translations';
 import { MapPin, mapService } from '../services/mapService';
 import { voiceService } from '../services/voiceService';
@@ -27,6 +28,7 @@ export const OfflineMapScreen: React.FC<OfflineMapScreenProps> = ({ locale }) =>
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
   const markersLayerRef = useRef<L.LayerGroup | null>(null);
+  const userMarkerRef = useRef<L.Marker | null>(null);
 
   const [pins, setPins] = useState<MapPin[]>([]);
   const [filterType, setFilterType] = useState<string>('all');
@@ -34,6 +36,10 @@ export const OfflineMapScreen: React.FC<OfflineMapScreenProps> = ({ locale }) =>
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isAddingPin, setIsAddingPin] = useState(false);
   const [newPinCoord, setNewPinCoord] = useState<{ lat: number; lng: number } | null>(null);
+
+  // GPS three states: 'loading' | 'success' | 'error' | 'idle'
+  const [gpsStatus, setGpsStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [dismissErrorBanner, setDismissErrorBanner] = useState(false);
 
   // New pin form state
   const [pinType, setPinType] = useState<MapPin['type']>('crop_disease');
@@ -66,8 +72,8 @@ export const OfflineMapScreen: React.FC<OfflineMapScreenProps> = ({ locale }) =>
       const map = L.map(mapContainerRef.current, {
         center: [9.082, 8.6753],
         zoom: 6,
-        minZoom: 5,
-        maxZoom: 15,
+        minZoom: 4,
+        maxZoom: 18,
         attributionControl: false,
       });
 
@@ -89,6 +95,9 @@ export const OfflineMapScreen: React.FC<OfflineMapScreenProps> = ({ locale }) =>
       mapInstanceRef.current = map;
     }
 
+    // Auto-fetch GPS on initial screen load
+    fetchGpsLocation(false);
+
     return () => {
       if (mapInstanceRef.current) {
         mapInstanceRef.current.remove();
@@ -97,9 +106,95 @@ export const OfflineMapScreen: React.FC<OfflineMapScreenProps> = ({ locale }) =>
     };
   }, []);
 
+  // Robust GPS location fetch with Capacitor Geolocation & web fallback
+  const fetchGpsLocation = async (isManualPin = false) => {
+    setGpsStatus('loading');
+    setDismissErrorBanner(false);
+
+    let lat: number | null = null;
+    let lng: number | null = null;
+
+    // 1. Try Capacitor Geolocation Plugin
+    try {
+      const permCheck = await Geolocation.checkPermissions().catch(() => null);
+      if (permCheck && permCheck.location !== 'granted') {
+        const req = await Geolocation.requestPermissions().catch(() => null);
+        if (req && req.location === 'denied') {
+          console.warn('Geolocation permission denied by user');
+        }
+      }
+
+      const position = await Geolocation.getCurrentPosition({
+        enableHighAccuracy: true,
+        timeout: 9000,
+      });
+
+      if (position?.coords) {
+        lat = Number(position.coords.latitude.toFixed(4));
+        lng = Number(position.coords.longitude.toFixed(4));
+      }
+    } catch (pluginErr) {
+      console.warn('Capacitor Geolocation exception, attempting navigator fallback:', pluginErr);
+    }
+
+    // 2. Fallback to browser navigator.geolocation for Vercel PWA
+    if (lat === null || lng === null) {
+      if (typeof navigator !== 'undefined' && navigator.geolocation) {
+        try {
+          await new Promise<void>((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(
+              (pos) => {
+                lat = Number(pos.coords.latitude.toFixed(4));
+                lng = Number(pos.coords.longitude.toFixed(4));
+                resolve();
+              },
+              (err) => reject(err),
+              { enableHighAccuracy: true, timeout: 8000 }
+            );
+          });
+        } catch (navErr) {
+          console.warn('navigator.geolocation failed:', navErr);
+        }
+      }
+    }
+
+    // 3. Handle Three States: Loading, Success, Error
+    if (lat !== null && lng !== null) {
+      setGpsStatus('success');
+
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.setView([lat, lng], 13);
+
+        // Add or update live position marker
+        if (userMarkerRef.current) {
+          userMarkerRef.current.setLatLng([lat, lng]);
+        } else {
+          const userIcon = L.divIcon({
+            html: `<div style="background:#2563eb;width:18px;height:18px;border-radius:50%;border:3px solid white;box-shadow:0 0 10px rgba(37,99,235,0.7);"></div>`,
+            className: 'user-loc-pin',
+            iconSize: [18, 18],
+            iconAnchor: [9, 9],
+          });
+          const marker = L.marker([lat, lng], { icon: userIcon });
+          marker.addTo(mapInstanceRef.current);
+          userMarkerRef.current = marker;
+        }
+      }
+
+      if (isManualPin) {
+        setNewPinCoord({ lat, lng });
+        setIsAddingPin(true);
+      }
+
+      showToast(locale === 'ha' ? 'An gano wurin GPS cikin nasara!' : 'GPS location found successfully!');
+    } else {
+      setGpsStatus('error');
+    }
+  };
+
   // Create custom marker icon
   const createPinIcon = (pin: MapPin) => {
-    let colorClass = '#b91c1c'; // Red for crop
+    let colorClass = '#b91c1c';
     let iconLetter = '🌱';
 
     if (pin.type === 'weather_station') {
@@ -165,30 +260,6 @@ export const OfflineMapScreen: React.FC<OfflineMapScreenProps> = ({ locale }) =>
     });
   }, [pins, filterType]);
 
-  const handleUseGps = () => {
-    if (!navigator.geolocation) {
-      showToast(locale === 'ha' ? 'Babu tsarin GPS a wannan waya.' : 'Geolocation not supported.');
-      return;
-    }
-
-    showToast(locale === 'ha' ? 'Ana neman wurin da kake (GPS)...' : 'Locating GPS position...');
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const lat = Number(pos.coords.latitude.toFixed(4));
-        const lng = Number(pos.coords.longitude.toFixed(4));
-        setNewPinCoord({ lat, lng });
-        setIsAddingPin(true);
-        if (mapInstanceRef.current) {
-          mapInstanceRef.current.setView([lat, lng], 10);
-        }
-      },
-      () => {
-        showToast(locale === 'ha' ? 'Kasa samun GPS. Taɓa kan taswira.' : 'GPS unavailable. Tap on map to pin.');
-      },
-      { timeout: 8000 }
-    );
-  };
-
   const handleSavePin = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newPinCoord || !pinTitle.trim()) {
@@ -246,8 +317,9 @@ export const OfflineMapScreen: React.FC<OfflineMapScreenProps> = ({ locale }) =>
     <div className="max-w-2xl mx-auto px-4 py-4 space-y-4">
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white text-xs sm:text-sm px-4 py-2.5 rounded-xl shadow-lg border border-slate-700 animate-fade-in">
-          {toastMessage}
+        <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white text-xs sm:text-sm px-4 py-2.5 rounded-xl shadow-lg border border-slate-700 animate-fade-in flex items-center gap-2">
+          <Sparkles className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>{toastMessage}</span>
         </div>
       )}
 
@@ -267,13 +339,69 @@ export const OfflineMapScreen: React.FC<OfflineMapScreenProps> = ({ locale }) =>
 
         {/* Quick GPS Pin Button */}
         <button
-          onClick={handleUseGps}
-          className="flex items-center space-x-1.5 bg-[#1f7a4c] hover:bg-[#19653e] text-white text-xs font-semibold px-3 py-2 rounded-xl shadow-xs cursor-pointer transition-all active:scale-95"
+          onClick={() => fetchGpsLocation(true)}
+          disabled={gpsStatus === 'loading'}
+          className="flex items-center space-x-1.5 bg-[#1f7a4c] hover:bg-[#19653e] active:scale-95 disabled:opacity-50 text-white text-xs font-semibold px-3 py-2 rounded-xl shadow-xs cursor-pointer transition-all"
         >
-          <Navigation className="w-3.5 h-3.5" />
+          {gpsStatus === 'loading' ? (
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          ) : (
+            <Navigation className="w-3.5 h-3.5" />
+          )}
           <span>{locale === 'ha' ? 'GPS Wuri' : 'GPS Pin'}</span>
         </button>
       </div>
+
+      {/* GPS Status Banners: Three States */}
+      {gpsStatus === 'loading' && (
+        <div className="bg-sky-50 border border-sky-200 text-sky-900 px-3.5 py-2.5 rounded-2xl flex items-center space-x-2.5 text-xs font-semibold animate-pulse">
+          <Loader2 className="w-4 h-4 text-sky-600 animate-spin shrink-0" />
+          <span>{locale === 'ha' ? 'Ana neman GPS...' : 'Searching for GPS...'}</span>
+        </div>
+      )}
+
+      {gpsStatus === 'error' && !dismissErrorBanner && (
+        <div className="bg-slate-900 text-white px-3.5 py-2.5 rounded-2xl shadow-md border border-slate-700 flex items-center justify-between gap-2 text-xs animate-fade-in">
+          <div className="flex items-center space-x-2">
+            <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+            <span className="font-bold">
+              {locale === 'ha'
+                ? 'Kasa samun GPS. Taɓa kan taswira.'
+                : 'Unable to get GPS. Tap on the map.'}
+            </span>
+          </div>
+          <div className="flex items-center space-x-2 shrink-0">
+            <button
+              onClick={() => fetchGpsLocation(false)}
+              className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 px-2 py-1 rounded-lg flex items-center gap-1 cursor-pointer transition-colors"
+            >
+              <RotateCcw className="w-3 h-3" />
+              <span>{locale === 'ha' ? 'Sake gwadawa' : 'Retry'}</span>
+            </button>
+            <button
+              onClick={() => setDismissErrorBanner(true)}
+              className="text-slate-400 hover:text-white p-1 cursor-pointer"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+
+      {gpsStatus === 'success' && (
+        <div className="bg-emerald-50 border border-emerald-200 text-emerald-900 px-3 py-1.5 rounded-xl flex items-center justify-between text-xs">
+          <span className="font-semibold flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-emerald-600 animate-ping inline-block" />
+            {locale === 'ha' ? 'An haɗa GPS daidai' : 'GPS centered on your position'}
+          </span>
+          <button
+            onClick={() => setGpsStatus('idle')}
+            className="text-emerald-700 hover:text-emerald-900 text-[11px] font-bold"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* Filter Tabs */}
       <div className="flex items-center space-x-2 overflow-x-auto pb-1 text-xs">
@@ -356,13 +484,12 @@ export const OfflineMapScreen: React.FC<OfflineMapScreenProps> = ({ locale }) =>
 
             <button
               onClick={() => setSelectedPin(null)}
-              className="text-slate-400 hover:text-slate-600 p-1"
+              className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
 
-          {/* Details / Weather stats / Notes */}
           <div className="bg-slate-50 rounded-xl p-3 text-xs sm:text-sm text-slate-700 space-y-1.5 border border-slate-100">
             {selectedPin.cropOrAnimal && (
               <div className="flex items-center justify-between">
@@ -392,35 +519,11 @@ export const OfflineMapScreen: React.FC<OfflineMapScreenProps> = ({ locale }) =>
               </div>
             )}
 
-            {selectedPin.weatherDetails && (
-              <div className="grid grid-cols-3 gap-2 pt-1 border-t border-slate-200 mt-2 text-center">
-                <div className="bg-white p-2 rounded-lg border border-slate-200">
-                  <div className="text-[10px] text-slate-500">Temp</div>
-                  <div className="font-bold text-slate-800">
-                    {selectedPin.weatherDetails.temperature}°C
-                  </div>
-                </div>
-                <div className="bg-white p-2 rounded-lg border border-slate-200">
-                  <div className="text-[10px] text-slate-500">Rainfall</div>
-                  <div className="font-bold text-slate-800">
-                    {selectedPin.weatherDetails.rainfall} mm
-                  </div>
-                </div>
-                <div className="bg-white p-2 rounded-lg border border-slate-200">
-                  <div className="text-[10px] text-slate-500">Humidity</div>
-                  <div className="font-bold text-slate-800">
-                    {selectedPin.weatherDetails.humidity}%
-                  </div>
-                </div>
-              </div>
-            )}
-
             <p className="mt-2 text-slate-600 leading-relaxed">
               {locale === 'ha' ? selectedPin.notes_hausa || selectedPin.notes : selectedPin.notes}
             </p>
           </div>
 
-          {/* Action Row */}
           <div className="flex items-center justify-between pt-1">
             <button
               onClick={() => handleSpeakPin(selectedPin)}
@@ -456,14 +559,13 @@ export const OfflineMapScreen: React.FC<OfflineMapScreenProps> = ({ locale }) =>
               </div>
               <button
                 onClick={() => setIsAddingPin(false)}
-                className="text-slate-400 hover:text-slate-600 p-1"
+                className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <form onSubmit={handleSavePin} className="space-y-3.5 text-xs sm:text-sm">
-              {/* Pin Type */}
               <div>
                 <label className="block font-bold text-slate-700 mb-1">
                   {locale === 'ha' ? 'Nau\'in Alama:' : 'Category:'}
@@ -491,56 +593,47 @@ export const OfflineMapScreen: React.FC<OfflineMapScreenProps> = ({ locale }) =>
                 </div>
               </div>
 
-              {/* Title */}
               <div>
                 <label className="block font-bold text-slate-700 mb-1">
                   {t(locale, 'pinTitle')}
                 </label>
                 <input
                   type="text"
-                  required
                   value={pinTitle}
                   onChange={(e) => setPinTitle(e.target.value)}
-                  placeholder={
-                    locale === 'ha'
-                      ? 'Misali: Cutar Albasa a Kano Fadama'
-                      : 'e.g. Maize Rust in Zaria, Rain Gauge Point'
-                  }
-                  className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  placeholder={locale === 'ha' ? 'Misali: Cutar albasa a gona' : 'E.g., Onion purple blotch on farm'}
+                  className="w-full p-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 outline-none"
+                  required
                 />
               </div>
 
-              {/* Subject (Crop / Animal) */}
               <div>
                 <label className="block font-bold text-slate-700 mb-1">
-                  {locale === 'ha' ? 'Shuka ko Dabba (idan akwai):' : 'Crop or Animal:'}
+                  {locale === 'ha' ? 'Amfanin Gona / Dabba (Idan akwai):' : 'Crop / Animal (Optional):'}
                 </label>
                 <input
                   type="text"
                   value={pinCropOrAnimal}
                   onChange={(e) => setPinCropOrAnimal(e.target.value)}
-                  placeholder={
-                    locale === 'ha' ? 'Misali: Albasa, Masara, Akuya...' : 'e.g. Onion, Maize, Goat...'
-                  }
-                  className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  placeholder={locale === 'ha' ? 'Misali: Albasa, Masara, Saniya...' : 'E.g., Onion, Maize, Cattle...'}
+                  className="w-full p-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 outline-none"
                 />
               </div>
 
-              {/* Severity */}
               <div>
                 <label className="block font-bold text-slate-700 mb-1">
                   {t(locale, 'pinSeverity')}
                 </label>
-                <div className="flex gap-2">
-                  {(['low', 'moderate', 'high', 'critical'] as const).map((sev) => (
+                <div className="grid grid-cols-3 gap-2">
+                  {(['low', 'moderate', 'high', 'critical'] as MapPin['severity'][]).slice(0, 3).map((sev) => (
                     <button
                       type="button"
                       key={sev}
                       onClick={() => setPinSeverity(sev)}
-                      className={`flex-1 py-1.5 rounded-lg text-xs font-bold uppercase border cursor-pointer ${
+                      className={`p-2 rounded-xl text-center font-bold uppercase text-[11px] border cursor-pointer transition-all ${
                         pinSeverity === sev
-                          ? 'bg-slate-800 text-white border-slate-800'
-                          : 'bg-white text-slate-600 border-slate-200'
+                          ? 'bg-emerald-700 text-white border-emerald-700'
+                          : 'bg-slate-50 text-slate-600 border-slate-200'
                       }`}
                     >
                       {sev}
@@ -549,42 +642,32 @@ export const OfflineMapScreen: React.FC<OfflineMapScreenProps> = ({ locale }) =>
                 </div>
               </div>
 
-              {/* Notes */}
               <div>
                 <label className="block font-bold text-slate-700 mb-1">
                   {t(locale, 'pinNotes')}
                 </label>
                 <textarea
-                  rows={2}
                   value={pinNotes}
                   onChange={(e) => setPinNotes(e.target.value)}
-                  placeholder={
-                    locale === 'ha'
-                      ? 'Bayyana abin da ka gani da shawarwari...'
-                      : 'Observed signs, treatment applied or weather status...'
-                  }
-                  className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
+                  rows={2}
+                  placeholder={locale === 'ha' ? 'Ƙarin bayani...' : 'Observations and notes...'}
+                  className="w-full p-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 outline-none"
                 />
               </div>
 
-              <div className="text-[11px] text-slate-500">
-                Coordinates: {newPinCoord.lat}, {newPinCoord.lng}
-              </div>
-
-              {/* Buttons */}
-              <div className="flex space-x-2 pt-2">
+              <div className="pt-2 flex items-center justify-end space-x-2 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setIsAddingPin(false)}
-                  className="flex-1 py-2.5 rounded-xl border border-slate-300 font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
+                  className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-bold text-xs cursor-pointer"
                 >
-                  Cancel
+                  {locale === 'ha' ? 'Fasa' : 'Cancel'}
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2.5 rounded-xl bg-[#1f7a4c] hover:bg-[#19653e] font-bold text-white shadow-sm cursor-pointer"
+                  className="px-5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs shadow-xs cursor-pointer"
                 >
-                  {t(locale, 'savePin')}
+                  {t(locale, 'save')}
                 </button>
               </div>
             </form>
