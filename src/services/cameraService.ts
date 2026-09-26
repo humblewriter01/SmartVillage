@@ -1,3 +1,4 @@
+import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { Capacitor } from '@capacitor/core';
 
 // Web fallback (browser only)
@@ -58,16 +59,97 @@ export function pickImageFromWeb(source: 'camera' | 'photos' = 'camera'): Promis
   });
 }
 
-// Function to open the CAMERA directly using the HTML method (works on ALL Android phones including Tecno)
+// Function to open the CAMERA directly with explicit runtime permission checks
 export async function takePhotoWithCamera(): Promise<string | null> {
-  // Force HTML file input method on ALL platforms to bypass Tecno/HiOS restrictions
-  return await pickImageFromWeb('camera');
+  try {
+    if (Capacitor.isNativePlatform()) {
+      // Proactively request camera permission if possible
+      try {
+        const check = await Camera.checkPermissions();
+        if (check.camera !== 'granted') {
+          await Camera.requestPermissions({ permissions: ['camera'] });
+        }
+      } catch (permErr) {
+        console.warn('Capacitor check/request permissions note:', permErr);
+      }
+
+      // Open camera natively via Capacitor Camera
+      const photo = await Camera.getPhoto({
+        quality: 90,
+        allowEditing: false,
+        resultType: CameraResultType.Base64,
+        source: CameraSource.Camera,
+      });
+
+      return photo.base64String || null;
+    } else {
+      // Web fallback (browser only)
+      return await pickImageFromWeb('camera');
+    }
+  } catch (error: any) {
+    const msg = String(error?.message || error);
+    // Ignore normal cancellation
+    if (
+      msg.includes('cancelled') ||
+      msg.includes('canceled') ||
+      msg.includes('User cancelled') ||
+      msg.includes('TakePhotoCancelled')
+    ) {
+      return null;
+    }
+
+    console.warn('Native camera error, trying web/system input fallback:', error);
+
+    // Try webview file capture as seamless fallback
+    try {
+      const fallback = await pickImageFromWeb('camera');
+      if (fallback) return fallback;
+    } catch {
+      // ignore
+    }
+
+    // Only alert if there is a real permission denial that prevents any capture
+    alert('Ba a iya buɗe kyamara ba. Don Allah ka ba da izinin kyamara a saitunan waya.');
+    return null;
+  }
 }
 
-// Function to open the GALLERY using the HTML method
+// Function to open the GALLERY separately (optional)
 export async function pickPhotoFromGallery(): Promise<string | null> {
-  // Force HTML file input method on ALL platforms
-  return await pickImageFromWeb('photos');
+  try {
+    if (Capacitor.isNativePlatform()) {
+      let permissions = await Camera.checkPermissions();
+      if (permissions.photos !== 'granted') {
+        permissions = await Camera.requestPermissions({ permissions: ['photos'] });
+      }
+
+      const photo = await Camera.getPhoto({
+        quality: 90,
+        allowEditing: false,
+        resultType: CameraResultType.Base64,
+        source: CameraSource.Photos, // <--- This opens the Gallery
+      });
+      return photo.base64String || null;
+    } else {
+      return await pickImageFromWeb('photos');
+    }
+  } catch (error: any) {
+    const msg = String(error?.message || error);
+    if (
+      msg.includes('cancelled') ||
+      msg.includes('canceled') ||
+      msg.includes('User cancelled') ||
+      msg.includes('TakePhotoCancelled')
+    ) {
+      return null;
+    }
+    console.warn('Native gallery encountered an issue, trying web file picker fallback:', error);
+    try {
+      return await pickImageFromWeb('photos');
+    } catch {
+      return null;
+    }
+  }
 }
 
 export const cameraService = {

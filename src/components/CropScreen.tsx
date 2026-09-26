@@ -101,7 +101,6 @@ export const CropScreen: React.FC<CropScreenProps> = ({
   // Manual Selector Modal state
   const [showManualModal, setShowManualModal] = useState(false);
   const [modalStep, setModalStep] = useState<1 | 2>(1);
-  const [photoSourceMode, setPhotoSourceMode] = useState<'camera' | 'gallery'>('camera');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -682,64 +681,31 @@ export const CropScreen: React.FC<CropScreenProps> = ({
             )}
           </div>
 
-          {/* Camera / Gallery Toggle & Action */}
-          <div className="space-y-2.5">
-            <div className="flex items-center justify-between bg-slate-100/90 p-1.5 rounded-2xl border border-slate-200">
-              <span className="text-xs font-bold text-slate-700 px-2 flex items-center space-x-1.5">
-                <span>{locale === 'ha' ? 'Zaɓi Hanyar Hoto:' : 'Photo Mode:'}</span>
+          {/* Single Primary Action: Take Photo with Camera & Secondary Gallery Option */}
+          <div className="space-y-2">
+            <button
+              type="button"
+              onClick={handleTakePhoto}
+              className="w-full flex items-center justify-center space-x-2.5 py-3.5 px-4 bg-emerald-700 hover:bg-emerald-800 active:scale-[0.99] text-white rounded-2xl font-black text-sm sm:text-base shadow-sm hover:shadow transition-all cursor-pointer"
+            >
+              <Camera className="w-5 h-5 text-emerald-200" />
+              <span>
+                {locale === 'ha' ? 'Ɗauki Hoto' : 'Take Photo'}
               </span>
-              <div className="inline-flex p-0.5 bg-white rounded-xl border border-slate-200/90 shadow-2xs">
-                <button
-                  type="button"
-                  onClick={() => setPhotoSourceMode('camera')}
-                  className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    photoSourceMode === 'camera'
-                      ? 'bg-emerald-700 text-white shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-                  }`}
-                >
-                  <Camera className="w-3.5 h-3.5" />
-                  <span>{t(locale, 'takePhoto')}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPhotoSourceMode('gallery')}
-                  className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    photoSourceMode === 'gallery'
-                      ? 'bg-emerald-700 text-white shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-                  }`}
-                >
-                  <ImageIcon className="w-3.5 h-3.5" />
-                  <span>{t(locale, 'gallery')}</span>
-                </button>
-              </div>
-            </div>
+            </button>
 
-            {/* Primary Action Button based on selected toggle */}
-            {photoSourceMode === 'camera' ? (
-              <button
-                type="button"
-                onClick={handleTakePhoto}
-                className="w-full flex items-center justify-center space-x-2 py-3 px-4 bg-emerald-700 hover:bg-emerald-800 active:scale-[0.99] text-white rounded-xl font-bold text-xs sm:text-sm shadow-sm transition-all cursor-pointer"
-              >
-                <Camera className="w-4 h-4 text-emerald-200" />
-                <span>
-                  {locale === 'ha' ? 'Ɗauki Hoto da Kyamara' : 'Open Camera to Take Photo'}
-                </span>
-              </button>
-            ) : (
+            <div className="flex items-center justify-center">
               <button
                 type="button"
                 onClick={handlePickGallery}
-                className="w-full flex items-center justify-center space-x-2 py-3 px-4 bg-emerald-700 hover:bg-emerald-800 active:scale-[0.99] text-white rounded-xl font-bold text-xs sm:text-sm shadow-sm transition-all cursor-pointer"
+                className="inline-flex items-center space-x-1.5 py-1.5 px-3 text-xs font-bold text-emerald-800 hover:text-emerald-950 hover:bg-emerald-50 rounded-xl transition-colors cursor-pointer"
               >
-                <ImageIcon className="w-4 h-4 text-emerald-200" />
+                <ImageIcon className="w-3.5 h-3.5 text-emerald-600" />
                 <span>
-                  {locale === 'ha' ? 'Zaɓi Hoto daga Taskar Hotuna' : 'Choose Photo from Gallery'}
+                  {locale === 'ha' ? 'Zaɓi daga Gallery' : 'Choose from Gallery'}
                 </span>
               </button>
-            )}
+            </div>
           </div>
 
           {/* Quick Test Samples */}
