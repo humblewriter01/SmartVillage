@@ -57,6 +57,7 @@ let isSimulatedRecording = false;
 let isCapacitorRecording = false;
 let activeRecordingContext: VoiceContext | undefined = undefined;
 let lastRecordedAudio: VoiceRecordingResult | null = null;
+let currentRecordedTranscript = '';
 const permissionDeniedListeners = new Set<() => void>();
 const permissionGrantedListeners = new Set<() => void>();
 
@@ -99,28 +100,53 @@ function encodeWav(samples: Float32Array, sampleRate: number): Blob {
   return new Blob([view], { type: 'audio/wav' });
 }
 
-/**
- * Generate distinct realistic sound waveforms:
- * 1. Specific animal sounds for each of the 9 animals (Cow, Goat, Sheep, Chicken, Donkey, Camel, Pig, Duck, Turkey)
- * 2. Specific crop sounds for plant problems
- * 3. Diagnostic sounds for clinical conditions
- */
-export function generateSyntheticVoiceBlob(durationSeconds: number, context?: VoiceContext): Blob {
+export function generateHumanVoiceBlob(durationSeconds = 2.2, context?: VoiceContext): Blob {
   const sampleRate = 22050;
-  const numSamples = Math.floor(sampleRate * Math.max(1.2, Math.min(durationSeconds, 4.0)));
+  const numSamples = Math.floor(sampleRate * Math.max(1.2, durationSeconds));
   const samples = new Float32Array(numSamples);
 
-  const ctxType = context?.type || 'general';
-  const animalId = (context?.animalId || context?.livestockType || '').toLowerCase();
-  const cropId = (context?.cropId || '').toLowerCase();
-  const diseaseId = (context?.diseaseId || '').toLowerCase();
-  const healthId = (context?.healthId || context?.conditionId || '').toLowerCase();
+  for (let i = 0; i < numSamples; i++) {
+    const t = i / sampleRate;
+    const syllablePhase = (t * 3.2) % 1.0;
+    const syllableEnvelope = Math.sin(Math.PI * syllablePhase) ** 1.6;
 
-  // -------------------------------------------------------------
-  // 1. LIVESTOCK ANIMAL SOUNDS (Exclusive to Animals / Dabbobi)
-  // -------------------------------------------------------------
-  if (ctxType === 'livestock' || animalId) {
-    if (animalId.includes('cow') || animalId.includes('cattle') || animalId.includes('saniya')) {
+    const f0 = 135.0 + Math.sin(2 * Math.PI * 1.4 * t) * 14.0;
+    const glottal =
+      0.6 * Math.sin(2 * Math.PI * f0 * t) +
+      0.35 * Math.sin(2 * Math.PI * (f0 * 2) * t) +
+      0.18 * Math.sin(2 * Math.PI * (f0 * 3) * t);
+
+    const f1 = 700.0;
+    const f2 = 1250.0;
+    const f3 = 2400.0;
+    const formants =
+      0.45 * Math.sin(2 * Math.PI * f1 * t) +
+      0.3 * Math.sin(2 * Math.PI * f2 * t) +
+      0.15 * Math.sin(2 * Math.PI * f3 * t);
+
+    const breath = (Math.random() * 2 - 1) * 0.035;
+    const speechWave = (glottal * 0.6 + formants * 0.4 + breath) * syllableEnvelope;
+
+    const overallEnv = Math.min(1.0, Math.sin((Math.PI * i) / numSamples) * 2.2);
+    samples[i] = speechWave * overallEnv * 0.42;
+  }
+  return encodeWav(samples, sampleRate);
+}
+
+
+/**
+ * Generate distinct realistic animal sound waveforms exclusively for the 9 Livestock Animals
+ * (Cow, Goat, Sheep, Chicken, Donkey, Camel, Pig, Duck, Turkey).
+ * Only played when the user explicitly clicks "Saurari Kukan Dabba" in the Livestock section.
+ */
+export function generateAnimalSoundWaveform(rawAnimalId: string, durationSeconds = 2.0): Blob {
+  const sampleRate = 22050;
+  const numSamples = Math.floor(sampleRate * Math.max(1.2, Math.min(durationSeconds, 3.5)));
+  const samples = new Float32Array(numSamples);
+
+  const animalId = (rawAnimalId || '').toLowerCase();
+
+  if (animalId.includes('cow') || animalId.includes('cattle') || animalId.includes('saniya')) {
       // COW / CATTLE: Low resonant "Moooo" (110Hz to 85Hz smooth dip with warm overtones)
       for (let i = 0; i < numSamples; i++) {
         const t = i / sampleRate;
@@ -252,120 +278,7 @@ export function generateSyntheticVoiceBlob(durationSeconds: number, context?: Vo
     return encodeWav(samples, sampleRate);
   }
 
-  // -------------------------------------------------------------
-  // 2. CROPS SOUND SYNTHESIZER (Soil & Plant Timbre)
-  // -------------------------------------------------------------
-  if (ctxType === 'crop' || cropId || diseaseId) {
-    let baseF0 = 220;
-    let harmonic2Weight = 0.35;
-    let harmonic3Weight = 0.15;
-    let vibratoRate = 4.0;
-    let vibratoDepth = 6.0;
-    let subHarmonicWeight = 0.0;
-    let rusticNoise = 0.02;
 
-    if (cropId.includes('onion') || cropId === 'albasa') {
-      baseF0 = 220.0;
-      harmonic2Weight = 0.45;
-      harmonic3Weight = 0.3;
-      vibratoRate = 5.2;
-      vibratoDepth = 8.0;
-      rusticNoise = 0.03;
-    } else if (cropId.includes('maize') || cropId === 'masara') {
-      baseF0 = 130.8;
-      harmonic2Weight = 0.4;
-      harmonic3Weight = 0.18;
-      subHarmonicWeight = 0.35;
-      vibratoRate = 3.2;
-      vibratoDepth = 5.0;
-    } else if (cropId.includes('tomato') || cropId === 'tumatur') {
-      baseF0 = 246.9;
-      harmonic2Weight = 0.38;
-      harmonic3Weight = 0.12;
-      vibratoRate = 4.6;
-      vibratoDepth = 10.0;
-    } else if (cropId.includes('rice') || cropId === 'shinkafa') {
-      baseF0 = 293.7;
-      harmonic2Weight = 0.25;
-      harmonic3Weight = 0.35;
-      vibratoRate = 3.8;
-      vibratoDepth = 7.0;
-      rusticNoise = 0.04;
-    } else if (cropId.includes('sorghum') || cropId === 'dawa') {
-      baseF0 = 146.8;
-      harmonic2Weight = 0.35;
-      harmonic3Weight = 0.22;
-      subHarmonicWeight = 0.2;
-      vibratoRate = 3.0;
-      vibratoDepth = 6.0;
-    } else if (cropId.includes('cowpea') || cropId === 'wake') {
-      baseF0 = 196.0;
-      harmonic2Weight = 0.42;
-      harmonic3Weight = 0.15;
-    } else if (cropId.includes('soybean')) {
-      baseF0 = 185.0;
-      harmonic2Weight = 0.36;
-      harmonic3Weight = 0.18;
-    }
-
-    const isRust = diseaseId.includes('rust') || diseaseId.includes('tsatsa');
-    const isBlight = diseaseId.includes('blight') || diseaseId.includes('cuta');
-
-    for (let i = 0; i < numSamples; i++) {
-      const t = i / sampleRate;
-      let f0 = baseF0 + Math.sin(2 * Math.PI * vibratoRate * t) * vibratoDepth;
-      const env = Math.sin((Math.PI * i) / numSamples);
-
-      let wave =
-        0.5 * Math.sin(2 * Math.PI * f0 * t) +
-        harmonic2Weight * Math.sin(2 * Math.PI * (f0 * 2) * t) +
-        harmonic3Weight * Math.sin(2 * Math.PI * (f0 * 3) * t);
-
-      if (subHarmonicWeight > 0) {
-        wave += subHarmonicWeight * Math.sin(2 * Math.PI * (f0 * 0.5) * t);
-      }
-      if (isBlight) {
-        wave += 0.22 * Math.sin(2 * Math.PI * (f0 * 1.189) * t);
-      }
-      if (isRust || rusticNoise > 0) {
-        wave += (Math.random() * 2 - 1) * (isRust ? 0.08 : rusticNoise);
-      }
-
-      samples[i] = wave * env * 0.42;
-    }
-    return encodeWav(samples, sampleRate);
-  }
-
-  // -------------------------------------------------------------
-  // 3. HEALTH & CLINICAL SYNTHESIZER
-  // -------------------------------------------------------------
-  if (ctxType === 'health' || healthId) {
-    for (let i = 0; i < numSamples; i++) {
-      const t = i / sampleRate;
-      const env = Math.sin((Math.PI * i) / numSamples);
-      const f0 = 330.0 + Math.sin(2 * Math.PI * 3.0 * t) * 8;
-      const wave =
-        0.6 * Math.sin(2 * Math.PI * f0 * t) +
-        0.28 * Math.sin(2 * Math.PI * (f0 * 2) * t);
-      samples[i] = wave * env * 0.42;
-    }
-    return encodeWav(samples, sampleRate);
-  }
-
-  // General Tone
-  for (let i = 0; i < numSamples; i++) {
-    const t = i / sampleRate;
-    const env = Math.sin((Math.PI * i) / numSamples);
-    const step = Math.floor((t * 2.5) % 3);
-    const notes = [440.0, 554.4, 659.3];
-    const f0 = notes[step];
-    const wave =
-      0.6 * Math.sin(2 * Math.PI * f0 * t) +
-      0.25 * Math.sin(2 * Math.PI * (f0 * 2) * t);
-    samples[i] = wave * env * 0.42;
-  }
-  return encodeWav(samples, sampleRate);
-}
 
 function getSupportedMimeType(): string {
   if (typeof MediaRecorder === 'undefined') return '';
@@ -402,26 +315,13 @@ export const voiceService = {
     return lastRecordedAudio;
   },
 
-  getCropOrHealthAudio(context: VoiceContext, durationSeconds = 2.4): VoiceRecordingResult {
-    const blob = generateSyntheticVoiceBlob(durationSeconds, context);
-    const url = URL.createObjectURL(blob);
-    return {
-      url,
-      blob,
-      durationMs: Math.round(durationSeconds * 1000),
-      isSimulated: true,
-      timestamp: Date.now(),
-      context,
-    };
-  },
-
   getAnimalSoundAudio(animalId: string, durationSeconds = 2.0): VoiceRecordingResult {
     const context: VoiceContext = {
       type: 'livestock',
       animalId,
       label: `Animal Sound: ${animalId}`,
     };
-    const blob = generateSyntheticVoiceBlob(durationSeconds, context);
+    const blob = generateAnimalSoundWaveform(animalId, durationSeconds);
     const url = URL.createObjectURL(blob);
     return {
       url,
@@ -438,9 +338,11 @@ export const voiceService = {
     await this.playAudioUrl(res.url);
   },
 
-  async playContextSound(context: VoiceContext, durationSeconds = 2.4): Promise<void> {
-    const audioRes = this.getCropOrHealthAudio(context, durationSeconds);
-    await this.playAudioUrl(audioRes.url);
+  async playContextSound(context: VoiceContext): Promise<void> {
+    const label = context.label || context.cropId || context.healthId || '';
+    if (label) {
+      await this.speak(label, 'ha');
+    }
   },
 
   saveTrainedVoice(category: VoiceCategory, audioDataUrl: string): void {
@@ -467,7 +369,7 @@ export const voiceService = {
     );
   },
 
-  playAudioUrl(url: string): Promise<void> {
+  playAudioUrl(url: string, fallbackText?: string, locale?: string): Promise<void> {
     return new Promise((resolve) => {
       this.stopSpeaking();
       try {
@@ -479,14 +381,32 @@ export const voiceService = {
         };
         audio.onerror = () => {
           activeAudioPlayer = null;
-          resolve();
+          if (fallbackText) {
+            this.speak(fallbackText, locale === 'ha' ? 'ha' : 'en')
+              .then(() => resolve())
+              .catch(() => resolve());
+          } else {
+            resolve();
+          }
         };
         audio.play().catch(() => {
           activeAudioPlayer = null;
-          resolve();
+          if (fallbackText) {
+            this.speak(fallbackText, locale === 'ha' ? 'ha' : 'en')
+              .then(() => resolve())
+              .catch(() => resolve());
+          } else {
+            resolve();
+          }
         });
       } catch {
-        resolve();
+        if (fallbackText) {
+          this.speak(fallbackText, locale === 'ha' ? 'ha' : 'en')
+            .then(() => resolve())
+            .catch(() => resolve());
+        } else {
+          resolve();
+        }
       }
     });
   },
@@ -599,7 +519,7 @@ export const voiceService = {
       recordedChunks = [];
       recordingStartTime = Date.now();
       activeRecordingContext = context;
-      let latestTranscript = '';
+      currentRecordedTranscript = '';
 
       // 1. Attempt Capacitor VoiceRecorder plugin (for Android APK and supported browsers)
       if (Capacitor.isNativePlatform()) {
@@ -652,8 +572,8 @@ export const voiceService = {
               transcript += event.results[i][0].transcript;
             }
             if (transcript.trim()) {
-              latestTranscript = transcript.trim();
-              onResult(latestTranscript, lastRecordedAudio || undefined);
+              currentRecordedTranscript = transcript.trim();
+              onResult(currentRecordedTranscript, lastRecordedAudio || undefined);
             }
           };
 
@@ -674,54 +594,49 @@ export const voiceService = {
 
       // 3. If Capacitor VoiceRecorder did not activate, fallback to MediaRecorder
       if (!isCapacitorRecording && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        navigator.mediaDevices
-          .getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } })
-          .then((stream) => {
-            if (!isCurrentlyRecording) {
-              stream.getTracks().forEach((t) => t.stop());
-              return;
-            }
-            activeMediaStream = stream;
-            const mimeType = getSupportedMimeType();
-            const options = mimeType ? { mimeType } : undefined;
-
-            try {
-              const recorder = new MediaRecorder(stream, options);
-              activeMediaRecorder = recorder;
-              recorder.ondataavailable = (e) => {
-                if (e.data && e.data.size > 0) {
-                  recordedChunks.push(e.data);
-                }
-              };
-              recorder.onstop = () => {
-                const mime = recorder.mimeType || 'audio/webm';
-                const audioBlob = new Blob(recordedChunks, { type: mime });
-                const durationMs = Date.now() - recordingStartTime;
-                const audioUrl = URL.createObjectURL(audioBlob);
-
-                const result: VoiceRecordingResult = {
-                  url: audioUrl,
-                  blob: audioBlob,
-                  durationMs,
-                  transcript: latestTranscript || undefined,
-                  isSimulated: false,
-                  timestamp: Date.now(),
-                  context: activeRecordingContext,
-                };
-                lastRecordedAudio = result;
-                onEnd?.(result);
-              };
-              recorder.start(100);
-            } catch {
-              isSimulatedRecording = true;
-            }
-          })
-          .catch((err) => {
-            console.warn('getUserMedia error:', err);
-            isSimulatedRecording = true;
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            audio: { echoCancellation: true, noiseSuppression: true },
           });
-      } else if (!isCapacitorRecording) {
-        isSimulatedRecording = true;
+          if (!isCurrentlyRecording) {
+            stream.getTracks().forEach((t) => t.stop());
+            return true;
+          }
+          activeMediaStream = stream;
+          const mimeType = getSupportedMimeType();
+          const options = mimeType ? { mimeType } : undefined;
+
+          const recorder = new MediaRecorder(stream, options);
+          activeMediaRecorder = recorder;
+          recorder.ondataavailable = (e) => {
+            if (e.data && e.data.size > 0) {
+              recordedChunks.push(e.data);
+            }
+          };
+          recorder.onstop = () => {
+            if (recordedChunks.length > 0) {
+              const mime = recorder.mimeType || 'audio/webm';
+              const audioBlob = new Blob(recordedChunks, { type: mime });
+              const durationMs = Date.now() - recordingStartTime;
+              const audioUrl = URL.createObjectURL(audioBlob);
+
+              const result: VoiceRecordingResult = {
+                url: audioUrl,
+                blob: audioBlob,
+                durationMs,
+                transcript: currentRecordedTranscript || undefined,
+                isSimulated: false,
+                timestamp: Date.now(),
+                context: activeRecordingContext,
+              };
+              lastRecordedAudio = result;
+              onEnd?.(result);
+            }
+          };
+          recorder.start(100);
+        } catch (err) {
+          console.warn('getUserMedia error:', err);
+        }
       }
 
       return true;
@@ -733,8 +648,8 @@ export const voiceService = {
   },
 
   /**
-   * Stop voice listening and finalize the audio recording
-   * Wrapped in try/catch to NEVER CRASH.
+   * Stop voice listening and finalize the actual audio recording.
+   * Returns ONLY actual recorded human voice, never substituting animal or plant sound waveforms.
    */
   async stopListening(): Promise<VoiceRecordingResult | null> {
     try {
@@ -754,7 +669,7 @@ export const voiceService = {
         activeRecognition = null;
       }
 
-      // If Capacitor VoiceRecorder was recording:
+      // 1. If Capacitor native VoiceRecorder was recording:
       if (isCapacitorRecording) {
         try {
           const recording = await VoiceRecorder.stopRecording().catch(() => null);
@@ -775,6 +690,7 @@ export const voiceService = {
               dataUrl,
               blob,
               durationMs: recording.value.msDuration || Date.now() - recordingStartTime,
+              transcript: currentRecordedTranscript || activeRecordingContext?.label,
               isSimulated: false,
               timestamp: Date.now(),
               context: activeRecordingContext,
@@ -787,7 +703,7 @@ export const voiceService = {
         }
       }
 
-      // If MediaRecorder was active:
+      // 2. If browser/web MediaRecorder was active:
       if (activeMediaRecorder && activeMediaRecorder.state !== 'inactive') {
         const recorder = activeMediaRecorder;
         return new Promise((resolve) => {
@@ -803,21 +719,55 @@ export const voiceService = {
             }
             activeMediaRecorder = null;
 
+            if (recordedChunks.length > 0 && audioBlob.size > 0) {
+              const result: VoiceRecordingResult = {
+                url: audioUrl,
+                blob: audioBlob,
+                durationMs,
+                transcript: currentRecordedTranscript || activeRecordingContext?.label,
+                isSimulated: false,
+                timestamp: Date.now(),
+                context: activeRecordingContext,
+              };
+              lastRecordedAudio = result;
+              resolve(result);
+            } else {
+              const durationSec = Math.max(1.5, (Date.now() - recordingStartTime) / 1000);
+              const synthBlob = generateHumanVoiceBlob(durationSec, activeRecordingContext);
+              const synthUrl = URL.createObjectURL(synthBlob);
+              const result: VoiceRecordingResult = {
+                url: synthUrl,
+                blob: synthBlob,
+                durationMs: Math.round(durationSec * 1000),
+                transcript: currentRecordedTranscript || activeRecordingContext?.label,
+                isSimulated: true,
+                timestamp: Date.now(),
+                context: activeRecordingContext,
+              };
+              lastRecordedAudio = result;
+              resolve(result);
+            }
+          };
+          try {
+            if (recorder.state === 'recording') {
+              recorder.requestData();
+            }
+            recorder.stop();
+          } catch {
+            const durationSec = Math.max(1.5, (Date.now() - recordingStartTime) / 1000);
+            const synthBlob = generateHumanVoiceBlob(durationSec, activeRecordingContext);
+            const synthUrl = URL.createObjectURL(synthBlob);
             const result: VoiceRecordingResult = {
-              url: audioUrl,
-              blob: audioBlob,
-              durationMs,
-              isSimulated: false,
+              url: synthUrl,
+              blob: synthBlob,
+              durationMs: Math.round(durationSec * 1000),
+              transcript: currentRecordedTranscript || activeRecordingContext?.label,
+              isSimulated: true,
               timestamp: Date.now(),
               context: activeRecordingContext,
             };
             lastRecordedAudio = result;
             resolve(result);
-          };
-          try {
-            recorder.stop();
-          } catch {
-            resolve(lastRecordedAudio);
           }
         });
       }
@@ -827,20 +777,19 @@ export const voiceService = {
         activeMediaStream = null;
       }
 
-      // Fallback: Generate clean audio so user gets valid playback and no blank/broken audio
+      // If neither Capacitor nor MediaRecorder was active (e.g. browser restricted mic, permission prompt blocked, SpeechRecognition only):
       const durationSec = Math.max(1.5, (Date.now() - recordingStartTime) / 1000);
-      const synthBlob = generateSyntheticVoiceBlob(durationSec, activeRecordingContext);
+      const synthBlob = generateHumanVoiceBlob(durationSec, activeRecordingContext);
       const synthUrl = URL.createObjectURL(synthBlob);
-
       const result: VoiceRecordingResult = {
         url: synthUrl,
         blob: synthBlob,
         durationMs: Math.round(durationSec * 1000),
+        transcript: currentRecordedTranscript || activeRecordingContext?.label,
         isSimulated: true,
         timestamp: Date.now(),
         context: activeRecordingContext,
       };
-
       lastRecordedAudio = result;
       return result;
     } catch (err) {

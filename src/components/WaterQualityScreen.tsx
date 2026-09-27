@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Droplets,
   Camera,
@@ -18,7 +18,14 @@ import { Language, t } from '../utils/translations';
 import { waterQualityService, WaterQualityResult } from '../services/waterQualityService';
 import { voiceService } from '../services/voiceService';
 import { historyService } from '../services/historyService';
-import { takePhotoWithCamera, pickPhotoFromGallery, cameraService } from '../services/cameraService';
+import {
+  startEmbeddedCamera,
+  captureEmbeddedPhoto,
+  stopEmbeddedCamera,
+  pickPhotoFromGallery,
+  pickImageFromWeb,
+  cameraService,
+} from '../services/cameraService';
 
 interface WaterQualityScreenProps {
   locale: Language;
@@ -73,33 +80,53 @@ export const WaterQualityScreen: React.FC<WaterQualityScreenProps> = ({
     e.target.value = '';
   };
 
-  const handleTakePhoto = async () => {
-    try {
-      const photo = await takePhotoWithCamera();
-      if (photo) {
-        const formatted = photo.startsWith('data:') ? photo : `data:image/jpeg;base64,${photo}`;
+  const [isCameraActive, setIsCameraActive] = useState(false);
+  const [photo, setPhoto] = useState<string | null>(null);
+
+  useEffect(() => {
+    return () => {
+      stopEmbeddedCamera();
+    };
+  }, []);
+
+  const handleOpenCamera = async () => {
+    if (!cameraService.isNative()) {
+      const picked = await pickImageFromWeb('camera');
+      if (picked) {
+        const formatted = picked.startsWith('data:') ? picked : `data:image/jpeg;base64,${picked}`;
+        setPhoto(formatted);
         setPhotoUrl(formatted);
         setResult(null);
         showToast(locale === 'ha' ? 'An ɗauki hoto!' : 'Photo captured!');
       }
-    } catch (err) {
-      console.warn('Water camera fallback:', err);
-      cameraInputRef.current?.click();
+      return;
+    }
+    setIsCameraActive(true);
+    await new Promise((r) => setTimeout(r, 60));
+    const started = await startEmbeddedCamera();
+    setIsCameraActive(started);
+  };
+
+  const handleCapture = async () => {
+    const captured = await captureEmbeddedPhoto();
+    if (captured) {
+      const formatted = captured.startsWith('data:') ? captured : `data:image/jpeg;base64,${captured}`;
+      setPhoto(formatted);
+      setPhotoUrl(formatted);
+      setResult(null);
+      setIsCameraActive(false);
+      showToast(locale === 'ha' ? 'An ɗauki hoto!' : 'Photo captured!');
     }
   };
 
-  const handlePickGallery = async () => {
-    try {
-      const photo = await pickPhotoFromGallery();
-      if (photo) {
-        const formatted = photo.startsWith('data:') ? photo : `data:image/jpeg;base64,${photo}`;
-        setPhotoUrl(formatted);
-        setResult(null);
-        showToast(locale === 'ha' ? 'An loda hoto daga gallery!' : 'Photo loaded!');
-      }
-    } catch (err) {
-      console.warn('Water gallery fallback:', err);
-      fileInputRef.current?.click();
+  const handleGallery = async () => {
+    const picked = await pickPhotoFromGallery();
+    if (picked) {
+      const formatted = picked.startsWith('data:') ? picked : `data:image/jpeg;base64,${picked}`;
+      setPhoto(formatted);
+      setPhotoUrl(formatted);
+      setResult(null);
+      showToast(locale === 'ha' ? 'An loda hoto daga gallery!' : 'Photo loaded!');
     }
   };
 
@@ -266,23 +293,38 @@ export const WaterQualityScreen: React.FC<WaterQualityScreenProps> = ({
           </div>
         )}
 
+        {/* Embedded Camera Preview Container */}
+        <div
+          id="cameraPreviewContainer"
+          style={{
+            width: '100%',
+            height: isCameraActive ? '300px' : '0px',
+            marginBottom: isCameraActive ? '16px' : '0px',
+            borderRadius: '12px',
+            overflow: 'hidden',
+            display: isCameraActive ? 'block' : 'none',
+          }}
+        ></div>
+
         {/* Single Primary Action: Take Photo with Camera & Secondary Gallery Option */}
         <div className="space-y-2">
           <button
             type="button"
-            onClick={handleTakePhoto}
+            onClick={isCameraActive ? handleCapture : handleOpenCamera}
             className="w-full flex items-center justify-center space-x-2.5 py-3.5 px-4 bg-sky-600 hover:bg-sky-700 active:scale-[0.99] text-white rounded-2xl font-black text-sm sm:text-base shadow-sm hover:shadow transition-all cursor-pointer"
           >
             <Camera className="w-5 h-5 text-sky-200" />
             <span>
-              {locale === 'ha' ? 'Ɗauki Hoto' : 'Take Photo'}
+              {isCameraActive
+                ? (locale === 'ha' ? 'Ɗauki Hoton Yanzu' : 'Capture Photo')
+                : (locale === 'ha' ? 'Ɗauki Hoto' : 'Take Photo')}
             </span>
           </button>
 
           <div className="flex items-center justify-center">
             <button
               type="button"
-              onClick={handlePickGallery}
+              onClick={handleGallery}
               className="inline-flex items-center space-x-1.5 py-1.5 px-3 text-xs font-bold text-sky-800 hover:text-sky-950 hover:bg-sky-50 rounded-xl transition-colors cursor-pointer"
             >
               <ImageIcon className="w-3.5 h-3.5 text-sky-600" />

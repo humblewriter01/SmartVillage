@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Camera,
   Image as ImageIcon,
@@ -25,7 +25,14 @@ import {
 } from '../services/healthService';
 import { voiceService } from '../services/voiceService';
 import { historyService } from '../services/historyService';
-import { takePhotoWithCamera, pickPhotoFromGallery, cameraService } from '../services/cameraService';
+import {
+  startEmbeddedCamera,
+  captureEmbeddedPhoto,
+  stopEmbeddedCamera,
+  pickPhotoFromGallery,
+  pickImageFromWeb,
+  cameraService,
+} from '../services/cameraService';
 
 interface HealthScreenProps {
   locale: Language;
@@ -73,33 +80,53 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
     e.target.value = '';
   };
 
-  const handleTakePhoto = async () => {
-    try {
-      const photo = await takePhotoWithCamera();
-      if (photo) {
-        const formatted = photo.startsWith('data:') ? photo : `data:image/jpeg;base64,${photo}`;
+  const [isCameraActive, setIsCameraActive] = useState(false);
+  const [photo, setPhoto] = useState<string | null>(null);
+
+  useEffect(() => {
+    return () => {
+      stopEmbeddedCamera();
+    };
+  }, []);
+
+  const handleOpenCamera = async () => {
+    if (!cameraService.isNative()) {
+      const picked = await pickImageFromWeb('camera');
+      if (picked) {
+        const formatted = picked.startsWith('data:') ? picked : `data:image/jpeg;base64,${picked}`;
+        setPhoto(formatted);
         setPhotoUrl(formatted);
         setResult(null);
         showToast(locale === 'ha' ? 'An ɗauki hoto!' : 'Photo captured!');
       }
-    } catch (err) {
-      console.warn('Health camera fallback:', err);
-      cameraInputRef.current?.click();
+      return;
+    }
+    setIsCameraActive(true);
+    await new Promise((r) => setTimeout(r, 60));
+    const started = await startEmbeddedCamera();
+    setIsCameraActive(started);
+  };
+
+  const handleCapture = async () => {
+    const captured = await captureEmbeddedPhoto();
+    if (captured) {
+      const formatted = captured.startsWith('data:') ? captured : `data:image/jpeg;base64,${captured}`;
+      setPhoto(formatted);
+      setPhotoUrl(formatted);
+      setResult(null);
+      setIsCameraActive(false);
+      showToast(locale === 'ha' ? 'An ɗauki hoto!' : 'Photo captured!');
     }
   };
 
-  const handlePickGallery = async () => {
-    try {
-      const photo = await pickPhotoFromGallery();
-      if (photo) {
-        const formatted = photo.startsWith('data:') ? photo : `data:image/jpeg;base64,${photo}`;
-        setPhotoUrl(formatted);
-        setResult(null);
-        showToast(locale === 'ha' ? 'An loda hoto daga gallery!' : 'Photo loaded!');
-      }
-    } catch (err) {
-      console.warn('Health gallery fallback:', err);
-      fileInputRef.current?.click();
+  const handleGallery = async () => {
+    const picked = await pickPhotoFromGallery();
+    if (picked) {
+      const formatted = picked.startsWith('data:') ? picked : `data:image/jpeg;base64,${picked}`;
+      setPhoto(formatted);
+      setPhotoUrl(formatted);
+      setResult(null);
+      showToast(locale === 'ha' ? 'An loda hoto daga gallery!' : 'Photo loaded!');
     }
   };
 
@@ -123,29 +150,25 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
     if (listening) {
       const rec = await voiceService.stopListening();
       setListening(false);
-      if (rec?.url) {
-        setRecordedVoiceUrl(rec.url);
-        if (!symptoms.trim()) {
-          const fallbackSym =
-            locale === 'ha'
-              ? 'Muryar alamun lafiya: Zazzabi, ciwon jiki ko ciwon ciki'
-              : 'Recorded symptom description: Fever, body aches or weakness';
-          setSymptoms(fallbackSym);
-          const res = analyzeHealth(fallbackSym, Boolean(photoUrl));
-          setResult(res);
-          const condId = getActiveHealthConditionId(res.condition, fallbackSym);
-          const healthAudio = voiceService.getCropOrHealthAudio({
-            type: 'health',
-            healthId: condId,
-          });
-          setRecordedVoiceUrl(healthAudio.url);
-        }
-        showToast(
-          locale === 'ha'
-            ? 'An ɗauki muryarka cikin nasara!'
-            : 'Voice recorded successfully!'
-        );
+      const audioUrl = rec?.url || voiceService.getLastRecording()?.url;
+      if (audioUrl) {
+        setRecordedVoiceUrl(audioUrl);
       }
+      if (!symptoms.trim()) {
+        const fallbackSym =
+          rec?.transcript ||
+          (locale === 'ha'
+            ? 'Muryar alamun lafiya: Zazzabi, ciwon jiki ko ciwon ciki'
+            : 'Recorded symptom description: Fever, body aches or weakness');
+        setSymptoms(fallbackSym);
+        const res = analyzeHealth(fallbackSym, Boolean(photoUrl));
+        setResult(res);
+      }
+      showToast(
+        locale === 'ha'
+          ? 'An ɗauki muryarka cikin nasara!'
+          : 'Voice recorded successfully!'
+      );
       return;
     }
 
@@ -153,8 +176,9 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
     const started = await voiceService.startListening(
       locale === 'ha' ? 'ha-NG' : 'en-NG',
       (recognizedText, rec) => {
-        if (rec?.url) {
-          setRecordedVoiceUrl(rec.url);
+        const audioUrl = rec?.url || voiceService.getLastRecording()?.url;
+        if (audioUrl) {
+          setRecordedVoiceUrl(audioUrl);
         }
         setSymptoms((prev) => {
           const trimmed = prev.trim();
@@ -164,20 +188,15 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
         // Automatically run instant analysis on the spoken words
         const res = analyzeHealth(recognizedText, Boolean(photoUrl));
         setResult(res);
-        const condId = getActiveHealthConditionId(res.condition, recognizedText);
-        const healthAudio = voiceService.getCropOrHealthAudio({
-          type: 'health',
-          healthId: condId,
-        });
-        setRecordedVoiceUrl(healthAudio.url);
       },
       (err) => {
         setListening(false);
       },
       (rec) => {
         setListening(false);
-        if (rec?.url) {
-          setRecordedVoiceUrl(rec.url);
+        const audioUrl = rec?.url || voiceService.getLastRecording()?.url;
+        if (audioUrl) {
+          setRecordedVoiceUrl(audioUrl);
         }
       },
       {
@@ -201,13 +220,6 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
     setTimeout(() => {
       const r = analyzeHealth(symptoms, Boolean(photoUrl));
       setResult(r);
-
-      const condId = getActiveHealthConditionId(r.condition, symptoms);
-      const healthAudio = voiceService.getCropOrHealthAudio({
-        type: 'health',
-        healthId: condId,
-      });
-      setRecordedVoiceUrl(healthAudio.url);
 
       // Save to local database / history
       historyService.insert({
@@ -242,13 +254,6 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
     setSymptoms(locale === 'ha' ? cond.symptomsHausa : cond.symptoms);
     setResult(res);
     setShowManualModal(false);
-
-    // Set distinctive sound for this selected health condition
-    const healthAudio = voiceService.getCropOrHealthAudio({
-      type: 'health',
-      healthId: cond.id,
-    });
-    setRecordedVoiceUrl(healthAudio.url);
 
     historyService.insert({
       type: 'health',
@@ -393,17 +398,6 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
             {t(locale, 'symptoms')}
           </label>
           <div className="flex items-center space-x-2">
-            {recordedVoiceUrl && (
-              <button
-                type="button"
-                onClick={() => voiceService.playAudioUrl(recordedVoiceUrl)}
-                className="flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-bold bg-red-100 hover:bg-red-200 text-red-800 transition-colors cursor-pointer"
-                title={locale === 'ha' ? 'Saurari muryar' : 'Play recorded voice'}
-              >
-                <Volume2 className="w-3.5 h-3.5" />
-                <span>{locale === 'ha' ? 'Saurari Murya' : 'Play Voice'}</span>
-              </button>
-            )}
             {symptoms && (
               <button
                 onClick={() => {
@@ -427,6 +421,49 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
           className="w-full p-3.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent shadow-2xs"
         />
 
+        {/* Recorded Voice Note Card */}
+        {recordedVoiceUrl && (
+          <div className="p-3 bg-red-50 rounded-2xl border border-red-200 text-xs text-slate-800 flex items-center justify-between gap-2 shadow-2xs">
+            <div className="flex items-center space-x-2 min-w-0">
+              <div className="w-7 h-7 rounded-lg bg-red-100 flex items-center justify-center text-red-700 shrink-0">
+                <Volume2 className="w-4 h-4" />
+              </div>
+              <div className="min-w-0">
+                <span className="font-black text-red-950 block">
+                  {locale === 'ha' ? 'Muryar da ka Ɗauka' : 'Your Recorded Voice Note'}
+                </span>
+                <span className="text-[11px] text-slate-600 truncate block max-w-[190px] sm:max-w-xs">
+                  {symptoms ? `"${symptoms}"` : locale === 'ha' ? 'Muryar alamun lafiya' : 'Health voice note'}
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center space-x-2 shrink-0">
+              <button
+                type="button"
+                onClick={() =>
+                  voiceService.playAudioUrl(
+                    recordedVoiceUrl,
+                    symptoms || (locale === 'ha' ? 'Muryar alamomin lafiya da aka ɗauka' : 'Recorded health symptoms voice note'),
+                    locale === 'ha' ? 'ha' : 'en'
+                  )
+                }
+                className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-black bg-red-700 hover:bg-red-800 text-white transition-all cursor-pointer shadow-xs active:scale-95"
+                title={locale === 'ha' ? 'Saurari muryar' : 'Play recorded voice'}
+              >
+                <Volume2 className="w-3.5 h-3.5" />
+                <span>{locale === 'ha' ? 'Saurari Murya' : 'Play Voice'}</span>
+              </button>
+              <button
+                onClick={() => setRecordedVoiceUrl(null)}
+                className="text-slate-400 hover:text-slate-700 text-xs cursor-pointer p-1.5 rounded-lg hover:bg-slate-200/60"
+                title={locale === 'ha' ? 'Goge muryar' : 'Remove recording'}
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Quick Symptom Chips */}
         <div className="flex flex-wrap gap-1.5 pt-1">
           {COMMON_SYMPTOM_CHIPS.map((chip, idx) => {
@@ -448,6 +485,19 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
           })}
         </div>
       </div>
+
+      {/* Embedded Camera Preview Container */}
+      <div
+        id="cameraPreviewContainer"
+        style={{
+          width: '100%',
+          height: isCameraActive ? '300px' : '0px',
+          marginBottom: isCameraActive ? '16px' : '0px',
+          borderRadius: '12px',
+          overflow: 'hidden',
+          display: isCameraActive ? 'block' : 'none',
+        }}
+      ></div>
 
       {/* Optional Photo Section (Wound, rash, snakebite puncture) */}
       <div className="bg-white rounded-2xl border-2 border-dashed border-red-200 p-3.5 flex flex-col items-center justify-center min-h-[140px] relative overflow-hidden">
@@ -477,17 +527,21 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
             <div className="space-y-2 pt-1 max-w-xs mx-auto w-full">
               <button
                 type="button"
-                onClick={handleTakePhoto}
+                onClick={isCameraActive ? handleCapture : handleOpenCamera}
                 className="w-full py-3 px-4 bg-red-700 hover:bg-red-800 text-white rounded-2xl font-black text-xs sm:text-sm cursor-pointer shadow-sm flex items-center justify-center space-x-2 active:scale-[0.99] transition-all"
               >
                 <Camera className="w-4 h-4 text-red-200" />
-                <span>{locale === 'ha' ? 'Ɗauki Hoto' : 'Take Photo'}</span>
+                <span>
+                  {isCameraActive
+                    ? (locale === 'ha' ? 'Ɗauki Hoton Yanzu' : 'Capture Photo')
+                    : (locale === 'ha' ? 'Ɗauki Hoto' : 'Take Photo')}
+                </span>
               </button>
 
               <div className="flex items-center justify-center">
                 <button
                   type="button"
-                  onClick={handlePickGallery}
+                  onClick={handleGallery}
                   className="inline-flex items-center space-x-1.5 py-1 px-3 text-xs font-bold text-red-800 hover:text-red-950 hover:bg-red-50 rounded-xl transition-colors cursor-pointer"
                 >
                   <ImageIcon className="w-3.5 h-3.5 text-red-600" />

@@ -12,6 +12,10 @@
 		"classpath": "com.capacitorjs.plugins.geolocation.GeolocationPlugin"
 	},
 	{
+		"pkg": "@capgo/camera-preview",
+		"classpath": "app.capgo.capacitor.camera.preview.CameraPreview"
+	},
+	{
 		"pkg": "capacitor-voice-recorder",
 		"classpath": "com.tchvu3.capacitorvoicerecorder.VoiceRecorder"
 	}

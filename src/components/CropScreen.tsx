@@ -34,7 +34,14 @@ import {
   CropDiseaseReference,
 } from '../data/cropReferenceData';
 import { HarvestCountdownCard } from './HarvestCountdownCard';
-import { takePhotoWithCamera, pickPhotoFromGallery, cameraService } from '../services/cameraService';
+import {
+  startEmbeddedCamera,
+  captureEmbeddedPhoto,
+  stopEmbeddedCamera,
+  pickPhotoFromGallery,
+  pickImageFromWeb,
+  cameraService,
+} from '../services/cameraService';
 
 interface CropScreenProps {
   locale: Language;
@@ -134,13 +141,6 @@ export const CropScreen: React.FC<CropScreenProps> = ({
     setShowManualModal(false);
     setModalStep(1);
 
-    // Update voice audio to this crop's unique sound
-    const cropAudio = voiceService.getCropOrHealthAudio({
-      type: 'crop',
-      cropId,
-    });
-    setRecordedVoiceUrl(cropAudio.url);
-
     const crop = CROP_REFERENCE_DATA.find((c) => c.id === cropId);
     showToast(
       locale === 'ha'
@@ -156,14 +156,6 @@ export const CropScreen: React.FC<CropScreenProps> = ({
     setResult(null); // Clear previous results so user can click Analyze
     setShowManualModal(false);
     setModalStep(1);
-
-    // Update voice audio to this specific crop disease's unique sound
-    const diseaseAudio = voiceService.getCropOrHealthAudio({
-      type: 'crop',
-      cropId: crop.id,
-      diseaseId: disease.id,
-    });
-    setRecordedVoiceUrl(diseaseAudio.url);
 
     showToast(
       locale === 'ha'
@@ -197,33 +189,53 @@ export const CropScreen: React.FC<CropScreenProps> = ({
     );
   };
 
-  const handleTakePhoto = async () => {
-    try {
-      const photo = await takePhotoWithCamera();
-      if (photo) {
-        const formatted = photo.startsWith('data:') ? photo : `data:image/jpeg;base64,${photo}`;
+  const [isCameraActive, setIsCameraActive] = useState(false);
+  const [photo, setPhoto] = useState<string | null>(null);
+
+  useEffect(() => {
+    return () => {
+      stopEmbeddedCamera();
+    };
+  }, []);
+
+  const handleOpenCamera = async () => {
+    if (!cameraService.isNative()) {
+      const picked = await pickImageFromWeb('camera');
+      if (picked) {
+        const formatted = picked.startsWith('data:') ? picked : `data:image/jpeg;base64,${picked}`;
+        setPhoto(formatted);
         setPhotoUrl(formatted);
         setResult(null);
         showToast(locale === 'ha' ? 'An ɗauki hoto!' : 'Photo captured!');
       }
-    } catch (err) {
-      console.warn('Native camera capture fallback:', err);
-      cameraInputRef.current?.click();
+      return;
+    }
+    setIsCameraActive(true);
+    await new Promise((r) => setTimeout(r, 60));
+    const started = await startEmbeddedCamera();
+    setIsCameraActive(started);
+  };
+
+  const handleCapture = async () => {
+    const captured = await captureEmbeddedPhoto();
+    if (captured) {
+      const formatted = captured.startsWith('data:') ? captured : `data:image/jpeg;base64,${captured}`;
+      setPhoto(formatted);
+      setPhotoUrl(formatted);
+      setResult(null);
+      setIsCameraActive(false);
+      showToast(locale === 'ha' ? 'An ɗauki hoto!' : 'Photo captured!');
     }
   };
 
-  const handlePickGallery = async () => {
-    try {
-      const photo = await pickPhotoFromGallery();
-      if (photo) {
-        const formatted = photo.startsWith('data:') ? photo : `data:image/jpeg;base64,${photo}`;
-        setPhotoUrl(formatted);
-        setResult(null);
-        showToast(locale === 'ha' ? 'An loda hoto daga gallery!' : 'Photo loaded from gallery!');
-      }
-    } catch (err) {
-      console.warn('Gallery pick fallback:', err);
-      fileInputRef.current?.click();
+  const handleGallery = async () => {
+    const picked = await pickPhotoFromGallery();
+    if (picked) {
+      const formatted = picked.startsWith('data:') ? picked : `data:image/jpeg;base64,${picked}`;
+      setPhoto(formatted);
+      setPhotoUrl(formatted);
+      setResult(null);
+      showToast(locale === 'ha' ? 'An loda hoto daga gallery!' : 'Photo loaded from gallery!');
     }
   };
 
@@ -253,15 +265,6 @@ export const CropScreen: React.FC<CropScreenProps> = ({
         setShowManualModal(true);
         return;
       }
-
-      // Update recorded voice URL to the diagnosed crop disease sound
-      const diseaseId = r.referenceDetail?.id || selectedDisease?.id;
-      const diagAudio = voiceService.getCropOrHealthAudio({
-        type: 'crop',
-        cropId: selectedCropId,
-        diseaseId,
-      });
-      setRecordedVoiceUrl(diagAudio.url);
 
       const topPred = r.predictions[0] || { label: 'unknown', confidence: 0 };
       const formattedTitle = r.referenceDetail
@@ -307,21 +310,23 @@ export const CropScreen: React.FC<CropScreenProps> = ({
     if (isListening) {
       const rec = await voiceService.stopListening();
       setIsListening(false);
-      if (rec?.url) {
-        setRecordedVoiceUrl(rec.url);
-        if (!spokenTranscript) {
-          setSpokenTranscript(
-            locale === 'ha'
+      const audioUrl = rec?.url || voiceService.getLastRecording()?.url;
+      if (audioUrl) {
+        setRecordedVoiceUrl(audioUrl);
+      }
+      if (!spokenTranscript) {
+        setSpokenTranscript(
+          rec?.transcript ||
+            (locale === 'ha'
               ? 'Muryar amfanin gona da aka ɗauka'
-              : 'Recorded crop voice description'
-          );
-        }
-        showToast(
-          locale === 'ha'
-            ? 'An ɗauki muryarka! Danna \'Bincika Shuka\' a ƙasa.'
-            : 'Voice recorded! Click \'Analyze Crop\' below.'
+              : 'Recorded crop voice description')
         );
       }
+      showToast(
+        locale === 'ha'
+          ? 'An ɗauki muryarka! Danna \'Bincika Shuka\' a ƙasa.'
+          : 'Voice recorded! Click \'Analyze Crop\' below.'
+      );
       return;
     }
 
@@ -329,11 +334,9 @@ export const CropScreen: React.FC<CropScreenProps> = ({
       locale === 'ha' ? 'ha-NG' : 'en-NG',
       (recognizedText, rec) => {
         setSpokenTranscript(recognizedText);
-        if (rec?.url) {
-          setRecordedVoiceUrl(rec.url);
-        } else {
-          const cropAudio = voiceService.getCropOrHealthAudio(currentCropContext);
-          setRecordedVoiceUrl(cropAudio.url);
+        const audioUrl = rec?.url || voiceService.getLastRecording()?.url;
+        if (audioUrl) {
+          setRecordedVoiceUrl(audioUrl);
         }
         showToast(
           locale === 'ha'
@@ -346,8 +349,12 @@ export const CropScreen: React.FC<CropScreenProps> = ({
       },
       (rec) => {
         setIsListening(false);
-        if (rec?.url) {
-          setRecordedVoiceUrl(rec.url);
+        const audioUrl = rec?.url || voiceService.getLastRecording()?.url;
+        if (audioUrl) {
+          setRecordedVoiceUrl(audioUrl);
+        }
+        if (!spokenTranscript && rec?.transcript) {
+          setSpokenTranscript(rec.transcript);
         }
       },
       currentCropContext
@@ -608,25 +615,39 @@ export const CropScreen: React.FC<CropScreenProps> = ({
             </div>
 
             {(spokenTranscript || recordedVoiceUrl) && (
-              <div className="mt-3 p-2.5 bg-emerald-50 rounded-xl border border-emerald-200 text-xs text-slate-800 flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <span className="font-bold text-emerald-900">
-                    {locale === 'ha' ? 'Bayanin Shuka da Murya: ' : 'Crop Voice Note: '}
-                  </span>
-                  <span className="truncate max-w-[200px] sm:max-w-xs">
-                    {spokenTranscript ? `"${spokenTranscript}"` : `${selectedCropCategory.crop} (${selectedDisease ? selectedDisease.name : 'Crop Sound'})`}
-                  </span>
+              <div className="mt-3 p-3 bg-emerald-50 rounded-2xl border border-emerald-200 text-xs text-slate-800 flex items-center justify-between gap-2 shadow-2xs">
+                <div className="flex items-center space-x-2 min-w-0">
+                  <div className="w-7 h-7 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-800 shrink-0">
+                    <Volume2 className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <span className="font-black text-emerald-950 block">
+                      {locale === 'ha' ? 'Muryar da ka Ɗauka' : 'Your Recorded Voice Note'}
+                    </span>
+                    <span className="text-[11px] text-slate-600 truncate block max-w-[190px] sm:max-w-xs">
+                      {spokenTranscript ? `"${spokenTranscript}"` : locale === 'ha' ? 'Muryar bayanin shuka' : 'Voice description of crop issue'}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex items-center space-x-2 ml-2 shrink-0">
+                <div className="flex items-center space-x-2 shrink-0">
                   {recordedVoiceUrl && (
                     <button
                       type="button"
-                      onClick={() => voiceService.playAudioUrl(recordedVoiceUrl)}
-                      className="flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-200 hover:bg-emerald-300 text-emerald-900 transition-colors cursor-pointer"
-                      title={locale === 'ha' ? 'Saurari bayanin shuka' : 'Play recorded crop voice note'}
+                      onClick={() =>
+                        voiceService.playAudioUrl(
+                          recordedVoiceUrl,
+                          spokenTranscript ||
+                            (locale === 'ha'
+                              ? 'Muryar bayanin shuka da aka ɗauka'
+                              : 'Recorded crop voice description'),
+                          locale === 'ha' ? 'ha' : 'en'
+                        )
+                      }
+                      className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-black bg-emerald-700 hover:bg-emerald-800 text-white transition-all cursor-pointer shadow-xs active:scale-95"
+                      title={locale === 'ha' ? 'Saurari muryarka da aka ɗauka' : 'Play your recorded voice note'}
                     >
                       <Volume2 className="w-3.5 h-3.5" />
-                      <span>{locale === 'ha' ? 'Saurari Bayanin Shuka' : 'Play Crop Note'}</span>
+                      <span>{locale === 'ha' ? 'Saurari Murya' : 'Play Voice'}</span>
                     </button>
                   )}
                   <button
@@ -634,7 +655,8 @@ export const CropScreen: React.FC<CropScreenProps> = ({
                       setSpokenTranscript('');
                       setRecordedVoiceUrl(null);
                     }}
-                    className="text-slate-400 hover:text-slate-600 text-xs cursor-pointer p-1"
+                    className="text-slate-400 hover:text-slate-700 text-xs cursor-pointer p-1.5 rounded-lg hover:bg-slate-200/60"
+                    title={locale === 'ha' ? 'Goge muryar' : 'Remove recording'}
                   >
                     ✕
                   </button>
@@ -681,23 +703,38 @@ export const CropScreen: React.FC<CropScreenProps> = ({
             )}
           </div>
 
+          {/* Embedded Camera Preview Container */}
+          <div
+            id="cameraPreviewContainer"
+            style={{
+              width: '100%',
+              height: isCameraActive ? '300px' : '0px',
+              marginBottom: isCameraActive ? '16px' : '0px',
+              borderRadius: '12px',
+              overflow: 'hidden',
+              display: isCameraActive ? 'block' : 'none',
+            }}
+          ></div>
+
           {/* Single Primary Action: Take Photo with Camera & Secondary Gallery Option */}
           <div className="space-y-2">
             <button
               type="button"
-              onClick={handleTakePhoto}
+              onClick={isCameraActive ? handleCapture : handleOpenCamera}
               className="w-full flex items-center justify-center space-x-2.5 py-3.5 px-4 bg-emerald-700 hover:bg-emerald-800 active:scale-[0.99] text-white rounded-2xl font-black text-sm sm:text-base shadow-sm hover:shadow transition-all cursor-pointer"
             >
               <Camera className="w-5 h-5 text-emerald-200" />
               <span>
-                {locale === 'ha' ? 'Ɗauki Hoto' : 'Take Photo'}
+                {isCameraActive
+                  ? (locale === 'ha' ? 'Ɗauki Hoton Yanzu' : 'Capture Photo')
+                  : (locale === 'ha' ? 'Ɗauki Hoto' : 'Take Photo')}
               </span>
             </button>
 
             <div className="flex items-center justify-center">
               <button
                 type="button"
-                onClick={handlePickGallery}
+                onClick={handleGallery}
                 className="inline-flex items-center space-x-1.5 py-1.5 px-3 text-xs font-bold text-emerald-800 hover:text-emerald-950 hover:bg-emerald-50 rounded-xl transition-colors cursor-pointer"
               >
                 <ImageIcon className="w-3.5 h-3.5 text-emerald-600" />

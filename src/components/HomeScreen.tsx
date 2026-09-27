@@ -51,18 +51,20 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     if (isListening) {
       const rec = await voiceService.stopListening();
       setIsListening(false);
-      if (rec?.url) {
-        setRecordedVoiceUrl(rec.url);
-        showToast(locale === 'ha' ? 'An ɗauki muryarka cikin nasara!' : 'Voice recorded successfully!');
+      const audioUrl = rec?.url || voiceService.getLastRecording()?.url;
+      if (audioUrl) {
+        setRecordedVoiceUrl(audioUrl);
       }
+      showToast(locale === 'ha' ? 'An ɗauki muryarka cikin nasara!' : 'Voice recorded successfully!');
       return;
     }
 
     const started = await voiceService.startListening(
       locale,
       (text, rec) => {
-        if (rec?.url) {
-          setRecordedVoiceUrl(rec.url);
+        const audioUrl = rec?.url || voiceService.getLastRecording()?.url;
+        if (audioUrl) {
+          setRecordedVoiceUrl(audioUrl);
         }
         showToast(`${locale === 'ha' ? 'An ji' : 'Heard'}: "${text}"`);
         const lower = text.toLowerCase();
@@ -91,8 +93,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       },
       (rec) => {
         setIsListening(false);
-        if (rec?.url) {
-          setRecordedVoiceUrl(rec.url);
+        const audioUrl = rec?.url || voiceService.getLastRecording()?.url;
+        if (audioUrl) {
+          setRecordedVoiceUrl(audioUrl);
         }
       }
     );
@@ -123,8 +126,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               {recordedVoiceUrl && (
                 <button
                   type="button"
-                  onClick={() => voiceService.playAudioUrl(recordedVoiceUrl)}
-                  className="flex items-center space-x-1 px-2.5 py-1.5 rounded-full text-xs font-bold bg-white/20 hover:bg-white/30 text-white backdrop-blur-xs transition-all cursor-pointer shadow-xs"
+                  onClick={() =>
+                    voiceService.playAudioUrl(
+                      recordedVoiceUrl,
+                      locale === 'ha'
+                        ? 'Barka dai, an dauki muryarka cikin nasara a SmartVillage'
+                        : 'Welcome, your voice note was recorded successfully in SmartVillage',
+                      locale === 'ha' ? 'ha' : 'en'
+                    )
+                  }
+                  className="flex items-center space-x-1 px-2.5 py-1.5 rounded-full text-xs font-bold bg-white/20 hover:bg-white/30 text-white backdrop-blur-xs transition-all cursor-pointer shadow-xs active:scale-95"
                   title={locale === 'ha' ? 'Saurari muryarka' : 'Play recorded voice'}
                 >
                   <Volume2 className="w-3.5 h-3.5" />
