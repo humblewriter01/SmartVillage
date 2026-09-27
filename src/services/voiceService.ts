@@ -372,6 +372,16 @@ export const voiceService = {
   playAudioUrl(url: string, fallbackText?: string, locale?: string): Promise<void> {
     return new Promise((resolve) => {
       this.stopSpeaking();
+      if (!url || url.trim() === '') {
+        if (fallbackText) {
+          this.speak(fallbackText, locale === 'ha' ? 'ha' : 'en')
+            .then(() => resolve())
+            .catch(() => resolve());
+        } else {
+          resolve();
+        }
+        return;
+      }
       try {
         const audio = new Audio(url);
         activeAudioPlayer = audio;
@@ -550,53 +560,11 @@ export const voiceService = {
         }
       }
 
-      // Soft non-blocking cue sound
-      try {
-        const cueCategory = context?.type === 'crop' ? 'crop' : context?.type === 'health' ? 'health' : 'general';
-        this.playAudioCue('start', cueCategory);
-      } catch {}
-
-      // 2. Parallel SpeechRecognition for live transcription
-      try {
-        const win = window as unknown as IWindow;
-        const SpeechRec = win.SpeechRecognition || win.webkitSpeechRecognition;
-        if (SpeechRec) {
-          const recognition = new SpeechRec();
-          recognition.continuous = false;
-          recognition.interimResults = true;
-          recognition.lang = localeId === 'ha' || localeId === 'ha-NG' ? 'ha-NG' : 'en-NG';
-
-          recognition.onresult = (event: SpeechRecognitionEvent) => {
-            let transcript = '';
-            for (let i = event.resultIndex; i < event.results.length; i++) {
-              transcript += event.results[i][0].transcript;
-            }
-            if (transcript.trim()) {
-              currentRecordedTranscript = transcript.trim();
-              onResult(currentRecordedTranscript, lastRecordedAudio || undefined);
-            }
-          };
-
-          recognition.onerror = (e: SpeechRecognitionErrorEvent) => {
-            console.warn('SpeechRecognition error:', e.error);
-          };
-
-          recognition.onend = () => {
-            activeRecognition = null;
-          };
-
-          recognition.start();
-          activeRecognition = recognition;
-        }
-      } catch (speechErr) {
-        console.warn('SpeechRecognition failed to start:', speechErr);
-      }
-
-      // 3. If Capacitor VoiceRecorder did not activate, fallback to MediaRecorder
-      if (!isCapacitorRecording && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      // 2. Browser MediaRecorder: obtain real microphone stream FIRST before starting recognition
+      if (!isCapacitorRecording && typeof navigator !== 'undefined' && navigator.mediaDevices?.getUserMedia) {
         try {
           const stream = await navigator.mediaDevices.getUserMedia({
-            audio: { echoCancellation: true, noiseSuppression: true },
+            audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
           });
           if (!isCurrentlyRecording) {
             stream.getTracks().forEach((t) => t.stop());
@@ -634,9 +602,46 @@ export const voiceService = {
             }
           };
           recorder.start(100);
+          this.notifyPermissionGranted();
         } catch (err) {
           console.warn('getUserMedia error:', err);
         }
+      }
+
+      // 3. Parallel SpeechRecognition for live transcription
+      try {
+        const win = window as unknown as IWindow;
+        const SpeechRec = win.SpeechRecognition || win.webkitSpeechRecognition;
+        if (SpeechRec) {
+          const recognition = new SpeechRec();
+          recognition.continuous = false;
+          recognition.interimResults = true;
+          recognition.lang = localeId === 'ha' || localeId === 'ha-NG' ? 'ha-NG' : 'en-NG';
+
+          recognition.onresult = (event: SpeechRecognitionEvent) => {
+            let transcript = '';
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+              transcript += event.results[i][0].transcript;
+            }
+            if (transcript.trim()) {
+              currentRecordedTranscript = transcript.trim();
+              onResult(currentRecordedTranscript, lastRecordedAudio || undefined);
+            }
+          };
+
+          recognition.onerror = (e: SpeechRecognitionErrorEvent) => {
+            console.warn('SpeechRecognition error:', e.error);
+          };
+
+          recognition.onend = () => {
+            activeRecognition = null;
+          };
+
+          recognition.start();
+          activeRecognition = recognition;
+        }
+      } catch (speechErr) {
+        console.warn('SpeechRecognition failed to start:', speechErr);
       }
 
       return true;
@@ -732,15 +737,12 @@ export const voiceService = {
               lastRecordedAudio = result;
               resolve(result);
             } else {
-              const durationSec = Math.max(1.5, (Date.now() - recordingStartTime) / 1000);
-              const synthBlob = generateHumanVoiceBlob(durationSec, activeRecordingContext);
-              const synthUrl = URL.createObjectURL(synthBlob);
               const result: VoiceRecordingResult = {
-                url: synthUrl,
-                blob: synthBlob,
-                durationMs: Math.round(durationSec * 1000),
+                url: '',
+                blob: new Blob([], { type: mime }),
+                durationMs: Date.now() - recordingStartTime,
                 transcript: currentRecordedTranscript || activeRecordingContext?.label,
-                isSimulated: true,
+                isSimulated: false,
                 timestamp: Date.now(),
                 context: activeRecordingContext,
               };
@@ -754,15 +756,12 @@ export const voiceService = {
             }
             recorder.stop();
           } catch {
-            const durationSec = Math.max(1.5, (Date.now() - recordingStartTime) / 1000);
-            const synthBlob = generateHumanVoiceBlob(durationSec, activeRecordingContext);
-            const synthUrl = URL.createObjectURL(synthBlob);
             const result: VoiceRecordingResult = {
-              url: synthUrl,
-              blob: synthBlob,
-              durationMs: Math.round(durationSec * 1000),
+              url: '',
+              blob: new Blob([], { type: 'audio/webm' }),
+              durationMs: Date.now() - recordingStartTime,
               transcript: currentRecordedTranscript || activeRecordingContext?.label,
-              isSimulated: true,
+              isSimulated: false,
               timestamp: Date.now(),
               context: activeRecordingContext,
             };
@@ -777,16 +776,13 @@ export const voiceService = {
         activeMediaStream = null;
       }
 
-      // If neither Capacitor nor MediaRecorder was active (e.g. browser restricted mic, permission prompt blocked, SpeechRecognition only):
-      const durationSec = Math.max(1.5, (Date.now() - recordingStartTime) / 1000);
-      const synthBlob = generateHumanVoiceBlob(durationSec, activeRecordingContext);
-      const synthUrl = URL.createObjectURL(synthBlob);
+      // If no audio chunks were captured: return the transcript-based result
       const result: VoiceRecordingResult = {
-        url: synthUrl,
-        blob: synthBlob,
-        durationMs: Math.round(durationSec * 1000),
+        url: '',
+        blob: new Blob([], { type: 'audio/webm' }),
+        durationMs: Math.max(500, Date.now() - recordingStartTime),
         transcript: currentRecordedTranscript || activeRecordingContext?.label,
-        isSimulated: true,
+        isSimulated: false,
         timestamp: Date.now(),
         context: activeRecordingContext,
       };

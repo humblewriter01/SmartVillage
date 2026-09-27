@@ -304,7 +304,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
   });
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6 space-y-5">
+    <div className="max-w-4xl lg:max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white text-xs sm:text-sm px-4 py-2.5 rounded-xl shadow-lg border border-slate-700 animate-fade-in">
@@ -384,11 +384,34 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
           </div>
 
           {listening && (
-            <span className="text-[11px] font-bold text-red-600 animate-pulse bg-red-100/80 px-2.5 py-1 rounded-full border border-red-200">
-              REC
-            </span>
+            <div className="flex items-center space-x-2 shrink-0">
+              <div className="flex items-center space-x-1 px-2 py-1 bg-red-100 rounded-full border border-red-200">
+                <span className="w-2 h-2 rounded-full bg-red-600 animate-ping"></span>
+                <span className="text-[11px] font-black text-red-700 tracking-wider">REC</span>
+              </div>
+              {/* Animated Sound Wave Bars */}
+              <div className="flex items-center space-x-0.5 h-4">
+                <span className="w-1 bg-red-500 rounded-full animate-bounce [animation-delay:0ms] h-3"></span>
+                <span className="w-1 bg-red-600 rounded-full animate-bounce [animation-delay:150ms] h-4"></span>
+                <span className="w-1 bg-red-500 rounded-full animate-bounce [animation-delay:300ms] h-2"></span>
+                <span className="w-1 bg-red-600 rounded-full animate-bounce [animation-delay:450ms] h-3.5"></span>
+              </div>
+            </div>
           )}
         </div>
+
+        {/* Live recording indicator alert while active */}
+        {listening && (
+          <div className="mt-3 p-2 bg-red-100/70 border border-red-200 rounded-xl flex items-center justify-between text-xs text-red-900 animate-pulse">
+            <span className="font-bold flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-red-600 inline-block"></span>
+              {locale === 'ha' ? 'Ana ɗaukar muryarka yanzu... Yi bayanin alamun rashin lafiyarka' : 'Recording your voice note now... Describe your symptoms aloud'}
+            </span>
+            <span className="text-[10px] font-black uppercase text-red-600">
+              {locale === 'ha' ? 'Danna domin gamawa' : 'Tap mic to stop'}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Symptoms Text Area */}

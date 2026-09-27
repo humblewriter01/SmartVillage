@@ -259,8 +259,17 @@ export function App() {
         <div className="p-4 border-b border-emerald-800 bg-gradient-to-br from-emerald-800 to-emerald-950 text-white">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center space-x-2.5">
-              <div className="w-9 h-9 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center text-white border border-white/30 shadow-xs">
-                <Sprout className="w-5 h-5 text-emerald-100" />
+              <div className="w-10 h-10 rounded-xl bg-white p-1 flex items-center justify-center shadow-xs border border-white/30 overflow-hidden">
+                <img
+                  src="/app-icon.png"
+                  alt="SmartVillage"
+                  className="w-full h-full object-contain"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                    e.currentTarget.parentElement?.classList.remove('bg-white');
+                    e.currentTarget.parentElement?.classList.add('bg-white/20');
+                  }}
+                />
               </div>
               <div>
                 <h2 className="font-black text-lg tracking-tight leading-tight">SmartVillage</h2>
@@ -364,9 +373,9 @@ export function App() {
 
       {/* Top Application Bar with Hamburger Menu Icon (☰) */}
       <header className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-emerald-100 shadow-2xs">
-        <div className="max-w-3xl mx-auto px-3 sm:px-4 h-14 flex items-center justify-between">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-15 flex items-center justify-between">
           {/* Left: Hamburger menu + Logo & Title */}
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-3">
             <button
               onClick={() => setIsDrawerOpen(true)}
               className="p-2 -ml-1 text-slate-700 hover:text-emerald-800 hover:bg-emerald-50 rounded-xl transition-colors cursor-pointer"
@@ -378,10 +387,17 @@ export function App() {
 
             <div
               onClick={() => navigateToTab(0)}
-              className="flex items-center space-x-2 cursor-pointer select-none"
+              className="flex items-center space-x-2.5 cursor-pointer select-none"
             >
-              <div className="w-8 h-8 rounded-lg bg-[#1f7a4c] flex items-center justify-center text-white shadow-2xs">
-                <Sprout className="w-5 h-5" />
+              <div className="w-8 h-8 rounded-lg bg-white p-0.5 flex items-center justify-center shadow-xs border border-emerald-600/30 overflow-hidden">
+                <img
+                  src="/app-icon.png"
+                  alt="SmartVillage Icon"
+                  className="w-full h-full object-contain"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                  }}
+                />
               </div>
               <div>
                 <span className="font-extrabold text-base sm:text-lg tracking-tight text-[#173326]">
@@ -488,9 +504,9 @@ export function App() {
         {tab === 11 && <SoilHealthScreen locale={locale} />}
       </main>
 
-      {/* Bottom Sticky Navigation Bar: ONLY 5 items for tap-friendly accessibility */}
+      {/* Bottom Sticky Navigation Bar: Responsive for both mobile and laptop */}
       <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur border-t border-slate-200/80 shadow-lg">
-        <div className="max-w-2xl mx-auto px-1 sm:px-2">
+        <div className="max-w-4xl mx-auto px-2 sm:px-6">
           <div className="grid grid-cols-5 h-16 items-center">
             {bottomNavItems.map((item) => {
               const Icon = item.icon;

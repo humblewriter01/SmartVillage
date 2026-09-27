@@ -390,7 +390,7 @@ export const CropScreen: React.FC<CropScreenProps> = ({
   };
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-5 space-y-4">
+    <div className="max-w-4xl lg:max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6 space-y-5">
       {/* Hidden File / Camera Inputs */}
       <input
         type="file"
@@ -419,15 +419,20 @@ export const CropScreen: React.FC<CropScreenProps> = ({
       {/* Screen Title & Sub-Navigation Tabs */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl sm:text-2xl font-black text-slate-800 tracking-tight">
-              {t(locale, 'cropHealth')}
-            </h1>
-            <p className="text-xs text-slate-500 mt-0.5">
-              {locale === 'ha'
-                ? 'Duba cututtukan albasa da amfanin gona, sannan bibiyi kwanakin girbi'
-                : 'Diagnose crop leaf diseases offline and track harvest countdowns'}
-            </p>
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 rounded-2xl bg-emerald-100 flex items-center justify-center text-emerald-800 shrink-0 shadow-2xs">
+              <Sprout className="w-6 h-6 text-emerald-700" />
+            </div>
+            <div>
+              <h1 className="text-xl sm:text-2xl font-black text-slate-800 tracking-tight">
+                {t(locale, 'cropHealth')}
+              </h1>
+              <p className="text-xs text-slate-500 mt-0.5">
+                {locale === 'ha'
+                  ? 'Duba cututtukan albasa da amfanin gona, sannan bibiyi kwanakin girbi'
+                  : 'Diagnose crop leaf diseases offline and track harvest countdowns'}
+              </p>
+            </div>
           </div>
         </div>
 
@@ -608,11 +613,34 @@ export const CropScreen: React.FC<CropScreenProps> = ({
               </div>
 
               {isListening && (
-                <span className="text-[11px] font-bold text-red-600 animate-pulse bg-red-100/80 px-2.5 py-1 rounded-full border border-red-200">
-                  REC
-                </span>
+                <div className="flex items-center space-x-2 shrink-0">
+                  <div className="flex items-center space-x-1 px-2 py-1 bg-red-100 rounded-full border border-red-200">
+                    <span className="w-2 h-2 rounded-full bg-red-600 animate-ping"></span>
+                    <span className="text-[11px] font-black text-red-700 tracking-wider">REC</span>
+                  </div>
+                  {/* Animated Sound Wave Bars */}
+                  <div className="flex items-center space-x-0.5 h-4">
+                    <span className="w-1 bg-red-500 rounded-full animate-bounce [animation-delay:0ms] h-3"></span>
+                    <span className="w-1 bg-red-600 rounded-full animate-bounce [animation-delay:150ms] h-4"></span>
+                    <span className="w-1 bg-red-500 rounded-full animate-bounce [animation-delay:300ms] h-2"></span>
+                    <span className="w-1 bg-red-600 rounded-full animate-bounce [animation-delay:450ms] h-3.5"></span>
+                  </div>
+                </div>
               )}
             </div>
+
+            {/* Live recording indicator alert while active */}
+            {isListening && (
+              <div className="mt-2.5 p-2 bg-red-50/90 border border-red-200/80 rounded-xl flex items-center justify-between text-xs text-red-900 animate-pulse">
+                <span className="font-bold flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-red-600 inline-block"></span>
+                  {locale === 'ha' ? 'Ana ɗaukar muryarka yanzu... Yi magana a sarari' : 'Recording your voice note now... Speak clearly'}
+                </span>
+                <span className="text-[10px] font-black uppercase text-red-600">
+                  {locale === 'ha' ? 'Danna domin gamawa' : 'Tap mic to stop'}
+                </span>
+              </div>
+            )}
 
             {(spokenTranscript || recordedVoiceUrl) && (
               <div className="mt-3 p-3 bg-emerald-50 rounded-2xl border border-emerald-200 text-xs text-slate-800 flex items-center justify-between gap-2 shadow-2xs">

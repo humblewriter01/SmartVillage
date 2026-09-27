@@ -16,6 +16,7 @@ export const translations: Record<Language, Record<string, string>> = {
     calendar: 'Calendar',
     library: 'Library',
     soil: 'Soil Health',
+    cropHealth: 'Crop Health & Leaf Doctor',
 
     // Home Action Cards
     checkCrop: 'Check Crop Disease',
@@ -165,6 +166,7 @@ export const translations: Record<Language, Record<string, string>> = {
     calendar: 'Kalandar Noma',
     library: 'Laburare',
     soil: 'Lafiyar Ƙasa',
+    cropHealth: 'Lafiyar Shuke-shuke da Gona',
 
     // Home Action Cards
     checkCrop: 'Duba Cutar Shuka',

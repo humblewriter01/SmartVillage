@@ -170,7 +170,7 @@ export const LivestockScreen: React.FC<LivestockScreenProps> = ({
   };
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6 space-y-5">
+    <div className="max-w-4xl lg:max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white text-xs sm:text-sm px-4 py-2.5 rounded-xl shadow-lg border border-slate-700 animate-fade-in flex items-center gap-2">
@@ -215,7 +215,7 @@ export const LivestockScreen: React.FC<LivestockScreenProps> = ({
           </span>
         </div>
 
-        <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+        <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-2.5">
           {LIVESTOCK_ANIMALS.map((animal) => {
             const isSelected = selectedAnimal.id === animal.id;
             const isPlayingThis = playingAnimalId === animal.id;
