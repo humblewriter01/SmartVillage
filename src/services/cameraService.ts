@@ -41,7 +41,6 @@ export async function startEmbeddedCamera(): Promise<boolean> {
     return true;
   } catch (error) {
     console.error('Embedded camera error:', error);
-    alert('Ba a iya buɗe kyamara ba. Don Allah ka sake gwadawa.');
     return false;
   }
 }

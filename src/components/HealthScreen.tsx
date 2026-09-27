@@ -26,13 +26,10 @@ import {
 import { voiceService } from '../services/voiceService';
 import { historyService } from '../services/historyService';
 import {
-  startEmbeddedCamera,
-  captureEmbeddedPhoto,
-  stopEmbeddedCamera,
   pickPhotoFromGallery,
-  pickImageFromWeb,
   cameraService,
 } from '../services/cameraService';
+import { FullScreenCameraModal } from './FullScreenCameraModal';
 
 interface HealthScreenProps {
   locale: Language;
@@ -83,40 +80,21 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [photo, setPhoto] = useState<string | null>(null);
 
-  useEffect(() => {
-    return () => {
-      stopEmbeddedCamera();
-    };
-  }, []);
-
-  const handleOpenCamera = async () => {
-    if (!cameraService.isNative()) {
-      const picked = await pickImageFromWeb('camera');
-      if (picked) {
-        const formatted = picked.startsWith('data:') ? picked : `data:image/jpeg;base64,${picked}`;
-        setPhoto(formatted);
-        setPhotoUrl(formatted);
-        setResult(null);
-        showToast(locale === 'ha' ? 'An ɗauki hoto!' : 'Photo captured!');
-      }
-      return;
-    }
+  const handleOpenCamera = () => {
     setIsCameraActive(true);
-    await new Promise((r) => setTimeout(r, 60));
-    const started = await startEmbeddedCamera();
-    setIsCameraActive(started);
   };
 
-  const handleCapture = async () => {
-    const captured = await captureEmbeddedPhoto();
-    if (captured) {
-      const formatted = captured.startsWith('data:') ? captured : `data:image/jpeg;base64,${captured}`;
-      setPhoto(formatted);
-      setPhotoUrl(formatted);
-      setResult(null);
-      setIsCameraActive(false);
-      showToast(locale === 'ha' ? 'An ɗauki hoto!' : 'Photo captured!');
-    }
+  const handleCapturePhoto = (captured: string) => {
+    const formatted = captured.startsWith('data:') ? captured : `data:image/jpeg;base64,${captured}`;
+    setPhoto(formatted);
+    setPhotoUrl(formatted);
+    setResult(null);
+    setIsCameraActive(false);
+    showToast(locale === 'ha' ? 'An ɗauki hoto!' : 'Photo captured!');
+  };
+
+  const handleCloseCamera = () => {
+    setIsCameraActive(false);
   };
 
   const handleGallery = async () => {
@@ -509,18 +487,14 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
         </div>
       </div>
 
-      {/* Embedded Camera Preview Container */}
-      <div
-        id="cameraPreviewContainer"
-        style={{
-          width: '100%',
-          height: isCameraActive ? '300px' : '0px',
-          marginBottom: isCameraActive ? '16px' : '0px',
-          borderRadius: '12px',
-          overflow: 'hidden',
-          display: isCameraActive ? 'block' : 'none',
-        }}
-      ></div>
+      {/* Full Screen Native Android Camera Modal */}
+      <FullScreenCameraModal
+        isOpen={isCameraActive}
+        locale={locale}
+        title={locale === 'ha' ? 'Kyamarar Duba Lafiya' : 'Health Screening Camera'}
+        onCapture={handleCapturePhoto}
+        onClose={handleCloseCamera}
+      />
 
       {/* Optional Photo Section (Wound, rash, snakebite puncture) */}
       <div className="bg-white rounded-2xl border-2 border-dashed border-red-200 p-3.5 flex flex-col items-center justify-center min-h-[140px] relative overflow-hidden">
@@ -550,14 +524,12 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
             <div className="space-y-2 pt-1 max-w-xs mx-auto w-full">
               <button
                 type="button"
-                onClick={isCameraActive ? handleCapture : handleOpenCamera}
+                onClick={handleOpenCamera}
                 className="w-full py-3 px-4 bg-red-700 hover:bg-red-800 text-white rounded-2xl font-black text-xs sm:text-sm cursor-pointer shadow-sm flex items-center justify-center space-x-2 active:scale-[0.99] transition-all"
               >
                 <Camera className="w-4 h-4 text-red-200" />
                 <span>
-                  {isCameraActive
-                    ? (locale === 'ha' ? 'Ɗauki Hoton Yanzu' : 'Capture Photo')
-                    : (locale === 'ha' ? 'Ɗauki Hoto' : 'Take Photo')}
+                  {locale === 'ha' ? 'Ɗauki Hoto' : 'Take Photo'}
                 </span>
               </button>
 

@@ -19,13 +19,10 @@ import { waterQualityService, WaterQualityResult } from '../services/waterQualit
 import { voiceService } from '../services/voiceService';
 import { historyService } from '../services/historyService';
 import {
-  startEmbeddedCamera,
-  captureEmbeddedPhoto,
-  stopEmbeddedCamera,
   pickPhotoFromGallery,
-  pickImageFromWeb,
   cameraService,
 } from '../services/cameraService';
+import { FullScreenCameraModal } from './FullScreenCameraModal';
 
 interface WaterQualityScreenProps {
   locale: Language;
@@ -83,40 +80,21 @@ export const WaterQualityScreen: React.FC<WaterQualityScreenProps> = ({
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [photo, setPhoto] = useState<string | null>(null);
 
-  useEffect(() => {
-    return () => {
-      stopEmbeddedCamera();
-    };
-  }, []);
-
-  const handleOpenCamera = async () => {
-    if (!cameraService.isNative()) {
-      const picked = await pickImageFromWeb('camera');
-      if (picked) {
-        const formatted = picked.startsWith('data:') ? picked : `data:image/jpeg;base64,${picked}`;
-        setPhoto(formatted);
-        setPhotoUrl(formatted);
-        setResult(null);
-        showToast(locale === 'ha' ? 'An ɗauki hoto!' : 'Photo captured!');
-      }
-      return;
-    }
+  const handleOpenCamera = () => {
     setIsCameraActive(true);
-    await new Promise((r) => setTimeout(r, 60));
-    const started = await startEmbeddedCamera();
-    setIsCameraActive(started);
   };
 
-  const handleCapture = async () => {
-    const captured = await captureEmbeddedPhoto();
-    if (captured) {
-      const formatted = captured.startsWith('data:') ? captured : `data:image/jpeg;base64,${captured}`;
-      setPhoto(formatted);
-      setPhotoUrl(formatted);
-      setResult(null);
-      setIsCameraActive(false);
-      showToast(locale === 'ha' ? 'An ɗauki hoto!' : 'Photo captured!');
-    }
+  const handleCapturePhoto = (captured: string) => {
+    const formatted = captured.startsWith('data:') ? captured : `data:image/jpeg;base64,${captured}`;
+    setPhoto(formatted);
+    setPhotoUrl(formatted);
+    setResult(null);
+    setIsCameraActive(false);
+    showToast(locale === 'ha' ? 'An ɗauki hoto!' : 'Photo captured!');
+  };
+
+  const handleCloseCamera = () => {
+    setIsCameraActive(false);
   };
 
   const handleGallery = async () => {
@@ -293,31 +271,25 @@ export const WaterQualityScreen: React.FC<WaterQualityScreenProps> = ({
           </div>
         )}
 
-        {/* Embedded Camera Preview Container */}
-        <div
-          id="cameraPreviewContainer"
-          style={{
-            width: '100%',
-            height: isCameraActive ? '300px' : '0px',
-            marginBottom: isCameraActive ? '16px' : '0px',
-            borderRadius: '12px',
-            overflow: 'hidden',
-            display: isCameraActive ? 'block' : 'none',
-          }}
-        ></div>
+        {/* Full Screen Native Android Camera Modal */}
+        <FullScreenCameraModal
+          isOpen={isCameraActive}
+          locale={locale}
+          title={locale === 'ha' ? 'Kyamarar Duba Ruwa' : 'Water Quality Camera'}
+          onCapture={handleCapturePhoto}
+          onClose={handleCloseCamera}
+        />
 
         {/* Single Primary Action: Take Photo with Camera & Secondary Gallery Option */}
         <div className="space-y-2">
           <button
             type="button"
-            onClick={isCameraActive ? handleCapture : handleOpenCamera}
+            onClick={handleOpenCamera}
             className="w-full flex items-center justify-center space-x-2.5 py-3.5 px-4 bg-sky-600 hover:bg-sky-700 active:scale-[0.99] text-white rounded-2xl font-black text-sm sm:text-base shadow-sm hover:shadow transition-all cursor-pointer"
           >
             <Camera className="w-5 h-5 text-sky-200" />
             <span>
-              {isCameraActive
-                ? (locale === 'ha' ? 'Ɗauki Hoton Yanzu' : 'Capture Photo')
-                : (locale === 'ha' ? 'Ɗauki Hoto' : 'Take Photo')}
+              {locale === 'ha' ? 'Ɗauki Hoto' : 'Take Photo'}
             </span>
           </button>
 
