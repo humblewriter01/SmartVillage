@@ -84,25 +84,34 @@ export const WeatherScreen: React.FC<WeatherScreenProps> = ({
     }
   };
 
-  const getWeatherAgroTip = (day: WeatherDay) => {
+  const getWeatherAgroTipData = (day: WeatherDay) => {
     if (day.rain > 10) {
-      return locale === 'ha'
-        ? 'Ruwa mai yawa: Kula da magudanar ruwa, kada a fesa magani a yau.'
-        : 'Heavy rain: Check field drainage; avoid spraying chemical products today.';
+      return {
+        tip_en: 'Heavy rain: Check field drainage; avoid spraying chemical products today.',
+        tip_ha: 'Ruwa mai yawa: Kula da magudanar ruwa, kada a fesa magani a yau.',
+      };
     }
     if (day.rain > 1.5) {
-      return locale === 'ha'
-        ? 'Akwai damshi: Yanayi mai kyau ga shuka ko ciyawa.'
-        : 'Good planting moisture: Favorable for germination and weeding.';
+      return {
+        tip_en: 'Good planting moisture: Favorable for germination and weeding.',
+        tip_ha: 'Akwai damshi: Yanayi mai kyau ga shuka ko ciyawa.',
+      };
     }
     if (day.max > 35) {
-      return locale === 'ha'
-        ? 'Zafi mai tsanani: Samar da inuwa da ruwa ga dabbobi da kananan shuke-shuke.'
-        : 'High heat: Provide shade and water for livestock and vulnerable seedlings.';
+      return {
+        tip_en: 'High heat: Provide shade and water for livestock and vulnerable seedlings.',
+        tip_ha: 'Zafi mai tsanani: Samar da inuwa da ruwa ga dabbobi da kananan shuke-shuke.',
+      };
     }
-    return locale === 'ha'
-      ? 'Yanayi matsakaici: Ya dace da duban gona da shirin girbi.'
-      : 'Moderate weather: Suitable for routine field scouting and harvest planning.';
+    return {
+      tip_en: 'Moderate weather: Suitable for routine field scouting and harvest planning.',
+      tip_ha: 'Yanayi matsakaici: Ya dace da duban gona da shirin girbi.',
+    };
+  };
+
+  const getWeatherAgroTip = (day: WeatherDay) => {
+    const tipData = getWeatherAgroTipData(day);
+    return locale === 'ha' ? tipData.tip_ha : tipData.tip_en;
   };
 
   return (
@@ -227,7 +236,7 @@ export const WeatherScreen: React.FC<WeatherScreenProps> = ({
                 {/* Farming tip based on weather */}
                 <div className="mt-3 pt-2.5 border-t border-slate-100 text-xs text-slate-600 flex items-start space-x-2">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded">
-                    Farm tip
+                    {t(locale, 'farmTip')}
                   </span>
                   <p className="flex-1">{getWeatherAgroTip(day)}</p>
                 </div>

@@ -71,6 +71,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
     const file = e.target.files?.[0];
     if (file) {
       const url = URL.createObjectURL(file);
+      setPhoto(url);
       setPhotoUrl(url);
       setResult(null);
     }
@@ -507,6 +508,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
             />
             <button
               onClick={() => {
+                setPhoto(null);
                 setPhotoUrl(null);
                 setResult(null);
               }}
@@ -548,7 +550,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
         )}
       </div>
 
-      {/* Analyze Button */}
+      {/* Analyze Button: Disappears completely when no photo or symptoms exist */}
       {(symptoms.trim() || photoUrl) && !result && (
         <button
           onClick={handleAnalyze}
@@ -564,12 +566,12 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
       {result && (
         <div className="bg-white rounded-2xl border border-red-200 p-5 shadow-sm space-y-4 animate-scale-up">
           {/* Header with Title and Grandma Listen Button */}
-          <div className="flex items-start justify-between">
-            <div>
-              <span className="text-xs font-bold text-red-700 uppercase tracking-wider">
+          <div className="flex items-start justify-between gap-3 min-h-0">
+            <div className="flex-1 min-w-0 space-y-1">
+              <span className="text-xs font-bold text-red-700 uppercase tracking-wider block">
                 {t(locale, 'healthResult')}
               </span>
-              <h3 className="font-extrabold text-lg sm:text-xl text-slate-800 mt-0.5">
+              <h3 className="font-extrabold text-lg sm:text-xl text-slate-800 leading-snug break-words">
                 {locale === 'ha' ? result.conditionHausa : result.condition}
               </h3>
             </div>
@@ -577,7 +579,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
             {/* Grandma-Friendly Read Aloud Button */}
             <button
               onClick={handleSpeak}
-              className={`flex items-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs font-bold cursor-pointer transition-all shadow-xs ${
+              className={`shrink-0 flex items-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs font-bold cursor-pointer transition-all shadow-xs ${
                 isSpeaking
                   ? 'bg-red-600 text-white animate-pulse'
                   : 'bg-red-50 hover:bg-red-100 text-red-800 border border-red-300'

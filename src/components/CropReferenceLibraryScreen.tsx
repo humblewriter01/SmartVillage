@@ -164,26 +164,26 @@ export const CropReferenceLibraryScreen: React.FC<CropReferenceLibraryScreenProp
               {/* Card Header Accordion */}
               <div
                 onClick={() => setExpandedDiseaseId(isExpanded ? null : disease.id)}
-                className="p-4 flex items-center justify-between cursor-pointer bg-white hover:bg-slate-50/70 transition-colors"
+                className="p-4 flex items-center justify-between gap-3 cursor-pointer bg-white hover:bg-slate-50/70 transition-colors min-h-[72px]"
               >
-                <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-3 flex-1 min-w-0">
                   {/* SVG Illustration Thumbnail */}
                   <img
                     src={disease.image}
                     alt={disease.name}
                     className="w-12 h-12 rounded-xl object-contain shrink-0 border border-slate-200 shadow-2xs bg-slate-50"
                   />
-                  <div>
-                    <h3 className="font-extrabold text-sm sm:text-base text-slate-800">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-extrabold text-sm sm:text-base text-slate-800 leading-snug break-words">
                       {locale === 'ha' ? disease.hausa_name : disease.name}
                     </h3>
-                    <p className="text-[11px] text-slate-500 truncate mt-0.5">
+                    <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed break-words">
                       {locale === 'ha' ? disease.causes_hausa : disease.causes}
                     </p>
                   </div>
                 </div>
 
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-2 shrink-0">
                   <button
                     onClick={(e) => {
                       e.stopPropagation();

@@ -17,6 +17,10 @@ export const translations: Record<Language, Record<string, string>> = {
     library: 'Library',
     soil: 'Soil Health',
     cropHealth: 'Crop Health & Leaf Doctor',
+    knowledgeTitle: 'Knowledge',
+    weatherTitle: 'Weather',
+    farmTip: 'FARM TIP',
+    selectPhotoFirst: 'First select a photo',
 
     // Home Action Cards
     checkCrop: 'Check Crop Disease',
@@ -126,6 +130,7 @@ export const translations: Record<Language, Record<string, string>> = {
     pinNotes: 'Field Notes & Observations',
     pinSeverity: 'Severity',
     savePin: 'Save Pin to Map',
+    save: 'Save',
 
     // Navigation & Voice Settings
     backToHome: 'Back to Home',
@@ -167,6 +172,10 @@ export const translations: Record<Language, Record<string, string>> = {
     library: 'Laburare',
     soil: 'Lafiyar Ƙasa',
     cropHealth: 'Lafiyar Shuke-shuke da Gona',
+    knowledgeTitle: 'Ilimi',
+    weatherTitle: 'Yanayi',
+    farmTip: 'SHAWARAR NOMA',
+    selectPhotoFirst: 'Da farko ka zaɓi hoto',
 
     // Home Action Cards
     checkCrop: 'Duba Cutar Shuka',
@@ -276,6 +285,7 @@ export const translations: Record<Language, Record<string, string>> = {
     pinNotes: 'Karin Bayani da Lura',
     pinSeverity: 'Matsayin Hadari',
     savePin: 'Adana Alama a Taswira',
+    save: 'Adana',
 
     // Navigation & Voice Settings
     backToHome: 'Koma Gida',

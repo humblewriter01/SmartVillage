@@ -165,6 +165,7 @@ export const CropScreen: React.FC<CropScreenProps> = ({
     const file = e.target.files?.[0];
     if (file) {
       const url = URL.createObjectURL(file);
+      setPhoto(url);
       setPhotoUrl(url);
       setResult(null);
       showToast(
@@ -177,6 +178,7 @@ export const CropScreen: React.FC<CropScreenProps> = ({
   };
 
   const handleSelectSample = (uri: string) => {
+    setPhoto(uri);
     setPhotoUrl(uri);
     setResult(null);
     showToast(
@@ -682,6 +684,7 @@ export const CropScreen: React.FC<CropScreenProps> = ({
                 />
                 <button
                   onClick={() => {
+                    setPhoto(null);
                     setPhotoUrl(null);
                     setResult(null);
                   }}
@@ -771,26 +774,29 @@ export const CropScreen: React.FC<CropScreenProps> = ({
 
           {/* 
             PRIMARY CALL TO ACTION: ANALYZE CROP BUTTON!
-            Always clearly visible so the user can click Analyze before the information is shown!
+            Only rendered in the DOM when a photo has actually been selected (camera, gallery, or sample).
+            Disappears completely when no photo exists.
           */}
-          <div className="pt-1">
-            <button
-              onClick={handlePerformAnalysis}
-              disabled={busy}
-              className="w-full py-4 px-4 bg-emerald-700 hover:bg-emerald-800 active:scale-[0.99] disabled:opacity-50 text-white font-extrabold rounded-2xl text-sm sm:text-base flex items-center justify-center space-x-2.5 shadow-md hover:shadow-lg transition-all cursor-pointer ring-2 ring-emerald-500/20"
-            >
-              <Sparkles className="w-5 h-5 text-emerald-200" />
-              <span>
-                {busy
-                  ? locale === 'ha'
-                    ? 'Ana binciken amfanin gona...'
-                    : 'Analyzing crop...'
-                  : locale === 'ha'
-                  ? `Bincika ${selectedCropCategory.hausa_name} Yanzu`
-                  : `Analyze ${selectedCropCategory.crop} Now`}
-              </span>
-            </button>
-          </div>
+          {photoUrl && (
+            <div className="pt-1">
+              <button
+                onClick={handlePerformAnalysis}
+                disabled={busy}
+                className="w-full py-4 px-4 bg-emerald-700 hover:bg-emerald-800 active:scale-[0.99] disabled:opacity-50 text-white font-extrabold rounded-2xl text-sm sm:text-base flex items-center justify-center space-x-2.5 shadow-md hover:shadow-lg transition-all cursor-pointer ring-2 ring-emerald-500/20"
+              >
+                <Sparkles className="w-5 h-5 text-emerald-200" />
+                <span>
+                  {busy
+                    ? locale === 'ha'
+                      ? 'Ana binciken amfanin gona...'
+                      : 'Analyzing crop...'
+                    : locale === 'ha'
+                    ? `Bincika ${selectedCropCategory.hausa_name} Yanzu`
+                    : `Analyze ${selectedCropCategory.crop} Now`}
+                </span>
+              </button>
+            </div>
+          )}
 
           {/* PROMPT TO SELECT CROP IF UNVERIFIED */}
           {result?.needsCropSelection && (
@@ -826,19 +832,19 @@ export const CropScreen: React.FC<CropScreenProps> = ({
               className="bg-white rounded-2xl border-2 border-emerald-400 p-5 shadow-sm space-y-4 animate-scale-up"
             >
               {/* Header with Title and Grandma Listen Button */}
-              <div className="flex items-start justify-between">
-                <div>
+              <div className="flex items-start justify-between gap-3 min-h-0">
+                <div className="flex-1 min-w-0 space-y-1">
                   <span className="text-xs font-bold text-emerald-700 uppercase tracking-wider block">
                     {t(locale, 'cropResult')}
                   </span>
-                  <h3 className="font-black text-lg sm:text-xl text-slate-800 capitalize mt-0.5">
+                  <h3 className="font-black text-lg sm:text-xl text-slate-800 capitalize leading-snug break-words">
                     {result.referenceDetail
                       ? locale === 'ha'
                         ? result.referenceDetail.hausa_name
                         : result.referenceDetail.name
                       : result.predictions[0]?.label.replace(/_/g, ' ') || 'Assessment'}
                   </h3>
-                  <div className="text-xs text-slate-500 font-semibold mt-0.5">
+                  <div className="text-xs text-slate-500 font-semibold break-words">
                     {selectedCropCategory.crop} ({selectedCropCategory.hausa_name})
                   </div>
                 </div>
@@ -846,7 +852,7 @@ export const CropScreen: React.FC<CropScreenProps> = ({
                 {/* Grandma-Friendly Read Aloud Button */}
                 <button
                   onClick={handleSpeak}
-                  className={`flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-bold cursor-pointer transition-all shadow-xs ${
+                  className={`shrink-0 flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-bold cursor-pointer transition-all shadow-xs ${
                     isSpeaking
                       ? 'bg-emerald-600 text-white animate-pulse'
                       : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300'
@@ -1067,21 +1073,23 @@ export const CropScreen: React.FC<CropScreenProps> = ({
                         <div
                           key={d.id}
                           onClick={() => handleSelectDiseaseOnly(selectedCropCategory, d)}
-                          className="p-3 rounded-xl border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/40 transition-all cursor-pointer flex items-start space-x-3 bg-white shadow-2xs"
+                          className="min-h-[72px] p-3 rounded-xl border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/40 transition-all cursor-pointer flex items-start space-x-3 bg-white shadow-2xs"
                         >
                           <img
                             src={d.image}
                             alt={d.name}
                             className="w-12 h-12 rounded-lg object-contain shrink-0 border border-slate-200 bg-slate-50 mt-0.5"
                           />
-                          <div className="flex-1 min-w-0">
-                            <div className="font-extrabold text-xs sm:text-sm text-slate-800 flex items-center justify-between">
-                              <span>{locale === 'ha' ? d.hausa_name : d.name}</span>
-                              <span className="text-[10px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                          <div className="flex-1 min-w-0 space-y-1">
+                            <div className="flex items-start justify-between gap-2">
+                              <h4 className="font-extrabold text-xs sm:text-sm text-slate-800 leading-snug break-words">
+                                {locale === 'ha' ? d.hausa_name : d.name}
+                              </h4>
+                              <span className="shrink-0 text-[10px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
                                 {locale === 'ha' ? 'Zaɓa' : 'Select'}
                               </span>
                             </div>
-                            <p className="text-[11px] text-slate-600 font-medium mt-0.5 line-clamp-2 leading-snug">
+                            <p className="text-[11px] text-slate-600 font-medium leading-relaxed break-words">
                               {locale === 'ha' ? d.symptoms_hausa : d.symptoms}
                             </p>
                           </div>

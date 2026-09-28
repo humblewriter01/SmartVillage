@@ -71,6 +71,7 @@ export const WaterQualityScreen: React.FC<WaterQualityScreenProps> = ({
     const file = e.target.files?.[0];
     if (file) {
       const url = URL.createObjectURL(file);
+      setPhoto(url);
       setPhotoUrl(url);
       setResult(null);
     }
@@ -243,6 +244,7 @@ export const WaterQualityScreen: React.FC<WaterQualityScreenProps> = ({
             />
             <button
               onClick={() => {
+                setPhoto(null);
                 setPhotoUrl(null);
                 setResult(null);
               }}
@@ -317,6 +319,7 @@ export const WaterQualityScreen: React.FC<WaterQualityScreenProps> = ({
               <button
                 key={idx}
                 onClick={() => {
+                  setPhoto(s.uri);
                   setPhotoUrl(s.uri);
                   setResult(null);
                 }}
@@ -328,7 +331,7 @@ export const WaterQualityScreen: React.FC<WaterQualityScreenProps> = ({
           </div>
         </div>
 
-        {/* Analyze Button */}
+        {/* Analyze Button: only renders when photoUrl exists, completely disappears otherwise */}
         {photoUrl && !result && (
           <button
             onClick={handleAnalyze}
@@ -346,23 +349,23 @@ export const WaterQualityScreen: React.FC<WaterQualityScreenProps> = ({
         <div className="bg-white rounded-2xl p-5 border border-sky-200 shadow-sm space-y-4 animate-fade-in">
           {/* Status Header */}
           <div
-            className={`p-4 rounded-xl flex items-center justify-between ${
+            className={`p-4 rounded-xl flex items-start justify-between gap-3 min-h-[72px] ${
               result.status === 'clean'
                 ? 'bg-emerald-50 border border-emerald-200 text-emerald-900'
                 : 'bg-amber-50 border border-amber-200 text-amber-900'
             }`}
           >
-            <div className="flex items-center space-x-3">
+            <div className="flex items-start space-x-3 flex-1 min-w-0">
               {result.status === 'clean' ? (
-                <CheckCircle2 className="w-7 h-7 text-emerald-600 shrink-0" />
+                <CheckCircle2 className="w-7 h-7 text-emerald-600 shrink-0 mt-0.5" />
               ) : (
-                <AlertTriangle className="w-7 h-7 text-amber-600 shrink-0" />
+                <AlertTriangle className="w-7 h-7 text-amber-600 shrink-0 mt-0.5" />
               )}
-              <div>
-                <h3 className="font-extrabold text-lg">
+              <div className="flex-1 min-w-0 space-y-0.5">
+                <h3 className="font-extrabold text-base sm:text-lg leading-snug break-words">
                   {locale === 'ha' ? result.verdictTitleHausa : result.verdictTitle}
                 </h3>
-                <p className="text-xs opacity-90 mt-0.5">
+                <p className="text-xs opacity-90 leading-relaxed break-words">
                   {locale === 'ha' ? result.colorAssessmentHausa : result.colorAssessment}
                 </p>
               </div>
@@ -371,7 +374,7 @@ export const WaterQualityScreen: React.FC<WaterQualityScreenProps> = ({
             {/* Read Aloud Button */}
             <button
               onClick={handleSpeak}
-              className="p-2.5 rounded-xl bg-white/80 hover:bg-white text-slate-700 shadow-xs cursor-pointer"
+              className="shrink-0 p-2.5 rounded-xl bg-white/80 hover:bg-white text-slate-700 shadow-xs cursor-pointer"
               title={t(locale, 'speakResult')}
             >
               <Volume2 className={`w-5 h-5 ${isSpeaking ? 'text-emerald-600 animate-bounce' : ''}`} />

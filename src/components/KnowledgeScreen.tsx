@@ -75,19 +75,37 @@ export const KnowledgeScreen: React.FC<KnowledgeScreenProps> = ({ locale }) => {
     { id: 'poultry', key: 'poultryCategory' },
   ];
 
+  const getItemTitle = (item: KnowledgeItem) => {
+    if (locale === 'ha') {
+      return item.title_ha || item.hausa || item.title;
+    }
+    return item.title_en || item.title;
+  };
+
+  const getItemBody = (item: KnowledgeItem) => {
+    if (locale === 'ha') {
+      return item.description_ha || item.body_ha || item.body;
+    }
+    return item.description_en || item.body;
+  };
+
   const filteredItems = useMemo(() => {
     const q = search.toLowerCase().trim();
     return KNOWLEDGE_ITEMS.filter((item) => {
       const matchCat = category === 'all' || item.category === category;
+      const titleText = getItemTitle(item).toLowerCase();
+      const bodyText = getItemBody(item).toLowerCase();
       const matchText =
         !q ||
+        titleText.includes(q) ||
+        bodyText.includes(q) ||
         item.title.toLowerCase().includes(q) ||
         (item.hausa && item.hausa.toLowerCase().includes(q)) ||
         item.body.toLowerCase().includes(q) ||
         item.source.toLowerCase().includes(q);
       return matchCat && matchText;
     });
-  }, [search, category]);
+  }, [search, category, locale]);
 
   const handleSpeak = async (item: KnowledgeItem) => {
     if (activeSpeechId === item.id) {
@@ -97,10 +115,9 @@ export const KnowledgeScreen: React.FC<KnowledgeScreenProps> = ({ locale }) => {
     }
 
     setActiveSpeechId(item.id);
-    const textToRead =
-      locale === 'ha'
-        ? `${item.hausa || item.title}. ${item.body}`
-        : `${item.title}. ${item.hausa ? `In Hausa: ${item.hausa}. ` : ''}${item.body}`;
+    const title = getItemTitle(item);
+    const body = getItemBody(item);
+    const textToRead = `${title}. ${body}`;
     await voiceService.speak(textToRead, locale);
     setActiveSpeechId(null);
   };
@@ -198,17 +215,22 @@ export const KnowledgeScreen: React.FC<KnowledgeScreenProps> = ({ locale }) => {
 
                 <div>
                   <h2 className="text-base sm:text-lg font-bold text-slate-800">
-                    {item.title}
+                    {getItemTitle(item)}
                   </h2>
-                  {item.hausa && (
+                  {locale === 'en' && item.hausa && (
                     <span className="text-xs text-emerald-800 font-semibold block mt-0.5">
                       Hausa: {item.hausa}
+                    </span>
+                  )}
+                  {locale === 'ha' && item.title_en && item.title_en !== getItemTitle(item) && (
+                    <span className="text-xs text-slate-500 font-semibold block mt-0.5">
+                      Turanci: {item.title_en}
                     </span>
                   )}
                 </div>
 
                 <p className="text-xs sm:text-sm text-slate-700 leading-relaxed">
-                  {item.body}
+                  {getItemBody(item)}
                 </p>
 
                 <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
