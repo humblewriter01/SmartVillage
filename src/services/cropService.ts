@@ -123,9 +123,10 @@ function evaluateCropSpecificDiseases(
   }
 
   // Check if plant looks overwhelmingly healthy
+  const healthyDisease = diseases.find((d) => d.id.includes('healthy') || d.name.toLowerCase().includes('healthy'));
   if (greenRatio > 0.75 && rustRatio < 0.05 && darkRatio < 0.05 && yellowRatio < 0.05 && purpleRatio < 0.02) {
     return {
-      topDisease: diseases[0],
+      topDisease: healthyDisease || diseases[0],
       confidence: 0.92,
       isHealthy: true,
     };
@@ -137,22 +138,22 @@ function evaluateCropSpecificDiseases(
     const nameMatch = query.includes(d.name.toLowerCase()) || query.includes(d.hausa_name.toLowerCase());
     const symptomMatch = query.includes(d.symptoms.toLowerCase()) || query.includes(d.symptoms_hausa.toLowerCase());
     if (nameMatch || symptomMatch) {
-      return { topDisease: d, confidence: 0.96, isHealthy: false };
+      return { topDisease: d, confidence: 0.96, isHealthy: d.id.includes('healthy') };
     }
   }
 
   // Crop-specific visual mapping within THIS CROP ONLY
   if (crop.id === 'onion') {
     if (purpleRatio > 0.02) {
-      const alt = diseases.find((d) => d.id === 'onion_alternaria') || diseases[0];
+      const alt = diseases.find((d) => d.id === 'onion_purple_blotch' || d.id === 'onion_alternaria') || diseases[0];
       return { topDisease: alt, confidence: 0.94, isHealthy: false };
     }
     if (yellowRatio > 0.1) {
-      const vir = diseases.find((d) => d.id === 'onion_virosis') || diseases[1];
-      return { topDisease: vir, confidence: 0.88, isHealthy: false };
+      const mildew = diseases.find((d) => d.id === 'onion_downy_mildew' || d.id.includes('thrips')) || diseases[1];
+      return { topDisease: mildew, confidence: 0.88, isHealthy: false };
     }
     if (darkRatio > 0.1) {
-      const rot = diseases.find((d) => d.id === 'onion_fusarium' || d.id === 'onion_bulb_blight') || diseases[0];
+      const rot = diseases.find((d) => d.id === 'onion_fusarium_rot' || d.id === 'onion_fusarium' || d.id === 'onion_neck_rot') || diseases[0];
       return { topDisease: rot, confidence: 0.89, isHealthy: false };
     }
   } else if (crop.id === 'maize') {
@@ -160,11 +161,15 @@ function evaluateCropSpecificDiseases(
       const rust = diseases.find((d) => d.id === 'maize_rust') || diseases[0];
       return { topDisease: rust, confidence: 0.93, isHealthy: false };
     }
+    if (yellowRatio > 0.1) {
+      const streak = diseases.find((d) => d.id === 'maize_streak_virus') || diseases[0];
+      return { topDisease: streak, confidence: 0.91, isHealthy: false };
+    }
     if (darkRatio > 0.1) {
-      const blight = diseases.find((d) => d.id === 'maize_leaf_blight' || d.id.includes('blight')) || diseases[0];
+      const blight = diseases.find((d) => d.id.includes('blight') || d.id.includes('smut')) || diseases[0];
       return { topDisease: blight, confidence: 0.89, isHealthy: false };
     }
-    const worm = diseases.find((d) => d.id.includes('armyworm') || d.id.includes('caterpillar')) || diseases[0];
+    const worm = diseases.find((d) => d.id.includes('armyworm') || d.id.includes('fall')) || diseases[0];
     return { topDisease: worm, confidence: 0.86, isHealthy: false };
   } else if (crop.id === 'tomato') {
     if (yellowRatio > 0.12) {
@@ -172,13 +177,17 @@ function evaluateCropSpecificDiseases(
       return { topDisease: curl, confidence: 0.92, isHealthy: false };
     }
     if (darkRatio > 0.08) {
-      const blight = diseases.find((d) => d.id.includes('blight')) || diseases[0];
+      const blight = diseases.find((d) => d.id.includes('blight') || d.id.includes('spot')) || diseases[0];
       return { topDisease: blight, confidence: 0.91, isHealthy: false };
     }
   } else if (crop.id === 'rice') {
     if (darkRatio > 0.08) {
       const blast = diseases.find((d) => d.id.includes('blast')) || diseases[0];
       return { topDisease: blast, confidence: 0.91, isHealthy: false };
+    }
+    if (yellowRatio > 0.1) {
+      const mottle = diseases.find((d) => d.id.includes('mottle') || d.id.includes('blight')) || diseases[0];
+      return { topDisease: mottle, confidence: 0.90, isHealthy: false };
     }
     if (rustRatio > 0.08) {
       const brownSpot = diseases.find((d) => d.id.includes('brown_spot') || d.id.includes('spot')) || diseases[0];
@@ -188,6 +197,15 @@ function evaluateCropSpecificDiseases(
     if (rustRatio > 0.08) {
       const rust = diseases.find((d) => d.id.includes('rust')) || diseases[0];
       return { topDisease: rust, confidence: 0.92, isHealthy: false };
+    }
+  } else if (crop.id === 'cassava') {
+    if (yellowRatio > 0.1) {
+      const mosaic = diseases.find((d) => d.id.includes('mosaic') || d.id.includes('mite')) || diseases[0];
+      return { topDisease: mosaic, confidence: 0.91, isHealthy: false };
+    }
+    if (darkRatio > 0.08) {
+      const blight = diseases.find((d) => d.id.includes('blight') || d.id.includes('anthracnose')) || diseases[0];
+      return { topDisease: blight, confidence: 0.89, isHealthy: false };
     }
   }
 

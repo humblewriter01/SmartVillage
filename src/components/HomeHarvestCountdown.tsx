@@ -85,6 +85,22 @@ export const HomeHarvestCountdown: React.FC<HomeHarvestCountdownProps> = ({
   );
   const [customPlotLabel, setCustomPlotLabel] = useState<string>('');
   const [speakingCropId, setSpeakingCropId] = useState<string | null>(null);
+  const [isSpeakingHeader, setIsSpeakingHeader] = useState(false);
+
+  const handleSpeakHeader = async () => {
+    if (isSpeakingHeader) {
+      voiceService.stopSpeaking();
+      setIsSpeakingHeader(false);
+      return;
+    }
+    setIsSpeakingHeader(true);
+    const textToSpeak =
+      locale === 'ha'
+        ? 'Ƙididdigar Kwanakin Girbi. Bibiyar kwanakin da suka rage kafin girbin albasa, masara da sauran amfanin gona.'
+        : 'Harvest Countdown. Track days until harvest for your active field crops.';
+    await voiceService.speak(textToSpeak, locale);
+    setIsSpeakingHeader(false);
+  };
 
   // Sync with localStorage updates across tabs and components
   useEffect(() => {
@@ -219,6 +235,18 @@ export const HomeHarvestCountdown: React.FC<HomeHarvestCountdownProps> = ({
               <h2 className="font-black text-sm sm:text-base text-slate-800 tracking-tight">
                 {locale === 'ha' ? 'Ƙididdigar Kwanakin Girbi' : 'Harvest Countdown'}
               </h2>
+              <button
+                type="button"
+                onClick={handleSpeakHeader}
+                className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
+                  isSpeakingHeader
+                    ? 'bg-emerald-500 text-white border-emerald-600 animate-pulse'
+                    : 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
+                }`}
+                title={locale === 'ha' ? 'Karanta da Murya' : 'Read Aloud'}
+              >
+                <Volume2 className="w-3.5 h-3.5" />
+              </button>
               <span className="text-[10px] bg-emerald-100 text-emerald-800 font-extrabold px-2 py-0.5 rounded-full border border-emerald-200">
                 {plantings.length} {locale === 'ha' ? 'shuki' : 'active'}
               </span>
@@ -267,7 +295,9 @@ export const HomeHarvestCountdown: React.FC<HomeHarvestCountdownProps> = ({
               >
                 {CROP_HARVEST_PRESETS.map((p) => (
                   <option key={p.cropId} value={p.cropId}>
-                    {p.hausaName} ({p.name}) - {p.maturityDays} {locale === 'ha' ? 'kwanaki' : 'days'}
+                    {locale === 'ha'
+                      ? `${p.hausaName} (${p.name}) - kwanaki ${p.maturityDays}`
+                      : `${p.name} (${p.hausaName}) - ${p.maturityDays} days`}
                   </option>
                 ))}
               </select>

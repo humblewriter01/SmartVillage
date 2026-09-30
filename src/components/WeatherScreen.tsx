@@ -8,6 +8,7 @@ import {
   Calendar,
   CloudRain,
   Sun,
+  Volume2,
 } from 'lucide-react';
 import { Language, t } from '../utils/translations';
 import {
@@ -15,6 +16,7 @@ import {
   NIGERIAN_LOCATIONS,
   NigerianLocation,
 } from '../services/weatherService';
+import { voiceService } from '../services/voiceService';
 
 interface WeatherScreenProps {
   locale: Language;
@@ -35,6 +37,19 @@ export const WeatherScreen: React.FC<WeatherScreenProps> = ({
     NIGERIAN_LOCATIONS[0]
   );
   const [detectingGps, setDetectingGps] = useState(false);
+  const [isSpeakingWeatherHeader, setIsSpeakingWeatherHeader] = useState(false);
+
+  const handleSpeakWeatherHeader = async () => {
+    if (isSpeakingWeatherHeader) {
+      voiceService.stopSpeaking();
+      setIsSpeakingWeatherHeader(false);
+      return;
+    }
+    setIsSpeakingWeatherHeader(true);
+    const textToSpeak = locale === 'ha' ? 'Yanayi. Bayanan da aka adana.' : 'Weather. Saved data.';
+    await voiceService.speak(textToSpeak, locale);
+    setIsSpeakingWeatherHeader(false);
+  };
 
   const handleLocationChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const loc = NIGERIAN_LOCATIONS.find((l) => l.name === e.target.value);
@@ -119,11 +134,25 @@ export const WeatherScreen: React.FC<WeatherScreenProps> = ({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-[#1f7a4c]">
-            {t(locale, 'weatherTitle')}
-          </h1>
+          <div className="flex items-center space-x-2">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-[#1f7a4c]">
+              {t(locale, 'weatherTitle')}
+            </h1>
+            <button
+              type="button"
+              onClick={handleSpeakWeatherHeader}
+              className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
+                isSpeakingWeatherHeader
+                  ? 'bg-emerald-600 text-white border-emerald-700 animate-pulse'
+                  : 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100 shadow-2xs'
+              }`}
+              title={locale === 'ha' ? 'Karanta da Murya' : 'Read Aloud'}
+            >
+              <Volume2 className="w-4 h-4" />
+            </button>
+          </div>
           <p className="text-xs sm:text-sm text-slate-600 mt-0.5">
-            {isCached ? t(locale, 'cached') : t(locale, 'online')} · Open-Meteo
+            {locale === 'ha' ? 'Bayanan da aka adana' : 'Saved data'} · Open-Meteo
           </p>
         </div>
 

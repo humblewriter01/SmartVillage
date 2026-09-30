@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   Droplets,
   Camera,
@@ -7,12 +7,10 @@ import {
   Volume2,
   AlertTriangle,
   CheckCircle2,
-  Info,
   Flame,
   Sun,
   ShieldCheck,
-  Mic,
-  MicOff,
+  RotateCcw,
 } from 'lucide-react';
 import { Language, t } from '../utils/translations';
 import { waterQualityService, WaterQualityResult } from '../services/waterQualityService';
@@ -20,7 +18,6 @@ import { voiceService } from '../services/voiceService';
 import { historyService } from '../services/historyService';
 import {
   pickPhotoFromGallery,
-  cameraService,
 } from '../services/cameraService';
 import { FullScreenCameraModal } from './FullScreenCameraModal';
 
@@ -56,7 +53,6 @@ export const WaterQualityScreen: React.FC<WaterQualityScreenProps> = ({
   const [result, setResult] = useState<WaterQualityResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [isListening, setIsListening] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -65,6 +61,23 @@ export const WaterQualityScreen: React.FC<WaterQualityScreenProps> = ({
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  const handleResetWater = () => {
+    voiceService.stopSpeaking();
+    setIsSpeaking(false);
+    setPhoto(null);
+    setPhotoUrl(null);
+    setResult(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    if (cameraInputRef.current) cameraInputRef.current.value = '';
+    showToast(locale === 'ha' ? 'An sake farawa!' : 'Reset complete!');
+  };
+
+  const handleCheckAgain = () => {
+    voiceService.stopSpeaking();
+    setIsSpeaking(false);
+    setResult(null);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -138,6 +151,8 @@ export const WaterQualityScreen: React.FC<WaterQualityScreenProps> = ({
     }
   };
 
+  // Read Aloud inside Water Quality result box:
+  // Reads Verdict Title, Turbidity Score, and Actionable Advice
   const handleSpeak = async () => {
     if (!result) return;
     if (isSpeaking) {
@@ -148,8 +163,12 @@ export const WaterQualityScreen: React.FC<WaterQualityScreenProps> = ({
 
     setIsSpeaking(true);
     const titleText = locale === 'ha' ? result.verdictTitleHausa : result.verdictTitle;
+    const scoreText =
+      locale === 'ha'
+        ? `Matsayin laka da duhu: ${result.turbidityScore} cikin 100.`
+        : `Turbidity score: ${result.turbidityScore} out of 100.`;
     const adviceText = locale === 'ha' ? result.adviceHausa : result.advice;
-    const textToSpeak = `${titleText}. ${adviceText}`;
+    const textToSpeak = `${titleText}. ${scoreText} ${adviceText}`;
 
     await voiceService.speak(textToSpeak, locale, (warning) => {
       showToast(warning);
@@ -157,30 +176,21 @@ export const WaterQualityScreen: React.FC<WaterQualityScreenProps> = ({
     setIsSpeaking(false);
   };
 
-  const handleVoiceListen = async () => {
-    if (isListening) {
-      await voiceService.stopListening();
-      setIsListening(false);
+  const [isSpeakingWaterHeader, setIsSpeakingWaterHeader] = useState(false);
+
+  const handleSpeakWaterHeader = async () => {
+    if (isSpeakingWaterHeader) {
+      voiceService.stopSpeaking();
+      setIsSpeakingWaterHeader(false);
       return;
     }
-
-    const started = await voiceService.startListening(
-      locale,
-      (text) => {
-        showToast(`Heard: "${text}"`);
-      },
-      (err) => {
-        showToast(err);
-        setIsListening(false);
-      },
-      () => {
-        setIsListening(false);
-      }
-    );
-
-    if (started) {
-      setIsListening(true);
-    }
+    setIsSpeakingWaterHeader(true);
+    const textToSpeak =
+      locale === 'ha'
+        ? 'Tsabtar Ruwa. Dauki hoton ruwa a kofi: Mai Kyau ko Tafasa Kafin Sha.'
+        : 'Water Quality. Take a photo of water in a cup: Safe or Boil Before Drinking.';
+    await voiceService.speak(textToSpeak, locale);
+    setIsSpeakingWaterHeader(false);
   };
 
   return (
@@ -192,28 +202,46 @@ export const WaterQualityScreen: React.FC<WaterQualityScreenProps> = ({
         </div>
       )}
 
-      {/* Screen Header */}
+      {/* Screen Header - Mic Button completely removed per Part 7 */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl sm:text-2xl font-extrabold text-[#173326] flex items-center gap-2">
-            <Droplets className="w-6 h-6 text-sky-600" />
-            <span>{t(locale, 'checkWater')}</span>
-          </h1>
-          <p className="text-xs text-slate-500 mt-0.5">{t(locale, 'waterSubtitle')}</p>
+          <div className="flex items-center space-x-2">
+            <h1 className="text-xl sm:text-2xl font-extrabold text-[#173326] flex items-center gap-2">
+              <Droplets className="w-6 h-6 text-sky-600" />
+              <span>{locale === 'ha' ? 'Tsabtar Ruwa' : 'Water Quality'}</span>
+            </h1>
+            <button
+              type="button"
+              onClick={handleSpeakWaterHeader}
+              className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
+                isSpeakingWaterHeader
+                  ? 'bg-sky-600 text-white border-sky-700 animate-pulse'
+                  : 'bg-sky-50 text-sky-800 border-sky-300 hover:bg-sky-100 shadow-2xs'
+              }`}
+              title={locale === 'ha' ? 'Karanta da Murya' : 'Read Aloud'}
+            >
+              <Volume2 className="w-4 h-4" />
+            </button>
+          </div>
+          <p className="text-xs text-slate-500 mt-0.5">
+            {locale === 'ha'
+              ? 'Dauki hoton ruwa a kofi: Mai Kyau ko Tafasa Kafin Sha'
+              : 'Take a photo of water in a cup: Safe or Boil Before Drinking'}
+          </p>
         </div>
 
-        {/* Grandma Voice Mic Button */}
-        <button
-          onClick={handleVoiceListen}
-          className={`p-2.5 rounded-xl transition-all cursor-pointer ${
-            isListening
-              ? 'bg-rose-600 text-white animate-pulse'
-              : 'bg-sky-50 text-sky-700 hover:bg-sky-100 border border-sky-200'
-          }`}
-          title="Voice Command"
-        >
-          {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
-        </button>
+        {/* Header Reset / Start Over Button */}
+        {(photoUrl || result) && (
+          <button
+            type="button"
+            onClick={handleResetWater}
+            className="flex items-center space-x-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors cursor-pointer border border-slate-200"
+            title={locale === 'ha' ? 'Sake Farawa' : 'Start Over'}
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span>{locale === 'ha' ? 'Sake Farawa' : 'Start Over'}</span>
+          </button>
+        )}
       </div>
 
       {/* Hidden file inputs */}
@@ -312,7 +340,7 @@ export const WaterQualityScreen: React.FC<WaterQualityScreenProps> = ({
         {/* Test Water Sample Chips */}
         <div className="pt-2 border-t border-slate-100">
           <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-2">
-            {locale === 'ha' ? 'Gwada da hotunan samfuri:' : 'Try test water samples:'}
+            {t(locale, 'tryTestWaterSamples')}
           </span>
           <div className="flex flex-wrap gap-2">
             {WATER_SAMPLES.map((s, idx) => (
@@ -374,10 +402,15 @@ export const WaterQualityScreen: React.FC<WaterQualityScreenProps> = ({
             {/* Read Aloud Button */}
             <button
               onClick={handleSpeak}
-              className="shrink-0 p-2.5 rounded-xl bg-white/80 hover:bg-white text-slate-700 shadow-xs cursor-pointer"
-              title={t(locale, 'speakResult')}
+              className={`shrink-0 flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-bold cursor-pointer transition-all shadow-xs ${
+                isSpeaking
+                  ? 'bg-sky-600 text-white animate-pulse'
+                  : 'bg-white/90 hover:bg-white text-slate-800 border border-slate-300'
+              }`}
+              title={locale === 'ha' ? 'Karanta sakamako da murya' : 'Read result aloud'}
             >
-              <Volume2 className={`w-5 h-5 ${isSpeaking ? 'text-emerald-600 animate-bounce' : ''}`} />
+              <Volume2 className={`w-4 h-4 ${isSpeaking ? 'text-white animate-bounce' : 'text-sky-700'}`} />
+              <span>{locale === 'ha' ? 'Saurara' : 'Listen'}</span>
             </button>
           </div>
 
@@ -453,6 +486,26 @@ export const WaterQualityScreen: React.FC<WaterQualityScreenProps> = ({
             <p className="text-[11px]">
               {result.guidelines.whoLimit} | {result.guidelines.nsdwqLimit}
             </p>
+          </div>
+
+          {/* Action & Reset Buttons (Part 3) */}
+          <div className="pt-2 flex flex-col sm:flex-row items-center gap-2.5">
+            <button
+              type="button"
+              onClick={handleResetWater}
+              className="w-full sm:flex-1 py-3 px-4 bg-sky-700 hover:bg-sky-800 text-white font-bold rounded-xl text-xs sm:text-sm flex items-center justify-center space-x-2 shadow-xs transition-all cursor-pointer active:scale-[0.99]"
+            >
+              <RotateCcw className="w-4 h-4 text-sky-200" />
+              <span>{locale === 'ha' ? 'Duba Wata Ruwa' : 'Check Another Water'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleCheckAgain}
+              className="w-full sm:w-auto py-3 px-4 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold rounded-xl text-xs sm:text-sm flex items-center justify-center space-x-1.5 border border-slate-300 transition-colors cursor-pointer"
+            >
+              <span>{locale === 'ha' ? 'Sake Dubawa' : 'Check Again'}</span>
+            </button>
           </div>
         </div>
       )}

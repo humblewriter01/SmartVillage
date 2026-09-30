@@ -12,8 +12,6 @@ import {
   ShieldCheck,
   ListFilter,
   X,
-  Mic,
-  MicOff,
   Sprout,
   Clock,
   RotateCcw,
@@ -47,34 +45,6 @@ interface CropScreenProps {
   initialSelectedDisease?: CropDiseaseReference;
 }
 
-// Sample leaf test images for instant evaluation
-const SAMPLE_LEAVES = [
-  {
-    name: 'Healthy Leaf',
-    name_hausa: 'Ganye Mai Lafiya',
-    color: '#34a853',
-    uri: `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="224" height="224" viewBox="0 0 224 224"><rect width="224" height="224" fill="%23e8f5e9"/><path d="M112 20 C180 60 190 160 112 210 C34 160 44 60 112 20 Z" fill="%232e7d32"/><path d="M112 20 Q112 120 112 210" stroke="%2381c784" stroke-width="3" fill="none"/><path d="M112 80 Q145 70 160 60" stroke="%2381c784" stroke-width="2" fill="none"/><path d="M112 110 Q70 100 55 90" stroke="%2381c784" stroke-width="2" fill="none"/><path d="M112 140 Q150 130 165 120" stroke="%2381c784" stroke-width="2" fill="none"/></svg>`,
-  },
-  {
-    name: 'Onion Purple Blotch',
-    name_hausa: 'Duhun Albasa (Alternaria)',
-    color: '#7c3aed',
-    uri: `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="224" height="224" viewBox="0 0 224 224"><rect width="224" height="224" fill="%23f3e8ff"/><path d="M70 210 Q85 80 110 30 Q135 80 150 210 Z" fill="%2316a34a"/><ellipse cx="110" cy="110" rx="22" ry="38" fill="%236b21a8" stroke="%234c1d95" stroke-width="2"/><ellipse cx="110" cy="110" rx="14" ry="24" fill="%239333ea"/><ellipse cx="120" cy="170" rx="12" ry="18" fill="%236b21a8"/></svg>`,
-  },
-  {
-    name: 'Tomato Blight',
-    name_hausa: 'Bakin Cutar Tumatir',
-    color: '#8d6e63',
-    uri: `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="224" height="224" viewBox="0 0 224 224"><rect width="224" height="224" fill="%23f1f8e9"/><path d="M112 20 C180 60 190 160 112 210 C34 160 44 60 112 20 Z" fill="%23558b2f"/><circle cx="95" cy="85" r="24" fill="%233e2723"/><circle cx="95" cy="85" r="18" fill="%234e342e" stroke="%23ffeb3b" stroke-width="2"/><circle cx="135" cy="130" r="18" fill="%233e2723" stroke="%23ffeb3b" stroke-width="2"/><circle cx="80" cy="150" r="14" fill="%23212121"/><path d="M112 20 Q112 120 112 210" stroke="%23aed581" stroke-width="2" fill="none"/></svg>`,
-  },
-  {
-    name: 'Maize Rust',
-    name_hausa: 'Tsatsar Masara',
-    color: '#d84315',
-    uri: `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="224" height="224" viewBox="0 0 224 224"><rect width="224" height="224" fill="%23fff3e0"/><path d="M112 20 C180 60 190 160 112 210 C34 160 44 60 112 20 Z" fill="%23689f38"/><circle cx="80" cy="70" r="6" fill="%23bf360c"/><circle cx="100" cy="65" r="5" fill="%23d84315"/><circle cx="130" cy="90" r="7" fill="%23bf360c"/><circle cx="90" cy="110" r="6" fill="%23d84315"/><circle cx="120" cy="130" r="8" fill="%23e64a19"/><circle cx="105" cy="155" r="6" fill="%23bf360c"/><circle cx="75" cy="135" r="5" fill="%23e64a19"/><path d="M112 20 Q112 120 112 210" stroke="%23c5e1a5" stroke-width="2" fill="none"/></svg>`,
-  },
-];
-
 export const CropScreen: React.FC<CropScreenProps> = ({
   locale,
   onRecordSaved,
@@ -96,11 +66,20 @@ export const CropScreen: React.FC<CropScreenProps> = ({
   const [result, setResult] = useState<CropResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [isListening, setIsListening] = useState(false);
-  const [recordedVoiceUrl, setRecordedVoiceUrl] = useState<string | null>(null);
-  const [spokenTranscript, setSpokenTranscript] = useState('');
+  const [isSpeakingCropHeader, setIsSpeakingCropHeader] = useState(false);
+  const [isSpeakingDiagnosisTab, setIsSpeakingDiagnosisTab] = useState(false);
+  const [isSpeakingHarvestTab, setIsSpeakingHarvestTab] = useState(false);
   const [expandedDetails, setExpandedDetails] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Helper: Live read-aloud when a crop is selected or tapped (Part 6)
+  const speakCropName = (crop: CropCategoryReference) => {
+    voiceService.stopSpeaking();
+    const textToSpeak = locale === 'ha'
+      ? `${crop.hausa_name}. ${crop.crop}`
+      : `${crop.crop}. ${crop.hausa_name}`;
+    voiceService.speak(textToSpeak, locale, undefined, 'crop');
+  };
 
   // Manual Selector Modal state
   const [showManualModal, setShowManualModal] = useState(false);
@@ -109,6 +88,54 @@ export const CropScreen: React.FC<CropScreenProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const resultRef = useRef<HTMLDivElement>(null);
+
+  // Read aloud section header
+  const handleSpeakCropHeader = async () => {
+    if (isSpeakingCropHeader) {
+      voiceService.stopSpeaking();
+      setIsSpeakingCropHeader(false);
+      return;
+    }
+    setIsSpeakingCropHeader(true);
+    const textToSpeak =
+      locale === 'ha'
+        ? 'Lafiyar Shuke-shuke da Gona. Duba cututtukan albasa da amfanin gona, sannan bibiyi kwanakin girbi.'
+        : 'Crop and Plant Health. Check onion and crop diseases, then track harvest days.';
+    await voiceService.speak(textToSpeak, locale);
+    setIsSpeakingCropHeader(false);
+  };
+
+  const handleSpeakDiagnosisTab = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isSpeakingDiagnosisTab) {
+      voiceService.stopSpeaking();
+      setIsSpeakingDiagnosisTab(false);
+      return;
+    }
+    setIsSpeakingDiagnosisTab(true);
+    const textToSpeak =
+      locale === 'ha'
+        ? 'Duba Cututtuka. Gano cututtuka da magungunan shuke-shukenka.'
+        : 'Crop Diagnosis. Identify diseases and treatments for your crops.';
+    await voiceService.speak(textToSpeak, locale);
+    setIsSpeakingDiagnosisTab(false);
+  };
+
+  const handleSpeakHarvestTab = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isSpeakingHarvestTab) {
+      voiceService.stopSpeaking();
+      setIsSpeakingHarvestTab(false);
+      return;
+    }
+    setIsSpeakingHarvestTab(true);
+    const textToSpeak =
+      locale === 'ha'
+        ? 'Ƙididdigar Girbi. Bibiyar kwanakin da suka rage kafin girbin albasa, masara da sauran amfanin gona.'
+        : 'Harvest Countdown. Track days until harvest for your active field crops.';
+    await voiceService.speak(textToSpeak, locale);
+    setIsSpeakingHarvestTab(false);
+  };
 
   // Sync if initial props change
   useEffect(() => {
@@ -130,7 +157,7 @@ export const CropScreen: React.FC<CropScreenProps> = ({
     CROP_REFERENCE_DATA.find((c) => c.id === 'soybeans' && (selectedCropId === 'soybean' || selectedCropId === 'soybeans')) ||
     CROP_REFERENCE_DATA[0];
 
-  // 1-Tap Crop Selection Handler: Sets crop WITHOUT immediately showing results!
+  // 1-Tap Crop Selection Handler: Sets crop and immediately speaks crop name aloud (Part 6)
   const handleSelectCropOnly = (cropId: string) => {
     setSelectedCropId(cropId);
     setSelectedDisease(null);
@@ -139,6 +166,9 @@ export const CropScreen: React.FC<CropScreenProps> = ({
     setModalStep(1);
 
     const crop = CROP_REFERENCE_DATA.find((c) => c.id === cropId);
+    if (crop) {
+      speakCropName(crop);
+    }
     showToast(
       locale === 'ha'
         ? `An zaɓi ${crop?.hausa_name || 'Shuka'}! Danna 'Bincika Shuka' a ƙasa.`
@@ -177,14 +207,15 @@ export const CropScreen: React.FC<CropScreenProps> = ({
     e.target.value = '';
   };
 
-  const handleSelectSample = (uri: string) => {
-    setPhoto(uri);
-    setPhotoUrl(uri);
+  const handleSelectSample = (disease: CropDiseaseReference) => {
+    setPhoto(disease.image);
+    setPhotoUrl(disease.image);
+    setSelectedDisease(disease);
     setResult(null);
     showToast(
       locale === 'ha'
-        ? 'An zaɓi samfurin ganye! Danna \'Bincika Shuka\' a ƙasa.'
-        : 'Sample leaf selected! Click \'Analyze Crop\' below.'
+        ? `An zaɓi samfurin ${disease.hausa_name}! Danna 'Bincika Shuka' a ƙasa.`
+        : `Selected ${disease.name} sample! Click 'Analyze Crop' below.`
     );
   };
 
@@ -226,12 +257,24 @@ export const CropScreen: React.FC<CropScreenProps> = ({
     try {
       let r: CropResult;
 
-      if (photoUrl) {
+      if (selectedDisease) {
+        // If a disease was manually selected or chosen from sample, skip AI analysis and return that exact disease!
+        r = {
+          predictions: [{ label: selectedDisease.id, confidence: 0.98 }],
+          advice: selectedDisease.treatment,
+          adviceHausa: selectedDisease.treatment_hausa,
+          isLowConfidence: false,
+          cropId: selectedCropCategory.id,
+          cropName: selectedCropCategory.crop,
+          cropHausaName: selectedCropCategory.hausa_name,
+          referenceDetail: selectedDisease,
+        };
+      } else if (photoUrl) {
         // Offline vision analysis prioritized for the selected crop
         r = await analyzeCropImage(photoUrl, selectedCropId, spokenTranscript);
       } else {
-        // Diagnosis based on selected crop, optional suspected disease, and spoken symptoms
-        r = diagnoseCropSelection(selectedCropId, selectedDisease?.id, spokenTranscript);
+        // Diagnosis based on selected crop and spoken symptoms
+        r = diagnoseCropSelection(selectedCropId, undefined, spokenTranscript);
       }
 
       setResult(r);
@@ -275,73 +318,6 @@ export const CropScreen: React.FC<CropScreenProps> = ({
       );
     } finally {
       setBusy(false);
-    }
-  };
-
-  // Voice-to-Text & Voice Recording: Listen to describe crop problem
-  const handleVoiceListen = async () => {
-    const currentCropContext = {
-      type: 'crop' as const,
-      cropId: selectedCropId,
-      diseaseId: selectedDisease?.id || result?.referenceDetail?.id,
-      label: selectedCropCategory.hausa_name || selectedCropCategory.crop,
-    };
-
-    if (isListening) {
-      const rec = await voiceService.stopListening();
-      setIsListening(false);
-      const audioUrl = rec?.url || voiceService.getLastRecording()?.url;
-      if (audioUrl) {
-        setRecordedVoiceUrl(audioUrl);
-      }
-      if (!spokenTranscript) {
-        setSpokenTranscript(
-          rec?.transcript ||
-            (locale === 'ha'
-              ? 'Muryar amfanin gona da aka ɗauka'
-              : 'Recorded crop voice description')
-        );
-      }
-      showToast(
-        locale === 'ha'
-          ? 'An ɗauki muryarka! Danna \'Bincika Shuka\' a ƙasa.'
-          : 'Voice recorded! Click \'Analyze Crop\' below.'
-      );
-      return;
-    }
-
-    const started = await voiceService.startListening(
-      locale === 'ha' ? 'ha-NG' : 'en-NG',
-      (recognizedText, rec) => {
-        setSpokenTranscript(recognizedText);
-        const audioUrl = rec?.url || voiceService.getLastRecording()?.url;
-        if (audioUrl) {
-          setRecordedVoiceUrl(audioUrl);
-        }
-        showToast(
-          locale === 'ha'
-            ? 'An ji bayanin murya! Danna \'Bincika Shuka\' a ƙasa.'
-            : 'Heard voice description! Click \'Analyze Crop\' below.'
-        );
-      },
-      (err) => {
-        setIsListening(false);
-      },
-      (rec) => {
-        setIsListening(false);
-        const audioUrl = rec?.url || voiceService.getLastRecording()?.url;
-        if (audioUrl) {
-          setRecordedVoiceUrl(audioUrl);
-        }
-        if (!spokenTranscript && rec?.transcript) {
-          setSpokenTranscript(rec.transcript);
-        }
-      },
-      currentCropContext
-    );
-
-    if (started) {
-      setIsListening(true);
     }
   };
 
@@ -404,13 +380,27 @@ export const CropScreen: React.FC<CropScreenProps> = ({
               <Sprout className="w-6 h-6 text-emerald-700" />
             </div>
             <div>
-              <h1 className="text-xl sm:text-2xl font-black text-slate-800 tracking-tight">
-                {t(locale, 'cropHealth')}
-              </h1>
+              <div className="flex items-center space-x-2">
+                <h1 className="text-xl sm:text-2xl font-black text-slate-800 tracking-tight">
+                  {t(locale, 'cropHealth')}
+                </h1>
+                <button
+                  type="button"
+                  onClick={handleSpeakCropHeader}
+                  className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
+                    isSpeakingCropHeader
+                      ? 'bg-emerald-500 text-white border-emerald-600 animate-pulse'
+                      : 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
+                  }`}
+                  title={locale === 'ha' ? 'Karanta da Murya' : 'Read Aloud'}
+                >
+                  <Volume2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
               <p className="text-xs text-slate-500 mt-0.5">
                 {locale === 'ha'
                   ? 'Duba cututtukan albasa da amfanin gona, sannan bibiyi kwanakin girbi'
-                  : 'Diagnose crop leaf diseases offline and track harvest countdowns'}
+                  : 'Check onion and crop diseases, then track harvest days'}
               </p>
             </div>
           </div>
@@ -418,28 +408,48 @@ export const CropScreen: React.FC<CropScreenProps> = ({
 
         {/* Mode Toggle: Crop Diagnosis vs Harvest Countdown */}
         <div className="grid grid-cols-2 p-1 bg-slate-100 rounded-2xl border border-slate-200">
-          <button
+          <div
             onClick={() => setActiveTab('diagnosis')}
-            className={`py-2 px-3 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center space-x-1.5 transition-all cursor-pointer ${
+            className={`py-2 px-3 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-between transition-all cursor-pointer ${
               activeTab === 'diagnosis'
                 ? 'bg-white text-emerald-900 shadow-xs border border-emerald-200'
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            <Sprout className="w-4 h-4 text-emerald-700" />
-            <span>{locale === 'ha' ? 'Duba Cututtuka' : 'Crop Diagnosis'}</span>
-          </button>
-          <button
+            <div className="flex items-center space-x-1.5 truncate">
+              <Sprout className="w-4 h-4 text-emerald-700 shrink-0" />
+              <span className="truncate">{locale === 'ha' ? 'Duba Cututtuka' : 'Crop Diagnosis'}</span>
+            </div>
+            <button
+              type="button"
+              onClick={handleSpeakDiagnosisTab}
+              className="p-1 rounded-md hover:bg-emerald-100 text-emerald-700 cursor-pointer shrink-0 transition-colors"
+              title={locale === 'ha' ? 'Karanta da Murya' : 'Read Aloud'}
+            >
+              <Volume2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
+          <div
             onClick={() => setActiveTab('harvest')}
-            className={`py-2 px-3 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center space-x-1.5 transition-all cursor-pointer ${
+            className={`py-2 px-3 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-between transition-all cursor-pointer ${
               activeTab === 'harvest'
                 ? 'bg-white text-emerald-900 shadow-xs border border-emerald-200'
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            <Clock className="w-4 h-4 text-emerald-700" />
-            <span>{locale === 'ha' ? 'Ƙididdigar Girbi' : 'Harvest Countdown'}</span>
-          </button>
+            <div className="flex items-center space-x-1.5 truncate">
+              <Clock className="w-4 h-4 text-emerald-700 shrink-0" />
+              <span className="truncate">{locale === 'ha' ? 'Ƙididdigar Girbi' : 'Harvest Countdown'}</span>
+            </div>
+            <button
+              type="button"
+              onClick={handleSpeakHarvestTab}
+              className="p-1 rounded-md hover:bg-emerald-100 text-emerald-700 cursor-pointer shrink-0 transition-colors"
+              title={locale === 'ha' ? 'Karanta da Murya' : 'Read Aloud'}
+            >
+              <Volume2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -452,6 +462,8 @@ export const CropScreen: React.FC<CropScreenProps> = ({
             setSelectedCropId(cropId);
             setSelectedDisease(null);
             setResult(null);
+            const crop = CROP_REFERENCE_DATA.find((c) => c.id === cropId);
+            if (crop) speakCropName(crop);
           }}
         />
       )}
@@ -557,122 +569,6 @@ export const CropScreen: React.FC<CropScreenProps> = ({
             </div>
           </div>
 
-          {/* Voice Symptom Input Banner */}
-          <div
-            className={`p-4 rounded-2xl border transition-all ${
-              isListening
-                ? 'bg-red-50 border-red-300 ring-2 ring-red-400'
-                : 'bg-white border-emerald-200 shadow-2xs'
-            }`}
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <button
-                  onClick={handleVoiceListen}
-                  className={`w-12 h-12 rounded-full flex items-center justify-center shadow-md transition-all cursor-pointer ${
-                    isListening
-                      ? 'bg-red-600 text-white animate-pulse scale-105'
-                      : 'bg-emerald-700 hover:bg-emerald-800 text-white'
-                  }`}
-                  title={isListening ? t(locale, 'stop') : t(locale, 'speakDescribeCrop')}
-                >
-                  {isListening ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
-                </button>
-                <div>
-                  <h2 className="font-extrabold text-xs sm:text-sm text-slate-800">
-                    {isListening
-                      ? (locale === 'ha' ? 'Ana sauraron bayanin shuka...' : 'Listening to crop description...')
-                      : (locale === 'ha' ? 'Taɓa domin faɗin matsalar shuka da murya' : 'Tap to speak your crop problem aloud')}
-                  </h2>
-                  <p className="text-[11px] text-slate-500 mt-0.5">
-                    {locale === 'ha'
-                      ? 'Misali: "Duhun ganye mai ruwan hoda a albasa", "Tsutsa a masara", "Lankwashewar ganyen tumatir"...'
-                      : 'E.g., "Onion purple blotch spots", "Maize armyworm eating leaves", "Tomato leaf curl"...'}
-                  </p>
-                </div>
-              </div>
-
-              {isListening && (
-                <div className="flex items-center space-x-2 shrink-0">
-                  <div className="flex items-center space-x-1 px-2 py-1 bg-red-100 rounded-full border border-red-200">
-                    <span className="w-2 h-2 rounded-full bg-red-600 animate-ping"></span>
-                    <span className="text-[11px] font-black text-red-700 tracking-wider">REC</span>
-                  </div>
-                  {/* Animated Sound Wave Bars */}
-                  <div className="flex items-center space-x-0.5 h-4">
-                    <span className="w-1 bg-red-500 rounded-full animate-bounce [animation-delay:0ms] h-3"></span>
-                    <span className="w-1 bg-red-600 rounded-full animate-bounce [animation-delay:150ms] h-4"></span>
-                    <span className="w-1 bg-red-500 rounded-full animate-bounce [animation-delay:300ms] h-2"></span>
-                    <span className="w-1 bg-red-600 rounded-full animate-bounce [animation-delay:450ms] h-3.5"></span>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Live recording indicator alert while active */}
-            {isListening && (
-              <div className="mt-2.5 p-2 bg-red-50/90 border border-red-200/80 rounded-xl flex items-center justify-between text-xs text-red-900 animate-pulse">
-                <span className="font-bold flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-red-600 inline-block"></span>
-                  {locale === 'ha' ? 'Ana ɗaukar muryarka yanzu... Yi magana a sarari' : 'Recording your voice note now... Speak clearly'}
-                </span>
-                <span className="text-[10px] font-black uppercase text-red-600">
-                  {locale === 'ha' ? 'Danna domin gamawa' : 'Tap mic to stop'}
-                </span>
-              </div>
-            )}
-
-            {(spokenTranscript || recordedVoiceUrl) && (
-              <div className="mt-3 p-3 bg-emerald-50 rounded-2xl border border-emerald-200 text-xs text-slate-800 flex items-center justify-between gap-2 shadow-2xs">
-                <div className="flex items-center space-x-2 min-w-0">
-                  <div className="w-7 h-7 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-800 shrink-0">
-                    <Volume2 className="w-4 h-4" />
-                  </div>
-                  <div className="min-w-0">
-                    <span className="font-black text-emerald-950 block">
-                      {locale === 'ha' ? 'Muryar da ka Ɗauka' : 'Your Recorded Voice Note'}
-                    </span>
-                    <span className="text-[11px] text-slate-600 truncate block max-w-[190px] sm:max-w-xs">
-                      {spokenTranscript ? `"${spokenTranscript}"` : locale === 'ha' ? 'Muryar bayanin shuka' : 'Voice description of crop issue'}
-                    </span>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-2 shrink-0">
-                  {recordedVoiceUrl && (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        voiceService.playAudioUrl(
-                          recordedVoiceUrl,
-                          spokenTranscript ||
-                            (locale === 'ha'
-                              ? 'Muryar bayanin shuka da aka ɗauka'
-                              : 'Recorded crop voice description'),
-                          locale === 'ha' ? 'ha' : 'en'
-                        )
-                      }
-                      className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-black bg-emerald-700 hover:bg-emerald-800 text-white transition-all cursor-pointer shadow-xs active:scale-95"
-                      title={locale === 'ha' ? 'Saurari muryarka da aka ɗauka' : 'Play your recorded voice note'}
-                    >
-                      <Volume2 className="w-3.5 h-3.5" />
-                      <span>{locale === 'ha' ? 'Saurari Murya' : 'Play Voice'}</span>
-                    </button>
-                  )}
-                  <button
-                    onClick={() => {
-                      setSpokenTranscript('');
-                      setRecordedVoiceUrl(null);
-                    }}
-                    className="text-slate-400 hover:text-slate-700 text-xs cursor-pointer p-1.5 rounded-lg hover:bg-slate-200/60"
-                    title={locale === 'ha' ? 'Goge muryar' : 'Remove recording'}
-                  >
-                    ✕
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-
           {/* Camera / Photo Upload Box */}
           <div className="bg-white rounded-2xl border-2 border-dashed border-emerald-200 p-4 flex flex-col items-center justify-center min-h-[170px] relative overflow-hidden group">
             {photoUrl ? (
@@ -748,38 +644,54 @@ export const CropScreen: React.FC<CropScreenProps> = ({
             </div>
           </div>
 
-          {/* Quick Test Samples */}
-          <div className="bg-slate-50/90 rounded-xl p-3 border border-slate-200/80">
-            <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider block mb-2">
-              {locale === 'ha' ? 'Gwada da Samfuran Hotuna:' : 'Or Test with Sample Leaves:'}
+          {/* Quick Test Samples dynamically built for selected crop */}
+          <div className="bg-slate-50/90 rounded-2xl p-3 sm:p-4 border border-slate-200/80 space-y-2.5">
+            <span className="text-[11px] font-black text-slate-600 uppercase tracking-wider block">
+              {locale === 'ha'
+                ? `KO GWADA DA SAMFURAN ${selectedCropCategory.hausa_name.toUpperCase()}:`
+                : `OR TEST WITH ${selectedCropCategory.crop.toUpperCase()} SAMPLES:`}
             </span>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {SAMPLE_LEAVES.map((sample, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => handleSelectSample(sample.uri)}
-                  className="p-2 bg-white hover:bg-emerald-50 rounded-lg border border-slate-200 text-left transition-all cursor-pointer flex items-center space-x-2"
-                >
-                  <div
-                    className="w-4 h-4 rounded-full shrink-0"
-                    style={{ backgroundColor: sample.color }}
-                  />
-                  <span className="text-xs font-semibold text-slate-700 truncate">
-                    {locale === 'ha' ? sample.name_hausa : sample.name}
-                  </span>
-                </button>
-              ))}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {selectedCropCategory.diseases.slice(0, 6).map((disease) => {
+                const isSelected = selectedDisease?.id === disease.id;
+                return (
+                  <button
+                    key={disease.id}
+                    type="button"
+                    onClick={() => handleSelectSample(disease)}
+                    className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex items-center space-x-2.5 shadow-2xs active:scale-95 ${
+                      isSelected
+                        ? 'bg-emerald-50 border-emerald-500 ring-2 ring-emerald-400'
+                        : 'bg-white hover:bg-emerald-50/50 border-slate-200'
+                    }`}
+                  >
+                    <img
+                      src={disease.image}
+                      alt={disease.name}
+                      className="w-8 h-8 rounded-lg object-contain shrink-0 border border-slate-200 bg-white"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <span className="text-xs font-bold text-slate-800 truncate block">
+                        {locale === 'ha' ? disease.hausa_name : disease.name}
+                      </span>
+                      <span className="text-[10px] text-emerald-700 font-semibold truncate block">
+                        {disease.affected_parts.slice(0, 2).join(', ')}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
           {/* 
             PRIMARY CALL TO ACTION: ANALYZE CROP BUTTON!
-            Only rendered in the DOM when a photo has actually been selected (camera, gallery, or sample).
-            Disappears completely when no photo exists.
+            Rendered when a photo has been selected OR a disease has been selected.
           */}
-          {photoUrl && (
+          {(photoUrl || selectedDisease) && (
             <div className="pt-1">
               <button
+                type="button"
                 onClick={handlePerformAnalysis}
                 disabled={busy}
                 className="w-full py-4 px-4 bg-emerald-700 hover:bg-emerald-800 active:scale-[0.99] disabled:opacity-50 text-white font-extrabold rounded-2xl text-sm sm:text-base flex items-center justify-center space-x-2.5 shadow-md hover:shadow-lg transition-all cursor-pointer ring-2 ring-emerald-500/20"
@@ -915,6 +827,8 @@ export const CropScreen: React.FC<CropScreenProps> = ({
                   onClick={() => {
                     setResult(null);
                     setPhotoUrl(null);
+                    setPhoto(null);
+                    setSelectedDisease(null);
                   }}
                   className="text-slate-500 hover:text-slate-800 flex items-center gap-1 font-semibold cursor-pointer"
                 >
@@ -977,8 +891,10 @@ export const CropScreen: React.FC<CropScreenProps> = ({
                     {CROP_REFERENCE_DATA.map((crop) => (
                       <button
                         key={crop.id}
+                        onMouseEnter={() => speakCropName(crop)}
                         onClick={() => {
                           setSelectedCropId(crop.id);
+                          speakCropName(crop);
                           setModalStep(2);
                         }}
                         className={`p-3 rounded-xl text-left border transition-all cursor-pointer flex flex-col justify-between shadow-2xs hover:border-emerald-500 hover:shadow-xs active:scale-95 ${
@@ -1002,7 +918,7 @@ export const CropScreen: React.FC<CropScreenProps> = ({
                         </div>
                         <div className="mt-2 text-[10px] text-slate-500 font-semibold flex items-center justify-between border-t border-slate-100 pt-1.5">
                           <span>
-                            {crop.diseases.length} {locale === 'ha' ? 'matsaloli' : 'issues'}
+                            {crop.diseases.length} {locale === 'ha' ? (crop.diseases.length === 1 ? 'matsala' : 'matsoli') : (crop.diseases.length === 1 ? 'issue' : 'issues')}
                           </span>
                           <span className="text-emerald-700 font-bold">Zaɓa →</span>
                         </div>

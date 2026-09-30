@@ -32,11 +32,27 @@ export const CropReferenceLibraryScreen: React.FC<CropReferenceLibraryScreenProp
   const [selectedCropId, setSelectedCropId] = useState<string>('onion');
   const [expandedDiseaseId, setExpandedDiseaseId] = useState<string | null>('onion_alternaria');
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isSpeakingLibraryHeader, setIsSpeakingLibraryHeader] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  const handleSpeakLibraryHeader = async () => {
+    if (isSpeakingLibraryHeader) {
+      voiceService.stopSpeaking();
+      setIsSpeakingLibraryHeader(false);
+      return;
+    }
+    setIsSpeakingLibraryHeader(true);
+    const textToSpeak =
+      locale === 'ha'
+        ? 'Laburaren Hotunan Shuke-shuke da Cututtuka. Cikakken littafin hotuna da shawarwarin cututtukan amfanin gona ba tare da intanet ba.'
+        : 'Plant Disease Library. Complete photo guide and crop disease advice without internet.';
+    await voiceService.speak(textToSpeak, locale);
+    setIsSpeakingLibraryHeader(false);
   };
 
   const handleSpeakDisease = async (disease: CropDiseaseReference) => {
@@ -83,14 +99,28 @@ export const CropReferenceLibraryScreen: React.FC<CropReferenceLibraryScreenProp
 
       {/* Screen Header */}
       <div>
-        <h1 className="text-xl sm:text-2xl font-extrabold text-[#173326] flex items-center gap-2">
-          <BookOpen className="w-6 h-6 text-emerald-600" />
-          <span>{t(locale, 'referenceLibraryTitle')}</span>
-        </h1>
+        <div className="flex items-center space-x-2">
+          <h1 className="text-xl sm:text-2xl font-extrabold text-[#173326] flex items-center gap-2">
+            <BookOpen className="w-6 h-6 text-emerald-600" />
+            <span>{locale === 'ha' ? 'Laburaren Hotunan Shuke-shuke' : 'Plant Disease Library'}</span>
+          </h1>
+          <button
+            type="button"
+            onClick={handleSpeakLibraryHeader}
+            className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
+              isSpeakingLibraryHeader
+                ? 'bg-emerald-600 text-white border-emerald-700 animate-pulse'
+                : 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100 shadow-2xs'
+            }`}
+            title={locale === 'ha' ? 'Karanta da Murya' : 'Read Aloud'}
+          >
+            <Volume2 className="w-4 h-4" />
+          </button>
+        </div>
         <p className="text-xs text-slate-500 mt-0.5">
           {locale === 'ha'
             ? 'Cikakken littafin hotuna da shawarwarin cututtukan amfanin gona ba tare da intanet ba'
-            : 'Offline visual atlas with symptoms, pathogen details, treatment & prevention'}
+            : 'Complete photo guide and crop disease advice without internet'}
         </p>
       </div>
 

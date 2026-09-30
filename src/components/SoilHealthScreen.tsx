@@ -83,6 +83,23 @@ export const SoilHealthScreen: React.FC<SoilHealthScreenProps> = ({ locale }) =>
     showToast(locale === 'ha' ? 'An goge bayanin.' : 'Record deleted.');
   };
 
+  const [isSpeakingSoilHeader, setIsSpeakingSoilHeader] = useState(false);
+
+  const handleSpeakSoilHeader = async () => {
+    if (isSpeakingSoilHeader) {
+      voiceService.stopSpeaking();
+      setIsSpeakingSoilHeader(false);
+      return;
+    }
+    setIsSpeakingSoilHeader(true);
+    const textToSpeak =
+      locale === 'ha'
+        ? 'Lafiyar Ƙasa. Gwajin pH, auna laima, da shawarwarin takin gargajiya da toka.'
+        : 'Soil Health. Test pH, measure moisture, and get natural fertilizer and ash advice.';
+    await voiceService.speak(textToSpeak, locale);
+    setIsSpeakingSoilHeader(false);
+  };
+
   const handleSpeakAdvice = (recordAdvice = liveAdvice, cropName = activeCropReq.name, cropHa = activeCropReq.hausaName) => {
     const text =
       locale === 'ha'
@@ -125,13 +142,27 @@ export const SoilHealthScreen: React.FC<SoilHealthScreenProps> = ({ locale }) =>
               <Layers className="w-6 h-6" />
             </div>
             <div>
-              <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-                <span>{locale === 'ha' ? 'Kula da Lafiyar Ƙasa' : 'Soil Health & Moisture'}</span>
-              </h1>
+              <div className="flex items-center space-x-2">
+                <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+                  {locale === 'ha' ? 'Lafiyar Ƙasa' : 'Soil Health'}
+                </h1>
+                <button
+                  type="button"
+                  onClick={handleSpeakSoilHeader}
+                  className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
+                    isSpeakingSoilHeader
+                      ? 'bg-amber-600 text-white border-amber-700 animate-pulse'
+                      : 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100 shadow-2xs'
+                  }`}
+                  title={locale === 'ha' ? 'Karanta da Murya' : 'Read Aloud'}
+                >
+                  <Volume2 className="w-4 h-4" />
+                </button>
+              </div>
               <p className="text-xs text-slate-500">
                 {locale === 'ha'
                   ? 'Gwajin pH, auna laima, da shawarwarin takin gargajiya da toka'
-                  : 'Track pH, moisture levels over time & get crop-specific soil remedies'}
+                  : 'Test pH, measure moisture, and get natural fertilizer and ash advice'}
               </p>
             </div>
           </div>

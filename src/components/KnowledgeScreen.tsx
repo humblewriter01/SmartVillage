@@ -65,6 +65,22 @@ export const KnowledgeScreen: React.FC<KnowledgeScreenProps> = ({ locale }) => {
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState<CategoryFilter>('all');
   const [activeSpeechId, setActiveSpeechId] = useState<string | null>(null);
+  const [isSpeakingKnowledgeHeader, setIsSpeakingKnowledgeHeader] = useState(false);
+
+  const handleSpeakKnowledgeHeader = async () => {
+    if (isSpeakingKnowledgeHeader) {
+      voiceService.stopSpeaking();
+      setIsSpeakingKnowledgeHeader(false);
+      return;
+    }
+    setIsSpeakingKnowledgeHeader(true);
+    const textToSpeak =
+      locale === 'ha'
+        ? 'Ilimi. Cikakkun bayanai ba tare da bukatar intanet ba.'
+        : 'Knowledge. Complete information without needing internet.';
+    await voiceService.speak(textToSpeak, locale);
+    setIsSpeakingKnowledgeHeader(false);
+  };
 
   const filterTabs: { id: CategoryFilter; key: string }[] = [
     { id: 'all', key: 'allGuidance' },
@@ -126,13 +142,27 @@ export const KnowledgeScreen: React.FC<KnowledgeScreenProps> = ({ locale }) => {
     <div className="max-w-2xl mx-auto px-4 py-6 space-y-4">
       {/* Title */}
       <div>
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-[#1f7a4c]">
-          {t(locale, 'knowledgeTitle')}
-        </h1>
+        <div className="flex items-center space-x-2">
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-[#1f7a4c]">
+            {t(locale, 'knowledgeTitle')}
+          </h1>
+          <button
+            type="button"
+            onClick={handleSpeakKnowledgeHeader}
+            className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
+              isSpeakingKnowledgeHeader
+                ? 'bg-emerald-600 text-white border-emerald-700 animate-pulse'
+                : 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100 shadow-2xs'
+            }`}
+            title={locale === 'ha' ? 'Karanta da Murya' : 'Read Aloud'}
+          >
+            <Volume2 className="w-4 h-4" />
+          </button>
+        </div>
         <p className="text-xs sm:text-sm text-slate-600 mt-1">
           {locale === 'ha'
             ? 'Cikakkun bayanai ba tare da bukatar intanet ba'
-            : 'Offline verified agricultural, water, poultry and health guidance'}
+            : 'Complete information without needing internet'}
         </p>
       </div>
 

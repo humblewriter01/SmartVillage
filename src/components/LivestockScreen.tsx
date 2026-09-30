@@ -6,9 +6,10 @@ import {
   Sparkles,
   ShieldAlert,
   RotateCcw,
-  Mic,
-  MicOff,
+  RefreshCw,
   Music,
+  Info,
+  ChevronRight,
 } from 'lucide-react';
 import { Language, t } from '../utils/translations';
 import {
@@ -16,6 +17,7 @@ import {
   LivestockAnimal,
   livestockService,
   LivestockCheckResult,
+  DifferentialMatch,
 } from '../services/livestockService';
 import { voiceService } from '../services/voiceService';
 import { historyService } from '../services/historyService';
@@ -33,7 +35,6 @@ export const LivestockScreen: React.FC<LivestockScreenProps> = ({
   const [checkedSymptoms, setCheckedSymptoms] = useState<string[]>([]);
   const [result, setResult] = useState<LivestockCheckResult | null>(null);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [isListening, setIsListening] = useState(false);
   const [playingAnimalId, setPlayingAnimalId] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -42,16 +43,64 @@ export const LivestockScreen: React.FC<LivestockScreenProps> = ({
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  const handleToggleSymptom = (sym: string) => {
+  // Live Text-to-Speech on symptom tap (select or deselect)
+  const handleToggleSymptom = (sym: string, symHausa?: string) => {
     if (checkedSymptoms.includes(sym)) {
       setCheckedSymptoms(checkedSymptoms.filter((s) => s !== sym));
     } else {
       setCheckedSymptoms([...checkedSymptoms, sym]);
     }
+
+    // Immediately speak the tapped symptom aloud in the selected language
+    // Stop any previous speech so rapid taps don't overlap
+    voiceService.stopSpeaking();
+    const textToSpeak = locale === 'ha' ? (symHausa || sym) : sym;
+    voiceService.speak(textToSpeak, locale, undefined, 'livestock');
+  };
+
+  const [isSpeakingLivestockHeader, setIsSpeakingLivestockHeader] = useState(false);
+  const [speakingAnimalCardId, setSpeakingAnimalCardId] = useState<string | null>(null);
+
+  const handleSpeakLivestockHeader = async () => {
+    if (isSpeakingLivestockHeader) {
+      voiceService.stopSpeaking();
+      setIsSpeakingLivestockHeader(false);
+      return;
+    }
+    setIsSpeakingLivestockHeader(true);
+    const textToSpeak =
+      locale === 'ha'
+        ? 'Likitancin Dabbobi da Kaji. Duba kaji, awaki, tumaki, shanu, jakuna, da rakuma.'
+        : 'Livestock and Poultry Care. Check chickens, goats, sheep, cattle, donkeys, and camels.';
+    await voiceService.speak(textToSpeak, locale);
+    setIsSpeakingLivestockHeader(false);
+  };
+
+  const handleSpeakAnimalCard = async (animal: LivestockAnimal, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (speakingAnimalCardId === animal.id) {
+      voiceService.stopSpeaking();
+      setSpeakingAnimalCardId(null);
+      return;
+    }
+    setSpeakingAnimalCardId(animal.id);
+    const textToSpeak =
+      locale === 'ha'
+        ? `${animal.hausa_name} (${animal.name}). Likitancin dabbobi.`
+        : `${animal.name} (${animal.hausa_name}). Livestock health and care.`;
+    await voiceService.speak(textToSpeak, locale);
+    setSpeakingAnimalCardId(null);
   };
 
   const handleSelectAnimal = (animal: LivestockAnimal) => {
     setSelectedAnimal(animal);
+    setCheckedSymptoms([]);
+    setResult(null);
+  };
+
+  const handleResetCheck = () => {
+    voiceService.stopSpeaking();
+    setIsSpeaking(false);
     setCheckedSymptoms([]);
     setResult(null);
   };
@@ -82,19 +131,31 @@ export const LivestockScreen: React.FC<LivestockScreenProps> = ({
     if (diag) {
       setResult(diag);
 
-      // Save to history
-      const title = `${selectedAnimal.emoji} ${diag.likelyDisease.name} (${diag.likelyDisease.hausa_name})`;
-      historyService.insert({
-        type: 'livestock',
-        createdAt: new Date().toISOString(),
-        title,
-        detail: `Symptoms: ${checkedSymptoms.join(', ')}`,
-        advice: locale === 'ha' ? diag.likelyDisease.treatment_hausa : diag.likelyDisease.treatment,
-        confidence: diag.confidence,
-      });
+      // Save to history ONLY if a valid disease match was determined
+      if (diag.hasMatch && diag.likelyDisease) {
+        const title = `${selectedAnimal.emoji} ${diag.likelyDisease.name} (${diag.likelyDisease.hausa_name})`;
+        historyService.insert({
+          type: 'livestock',
+          createdAt: new Date().toISOString(),
+          title,
+          detail: `Symptoms: ${checkedSymptoms.join(', ')}`,
+          advice: locale === 'ha' ? diag.likelyDisease.treatment_hausa : diag.likelyDisease.treatment,
+          confidence: diag.confidence,
+        });
 
-      onRecordSaved?.();
+        onRecordSaved?.();
+      }
     }
+  };
+
+  const handleSelectAlternativeDisease = (diff: DifferentialMatch) => {
+    if (!result) return;
+    setResult({
+      ...result,
+      likelyDisease: diff.disease,
+      confidence: diff.score / 100,
+      matchedSymptoms: diff.matchedSymptoms,
+    });
   };
 
   const handleSpeak = async () => {
@@ -106,11 +167,22 @@ export const LivestockScreen: React.FC<LivestockScreenProps> = ({
     }
 
     setIsSpeaking(true);
-    const dis = result.likelyDisease;
-    const diseaseName = locale === 'ha' ? dis.hausa_name : dis.name;
-    const treatmentText = locale === 'ha' ? dis.treatment_hausa : dis.treatment;
-    const preventionText = locale === 'ha' ? dis.prevention_hausa : dis.prevention;
-    const textToSpeak = `${diseaseName}. ${treatmentText}. ${preventionText}`;
+    let textToSpeak = '';
+
+    if (!result.hasMatch || !result.likelyDisease) {
+      textToSpeak = locale === 'ha'
+        ? (result.noMatchMessageHa || 'Ba a sami cutar da ta dace ba. Don Allah zaɓi ƙarin alamomi ko tuntuɓi likitan dabbobi.')
+        : (result.noMatchMessageEn || 'No matching disease found. Please select more symptoms or consult a local vet.');
+    } else {
+      const dis = result.likelyDisease;
+      const diseaseName = locale === 'ha' ? dis.hausa_name : dis.name;
+      const matchPercent = Math.round(result.confidence * 100);
+      const treatmentText = locale === 'ha' ? dis.treatment_hausa : dis.treatment;
+      const preventionText = locale === 'ha' ? dis.prevention_hausa : dis.prevention;
+      textToSpeak = locale === 'ha'
+        ? `${diseaseName}. Daidaito kashi ${matchPercent}. ${treatmentText}. ${preventionText}`
+        : `${diseaseName}. ${matchPercent}% match. ${treatmentText}. ${preventionText}`;
+    }
 
     try {
       await voiceService.speak(textToSpeak, locale, (warning) => {
@@ -120,52 +192,6 @@ export const LivestockScreen: React.FC<LivestockScreenProps> = ({
       console.warn('TTS speak error:', err);
     } finally {
       setIsSpeaking(false);
-    }
-  };
-
-  const handleVoiceListen = async () => {
-    if (isListening) {
-      await voiceService.stopListening();
-      setIsListening(false);
-      return;
-    }
-
-    try {
-      const started = await voiceService.startListening(
-        locale,
-        (text) => {
-          showToast(`Heard: "${text}"`);
-          const lower = text.toLowerCase();
-          for (const a of LIVESTOCK_ANIMALS) {
-            if (
-              lower.includes(a.name.toLowerCase()) ||
-              lower.includes(a.hausa_name.toLowerCase())
-            ) {
-              handleSelectAnimal(a);
-              break;
-            }
-          }
-        },
-        (err) => {
-          showToast(err);
-          setIsListening(false);
-        },
-        () => {
-          setIsListening(false);
-        },
-        {
-          type: 'livestock',
-          animalId: selectedAnimal.id,
-          label: selectedAnimal.name,
-        }
-      );
-
-      if (started) {
-        setIsListening(true);
-      }
-    } catch (err) {
-      console.warn('Voice listen error caught:', err);
-      setIsListening(false);
     }
   };
 
@@ -179,28 +205,30 @@ export const LivestockScreen: React.FC<LivestockScreenProps> = ({
         </div>
       )}
 
-      {/* Screen Header */}
+      {/* Screen Header - Mic Button completely removed per Part 7 */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl sm:text-2xl font-extrabold text-[#173326] flex items-center gap-2">
-            <span>🐔</span>
-            <span>{t(locale, 'checkLivestock')}</span>
+            <button
+              type="button"
+              onClick={handleSpeakLivestockHeader}
+              className={`p-2 rounded-xl border transition-all cursor-pointer ${
+                isSpeakingLivestockHeader
+                  ? 'bg-emerald-600 text-white border-emerald-700 animate-pulse'
+                  : 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100 shadow-2xs'
+              }`}
+              title={locale === 'ha' ? 'Karanta da Murya' : 'Read Aloud'}
+            >
+              <Volume2 className="w-5 h-5 text-emerald-700" />
+            </button>
+            <span>{locale === 'ha' ? 'Likitancin Dabbobi da Kaji' : 'Livestock and Poultry Care'}</span>
           </h1>
-          <p className="text-xs text-slate-500 mt-0.5">{t(locale, 'livestockSubtitle')}</p>
+          <p className="text-xs text-slate-500 mt-0.5">
+            {locale === 'ha'
+              ? 'Duba kaji, awaki, tumaki, shanu, jakuna, da rakuma'
+              : 'Check chickens, goats, sheep, cattle, donkeys, and camels'}
+          </p>
         </div>
-
-        {/* Voice Note Button */}
-        <button
-          onClick={handleVoiceListen}
-          className={`p-2.5 rounded-xl transition-all cursor-pointer ${
-            isListening
-              ? 'bg-rose-600 text-white animate-pulse'
-              : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'
-          }`}
-          title="Voice Input"
-        >
-          {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
-        </button>
       </div>
 
       {/* Animal Selection Grid (9 Animals) with Individual Sound Buttons */}
@@ -219,6 +247,7 @@ export const LivestockScreen: React.FC<LivestockScreenProps> = ({
           {LIVESTOCK_ANIMALS.map((animal) => {
             const isSelected = selectedAnimal.id === animal.id;
             const isPlayingThis = playingAnimalId === animal.id;
+            const isSpeakingThisCard = speakingAnimalCardId === animal.id;
 
             return (
               <div
@@ -231,24 +260,39 @@ export const LivestockScreen: React.FC<LivestockScreenProps> = ({
                 }`}
               >
                 <span className="text-2xl mb-1">{animal.emoji}</span>
-                <span className="text-xs font-bold text-center leading-tight mb-1">
+                <span className="text-xs font-bold text-center leading-tight mb-1 truncate w-full">
                   {locale === 'ha' ? animal.hausa_name : animal.name}
                 </span>
 
-                {/* Individual Sound Button for every animal */}
-                <button
-                  type="button"
-                  onClick={(e) => handlePlayAnimalSound(animal, e)}
-                  className={`mt-1 flex items-center justify-center space-x-1 px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all shadow-xs cursor-pointer ${
-                    isSelected
-                      ? 'bg-emerald-800 hover:bg-emerald-900 text-emerald-100 border border-emerald-600'
-                      : 'bg-white hover:bg-emerald-50 text-emerald-800 border border-slate-200'
-                  } ${isPlayingThis ? 'animate-pulse ring-2 ring-emerald-400' : ''}`}
-                  title={locale === 'ha' ? `Saurari kukan ${animal.hausa_name}` : `Play ${animal.name} sound`}
-                >
-                  <Volume2 className="w-3 h-3 text-emerald-600" />
-                  <span>{isPlayingThis ? '...' : (locale === 'ha' ? 'Kuka' : 'Sound')}</span>
-                </button>
+                {/* Individual Action Buttons: Sound + Read Aloud */}
+                <div className="mt-1 flex items-center gap-1 w-full justify-center">
+                  <button
+                    type="button"
+                    onClick={(e) => handlePlayAnimalSound(animal, e)}
+                    className={`flex items-center justify-center space-x-0.5 px-1.5 py-0.5 rounded-lg text-[10px] font-bold transition-all shadow-xs cursor-pointer ${
+                      isSelected
+                        ? 'bg-emerald-800 hover:bg-emerald-900 text-emerald-100 border border-emerald-600'
+                        : 'bg-white hover:bg-emerald-50 text-emerald-800 border border-slate-200'
+                    } ${isPlayingThis ? 'animate-pulse ring-2 ring-emerald-400' : ''}`}
+                    title={locale === 'ha' ? `Saurari kukan ${animal.hausa_name}` : `Play ${animal.name} sound`}
+                  >
+                    <Music className="w-2.5 h-2.5" />
+                    <span>{isPlayingThis ? '...' : (locale === 'ha' ? 'Kuka' : 'Sound')}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={(e) => handleSpeakAnimalCard(animal, e)}
+                    className={`p-1 rounded-lg text-[10px] font-bold transition-all shadow-xs cursor-pointer ${
+                      isSelected
+                        ? 'bg-emerald-800 hover:bg-emerald-900 text-emerald-100 border border-emerald-600'
+                        : 'bg-white hover:bg-emerald-50 text-emerald-800 border border-slate-200'
+                    } ${isSpeakingThisCard ? 'animate-pulse ring-2 ring-emerald-400' : ''}`}
+                    title={locale === 'ha' ? 'Karanta da Murya' : 'Read Aloud'}
+                  >
+                    <Volume2 className="w-2.5 h-2.5" />
+                  </button>
+                </div>
               </div>
             );
           })}
@@ -309,7 +353,7 @@ export const LivestockScreen: React.FC<LivestockScreenProps> = ({
             return (
               <div
                 key={index}
-                onClick={() => handleToggleSymptom(sym)}
+                onClick={() => handleToggleSymptom(sym, symHausa)}
                 className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-colors ${
                   isChecked
                     ? 'bg-emerald-50/80 border-emerald-500 text-emerald-900 font-semibold'
@@ -343,15 +387,82 @@ export const LivestockScreen: React.FC<LivestockScreenProps> = ({
         </button>
       </div>
 
-      {/* Result Card */}
-      {result && (
+      {/* Result Card: Case 1 - No Match Found */}
+      {result && !result.hasMatch && (
+        <div className="bg-white rounded-2xl p-5 border-2 border-amber-300 shadow-sm space-y-4 animate-fade-in text-center sm:text-left">
+          <div className="flex flex-col sm:flex-row items-center sm:items-start gap-3.5">
+            <div className="p-3 bg-amber-100 text-amber-800 rounded-2xl shrink-0">
+              <AlertTriangle className="w-6 h-6" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="font-extrabold text-base sm:text-lg text-slate-800">
+                {t(locale, 'noMatchingDiseaseTitle')}
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                {locale === 'ha' ? result.noMatchMessageHa : result.noMatchMessageEn}
+              </p>
+            </div>
+          </div>
+
+          <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row items-center gap-2.5">
+            <button
+              type="button"
+              onClick={handleResetCheck}
+              className="w-full sm:flex-1 py-3 px-4 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold text-xs sm:text-sm shadow-xs transition-all flex items-center justify-center space-x-2 cursor-pointer active:scale-[0.99]"
+            >
+              <RotateCcw className="w-4 h-4" />
+              <span>{t(locale, 'checkAnotherAnimal')}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleResetCheck}
+              className="w-full sm:w-auto py-3 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs sm:text-sm border border-slate-200 transition-all flex items-center justify-center space-x-1.5 cursor-pointer active:scale-[0.99]"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>{t(locale, 'checkAgain')}</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Result Card: Case 2 - Diagnosed with Match */}
+      {result && result.hasMatch && result.likelyDisease && (
         <div className="bg-white rounded-2xl p-5 border border-emerald-200 shadow-sm space-y-4 animate-fade-in">
           {/* Header */}
-          <div className="flex items-start justify-between border-b border-slate-100 pb-3">
-            <div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
-                {t(locale, 'diagnosis')}
-              </span>
+          <div className="flex items-start justify-between border-b border-slate-100 pb-3 gap-2">
+            <div className="space-y-1 min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
+                  {t(locale, 'diagnosis')}
+                </span>
+
+                {/* Confidence Badge */}
+                {(() => {
+                  const score = Math.round(result.confidence * 100);
+                  const isStrong = score >= 80;
+                  const isModerate = score >= 50 && score < 80;
+                  const badgeClass = isStrong
+                    ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                    : isModerate
+                    ? 'bg-amber-100 text-amber-800 border-amber-300'
+                    : 'bg-orange-100 text-orange-800 border-orange-300';
+                  const label = isStrong
+                    ? t(locale, 'strongMatch')
+                    : isModerate
+                    ? t(locale, 'moderateMatch')
+                    : t(locale, 'weakMatch');
+
+                  return (
+                    <span className={`text-[11px] font-extrabold px-2.5 py-0.5 rounded-full border flex items-center gap-1 ${badgeClass}`}>
+                      <span>{score}%</span>
+                      <span>·</span>
+                      <span>{label}</span>
+                    </span>
+                  );
+                })()}
+              </div>
+
               <h3 className="font-extrabold text-lg sm:text-xl text-slate-800 mt-1 flex items-center gap-1.5">
                 <span>{selectedAnimal.emoji}</span>
                 <span>
@@ -365,7 +476,7 @@ export const LivestockScreen: React.FC<LivestockScreenProps> = ({
             {/* Read Aloud Button */}
             <button
               onClick={handleSpeak}
-              className="p-2.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 cursor-pointer shadow-xs"
+              className="p-2.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 cursor-pointer shadow-xs shrink-0"
               title={t(locale, 'speakResult')}
             >
               <Volume2
@@ -373,6 +484,34 @@ export const LivestockScreen: React.FC<LivestockScreenProps> = ({
               />
             </button>
           </div>
+
+          {/* Weak Match Caution */}
+          {Math.round(result.confidence * 100) < 50 && (
+            <div className="p-2.5 bg-orange-50 border border-orange-200 rounded-xl text-orange-900 text-xs flex items-center space-x-2">
+              <Info className="w-4 h-4 text-orange-600 shrink-0" />
+              <span>{t(locale, 'consultVetNotice')}</span>
+            </div>
+          )}
+
+          {/* Matched Symptoms Breakdown */}
+          {result.matchedSymptoms && result.matchedSymptoms.length > 0 && (
+            <div className="space-y-1.5 bg-slate-50 p-3 rounded-xl border border-slate-200/80">
+              <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider block">
+                {t(locale, 'matchedSymptomsLabel')}
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {result.matchedSymptoms.map((sym, idx) => (
+                  <span
+                    key={idx}
+                    className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-lg text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200"
+                  >
+                    <CheckCircle2 className="w-3 h-3 text-emerald-700" />
+                    <span>{sym}</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Contagious Alert Banner */}
           {result.likelyDisease.isUrgentContagious && (
@@ -421,6 +560,96 @@ export const LivestockScreen: React.FC<LivestockScreenProps> = ({
                 ? result.likelyDisease.prevention_hausa
                 : result.likelyDisease.prevention}
             </p>
+          </div>
+
+          {/* Differential Diagnoses (Top 2-3) */}
+          {result.differentials && result.differentials.length > 1 && (
+            <div className="mt-4 pt-4 border-t border-slate-200 space-y-2.5">
+              <div>
+                <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  {t(locale, 'differentialDiagnosesTitle')}
+                </h4>
+                <p className="text-[11px] text-slate-500">
+                  {t(locale, 'differentialDiagnosesSubtitle')}
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                {result.differentials.map((diff, idx) => {
+                  const isCurrent = diff.disease.id === result.likelyDisease?.id;
+                  const isStrong = diff.score >= 80;
+                  const isModerate = diff.score >= 50 && diff.score < 80;
+                  const badgeClass = isStrong
+                    ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                    : isModerate
+                    ? 'bg-amber-100 text-amber-800 border-amber-300'
+                    : 'bg-orange-100 text-orange-800 border-orange-300';
+                  const label = isStrong
+                    ? t(locale, 'strongMatch')
+                    : isModerate
+                    ? t(locale, 'moderateMatch')
+                    : t(locale, 'weakMatch');
+
+                  return (
+                    <div
+                      key={diff.disease.id}
+                      onClick={() => !isCurrent && handleSelectAlternativeDisease(diff)}
+                      className={`p-3 rounded-xl border flex items-center justify-between transition-all ${
+                        isCurrent
+                          ? 'bg-emerald-50/60 border-emerald-400 ring-1 ring-emerald-300'
+                          : 'bg-slate-50 hover:bg-emerald-50/40 border-slate-200 cursor-pointer'
+                      }`}
+                    >
+                      <div className="space-y-0.5 min-w-0 flex-1">
+                        <div className="flex items-center space-x-2">
+                          <span className="text-xs font-extrabold text-slate-800 truncate">
+                            {idx + 1}. {locale === 'ha' ? diff.disease.hausa_name : diff.disease.name}
+                          </span>
+                          {isCurrent && (
+                            <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-1.5 py-0.2 rounded-sm">
+                              {locale === 'ha' ? 'Wanda aka duba' : 'Active'}
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-slate-500 truncate">
+                          {diff.matchedSymptoms.length} {locale === 'ha' ? 'alamomin da suka dace' : 'matching symptoms'}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center space-x-2 shrink-0">
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${badgeClass}`}>
+                          {diff.score}% · {label}
+                        </span>
+                        {!isCurrent && (
+                          <ChevronRight className="w-4 h-4 text-slate-400" />
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Action Reset Buttons */}
+          <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row items-center gap-2.5">
+            <button
+              type="button"
+              onClick={handleResetCheck}
+              className="w-full sm:flex-1 py-3 px-4 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold text-xs sm:text-sm shadow-xs transition-all flex items-center justify-center space-x-2 cursor-pointer active:scale-[0.99]"
+            >
+              <RotateCcw className="w-4 h-4" />
+              <span>{t(locale, 'checkAnotherAnimal')}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleResetCheck}
+              className="w-full sm:w-auto py-3 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs sm:text-sm border border-slate-200 transition-all flex items-center justify-center space-x-1.5 cursor-pointer active:scale-[0.99]"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>{t(locale, 'checkAgain')}</span>
+            </button>
           </div>
         </div>
       )}

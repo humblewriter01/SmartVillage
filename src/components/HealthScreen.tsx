@@ -1,20 +1,15 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   Camera,
   Image as ImageIcon,
-  Mic,
-  MicOff,
   Sparkles,
   Volume2,
   AlertCircle,
   ShieldAlert,
-  Info,
   ListFilter,
   X,
   HeartPulse,
-  AlertTriangle,
-  CheckCircle2,
-  Activity,
+  RotateCcw,
 } from 'lucide-react';
 import { Language, t } from '../utils/translations';
 import {
@@ -27,7 +22,6 @@ import { voiceService } from '../services/voiceService';
 import { historyService } from '../services/historyService';
 import {
   pickPhotoFromGallery,
-  cameraService,
 } from '../services/cameraService';
 import { FullScreenCameraModal } from './FullScreenCameraModal';
 
@@ -52,8 +46,6 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
   const [symptoms, setSymptoms] = useState('');
   const [result, setResult] = useState<HealthResult | null>(null);
   const [busy, setBusy] = useState(false);
-  const [listening, setListening] = useState(false);
-  const [recordedVoiceUrl, setRecordedVoiceUrl] = useState<string | null>(null);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [showManualModal, setShowManualModal] = useState(false);
   const [manualCategoryFilter, setManualCategoryFilter] = useState<'all' | 'emergency' | 'infectious' | 'respiratory' | 'skin'>('all');
@@ -65,6 +57,25 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  // Reset & Start Over Handlers (Part 4)
+  const handleResetHealth = () => {
+    voiceService.stopSpeaking();
+    setIsSpeaking(false);
+    setSymptoms('');
+    setPhoto(null);
+    setPhotoUrl(null);
+    setResult(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    if (cameraInputRef.current) cameraInputRef.current.value = '';
+    showToast(locale === 'ha' ? 'An sake farawa!' : 'Reset complete!');
+  };
+
+  const handleCheckAgain = () => {
+    voiceService.stopSpeaking();
+    setIsSpeaking(false);
+    setResult(null);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -106,86 +117,6 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
       setPhotoUrl(formatted);
       setResult(null);
       showToast(locale === 'ha' ? 'An loda hoto daga gallery!' : 'Photo loaded!');
-    }
-  };
-
-  // Voice-to-Text & Voice Recording: Speak symptoms aloud
-  const getActiveHealthConditionId = (condName?: string, symText?: string): string => {
-    const textToCheck = (condName || result?.condition || symText || symptoms || '').toLowerCase();
-    if (textToCheck.includes('malaria') || textToCheck.includes('sauro')) return 'malaria';
-    if (textToCheck.includes('cholera') || textToCheck.includes('diarrhea') || textToCheck.includes('kwalara') || textToCheck.includes('gudawa') || textToCheck.includes('zawayi')) return 'cholera_diarrhea';
-    if (textToCheck.includes('typhoid') || textToCheck.includes('taifot')) return 'typhoid_fever';
-    if (textToCheck.includes('snake') || textToCheck.includes('maciji') || textToCheck.includes('cizo')) return 'snakebite';
-    if (textToCheck.includes('pneumonia') || textToCheck.includes('nimoniya') || textToCheck.includes('tari') || textToCheck.includes('numfashi')) return 'pneumonia';
-    if (textToCheck.includes('measles') || textToCheck.includes('kyanda')) return 'measles';
-    if (textToCheck.includes('meningitis') || textToCheck.includes('sankarau')) return 'meningitis';
-    if (textToCheck.includes('heat') || textToCheck.includes('zafin rana')) return 'heat_exhaustion';
-    if (textToCheck.includes('dehydration') || textToCheck.includes('kishirwa')) return 'severe_dehydration';
-    if (textToCheck.includes('skin') || textToCheck.includes('scabies') || textToCheck.includes('kazuwa') || textToCheck.includes('kuraje')) return 'scabies_skin';
-    return 'malaria';
-  };
-
-  const toggleListening = async () => {
-    if (listening) {
-      const rec = await voiceService.stopListening();
-      setListening(false);
-      const audioUrl = rec?.url || voiceService.getLastRecording()?.url;
-      if (audioUrl) {
-        setRecordedVoiceUrl(audioUrl);
-      }
-      if (!symptoms.trim()) {
-        const fallbackSym =
-          rec?.transcript ||
-          (locale === 'ha'
-            ? 'Muryar alamun lafiya: Zazzabi, ciwon jiki ko ciwon ciki'
-            : 'Recorded symptom description: Fever, body aches or weakness');
-        setSymptoms(fallbackSym);
-        const res = analyzeHealth(fallbackSym, Boolean(photoUrl));
-        setResult(res);
-      }
-      showToast(
-        locale === 'ha'
-          ? 'An ɗauki muryarka cikin nasara!'
-          : 'Voice recorded successfully!'
-      );
-      return;
-    }
-
-    const currentHealthId = getActiveHealthConditionId();
-    const started = await voiceService.startListening(
-      locale === 'ha' ? 'ha-NG' : 'en-NG',
-      (recognizedText, rec) => {
-        const audioUrl = rec?.url || voiceService.getLastRecording()?.url;
-        if (audioUrl) {
-          setRecordedVoiceUrl(audioUrl);
-        }
-        setSymptoms((prev) => {
-          const trimmed = prev.trim();
-          return trimmed ? `${trimmed} ${recognizedText}` : recognizedText;
-        });
-
-        // Automatically run instant analysis on the spoken words
-        const res = analyzeHealth(recognizedText, Boolean(photoUrl));
-        setResult(res);
-      },
-      (err) => {
-        setListening(false);
-      },
-      (rec) => {
-        setListening(false);
-        const audioUrl = rec?.url || voiceService.getLastRecording()?.url;
-        if (audioUrl) {
-          setRecordedVoiceUrl(audioUrl);
-        }
-      },
-      {
-        type: 'health',
-        healthId: currentHealthId,
-      }
-    );
-
-    if (started) {
-      setListening(true);
     }
   };
 
@@ -267,6 +198,23 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
     setIsSpeaking(false);
   };
 
+  const [isSpeakingHealthHeader, setIsSpeakingHealthHeader] = useState(false);
+
+  const handleSpeakHealthHeader = async () => {
+    if (isSpeakingHealthHeader) {
+      voiceService.stopSpeaking();
+      setIsSpeakingHealthHeader(false);
+      return;
+    }
+    setIsSpeakingHealthHeader(true);
+    const textToSpeak =
+      locale === 'ha'
+        ? 'Lafiya. Binciken alamomin zazzabi, amai, cizon maciji da lafiyar iyali.'
+        : 'Health. Check symptoms of fever, vomiting, snake bites, and family health.';
+    await voiceService.speak(textToSpeak, locale);
+    setIsSpeakingHealthHeader(false);
+  };
+
   const addSymptomChip = (chip: { label: string; hausa: string }) => {
     const textToAdd = locale === 'ha' ? chip.hausa : chip.label;
     setSymptoms((prev) => {
@@ -311,86 +259,52 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
       {/* Header & Manual Selector Button */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-[#991b1b]">
-            {t(locale, 'health')}
-          </h1>
+          <div className="flex items-center space-x-2">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-[#991b1b]">
+              {t(locale, 'health')}
+            </h1>
+            <button
+              type="button"
+              onClick={handleSpeakHealthHeader}
+              className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
+                isSpeakingHealthHeader
+                  ? 'bg-rose-500 text-white border-rose-600 animate-pulse'
+                  : 'bg-rose-50 text-rose-800 border-rose-200 hover:bg-rose-100'
+              }`}
+              title={locale === 'ha' ? 'Karanta da Murya' : 'Read Aloud'}
+            >
+              <Volume2 className="w-4 h-4" />
+            </button>
+          </div>
           <p className="text-xs sm:text-sm text-slate-600 mt-0.5">
             {locale === 'ha'
               ? 'Binciken alamomin zazzabi, amai, cizon maciji da lafiyar iyali'
-              : 'Offline rural health symptom guidance, first aid & triage'}
+              : 'Check symptoms of fever, vomiting, snake bites, and family health'}
           </p>
         </div>
 
-        {/* Large Manual Selector Button */}
-        <button
-          onClick={() => setShowManualModal(true)}
-          className="flex items-center justify-center space-x-2 px-3.5 py-2.5 bg-red-50 hover:bg-red-100 text-red-900 border border-red-300 rounded-xl font-bold text-xs sm:text-sm transition-all cursor-pointer shadow-2xs shrink-0"
-        >
-          <ListFilter className="w-4 h-4 text-red-700" />
-          <span>{t(locale, 'manualHealthTitle')}</span>
-        </button>
-      </div>
-
-      {/* Voice-to-Text Recording Banner for Grandma & Patients */}
-      <div
-        className={`p-4 rounded-2xl border transition-all ${
-          listening
-            ? 'bg-red-50 border-red-300 ring-2 ring-red-400'
-            : 'bg-gradient-to-r from-red-50 to-rose-50/50 border-red-200'
-        }`}
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
+        {/* Large Manual Selector Button & Reset Button */}
+        <div className="flex items-center gap-2">
+          {(symptoms || photoUrl || result) && (
             <button
-              onClick={toggleListening}
-              className={`w-12 h-12 rounded-full flex items-center justify-center shadow-md transition-all cursor-pointer ${
-                listening
-                  ? 'bg-red-600 text-white animate-pulse scale-105'
-                  : 'bg-red-700 hover:bg-red-800 text-white'
-              }`}
-              title={listening ? t(locale, 'stop') : t(locale, 'speakDescribeHealth')}
+              type="button"
+              onClick={handleResetHealth}
+              className="flex items-center space-x-1.5 px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-900 border border-rose-300 rounded-xl font-bold text-xs sm:text-sm transition-all cursor-pointer shadow-2xs shrink-0"
+              title={locale === 'ha' ? 'Sake Farawa' : 'Start Over'}
             >
-              {listening ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
+              <RotateCcw className="w-4 h-4 text-rose-700" />
+              <span>{locale === 'ha' ? 'Sake Farawa' : 'Start Over'}</span>
             </button>
-            <div>
-              <h2 className="font-extrabold text-sm sm:text-base text-slate-800">
-                {listening ? t(locale, 'listeningNow') : t(locale, 'speakDescribeHealth')}
-              </h2>
-              <p className="text-[11px] text-slate-500 mt-0.5">
-                {t(locale, 'healthSpeechHint')}
-              </p>
-            </div>
-          </div>
-
-          {listening && (
-            <div className="flex items-center space-x-2 shrink-0">
-              <div className="flex items-center space-x-1 px-2 py-1 bg-red-100 rounded-full border border-red-200">
-                <span className="w-2 h-2 rounded-full bg-red-600 animate-ping"></span>
-                <span className="text-[11px] font-black text-red-700 tracking-wider">REC</span>
-              </div>
-              {/* Animated Sound Wave Bars */}
-              <div className="flex items-center space-x-0.5 h-4">
-                <span className="w-1 bg-red-500 rounded-full animate-bounce [animation-delay:0ms] h-3"></span>
-                <span className="w-1 bg-red-600 rounded-full animate-bounce [animation-delay:150ms] h-4"></span>
-                <span className="w-1 bg-red-500 rounded-full animate-bounce [animation-delay:300ms] h-2"></span>
-                <span className="w-1 bg-red-600 rounded-full animate-bounce [animation-delay:450ms] h-3.5"></span>
-              </div>
-            </div>
           )}
-        </div>
 
-        {/* Live recording indicator alert while active */}
-        {listening && (
-          <div className="mt-3 p-2 bg-red-100/70 border border-red-200 rounded-xl flex items-center justify-between text-xs text-red-900 animate-pulse">
-            <span className="font-bold flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-red-600 inline-block"></span>
-              {locale === 'ha' ? 'Ana ɗaukar muryarka yanzu... Yi bayanin alamun rashin lafiyarka' : 'Recording your voice note now... Describe your symptoms aloud'}
-            </span>
-            <span className="text-[10px] font-black uppercase text-red-600">
-              {locale === 'ha' ? 'Danna domin gamawa' : 'Tap mic to stop'}
-            </span>
-          </div>
-        )}
+          <button
+            onClick={() => setShowManualModal(true)}
+            className="flex items-center justify-center space-x-2 px-3.5 py-2.5 bg-red-50 hover:bg-red-100 text-red-900 border border-red-300 rounded-xl font-bold text-xs sm:text-sm transition-all cursor-pointer shadow-2xs shrink-0"
+          >
+            <ListFilter className="w-4 h-4 text-red-700" />
+            <span>{t(locale, 'manualHealthTitle')}</span>
+          </button>
+        </div>
       </div>
 
       {/* Symptoms Text Area */}
@@ -402,14 +316,15 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
           <div className="flex items-center space-x-2">
             {symptoms && (
               <button
+                type="button"
                 onClick={() => {
                   setSymptoms('');
-                  setRecordedVoiceUrl(null);
                   setResult(null);
                 }}
-                className="text-xs text-slate-400 hover:text-slate-600 cursor-pointer font-medium"
+                className="text-xs text-rose-600 hover:text-rose-800 cursor-pointer font-bold flex items-center gap-1"
               >
-                Clear
+                <RotateCcw className="w-3 h-3" />
+                <span>{locale === 'ha' ? 'Share rubutu' : 'Clear'}</span>
               </button>
             )}
           </div>
@@ -616,6 +531,26 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
           {/* Medical Disclaimer Notice */}
           <div className="p-2.5 bg-amber-50/70 border border-amber-200/80 rounded-xl text-[11px] text-amber-900 leading-tight">
             {t(locale, 'notMedical')}
+          </div>
+
+          {/* Action & Reset Buttons (Part 4) */}
+          <div className="pt-2 flex flex-col sm:flex-row items-center gap-2.5">
+            <button
+              type="button"
+              onClick={handleResetHealth}
+              className="w-full sm:flex-1 py-3 px-4 bg-red-700 hover:bg-red-800 text-white font-bold rounded-xl text-xs sm:text-sm flex items-center justify-center space-x-2 shadow-xs transition-all cursor-pointer active:scale-[0.99]"
+            >
+              <RotateCcw className="w-4 h-4 text-red-200" />
+              <span>{locale === 'ha' ? 'Duba Wata Alama' : 'Check Another Symptom'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleCheckAgain}
+              className="w-full sm:w-auto py-3 px-4 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold rounded-xl text-xs sm:text-sm flex items-center justify-center space-x-1.5 border border-slate-300 transition-colors cursor-pointer"
+            >
+              <span>{locale === 'ha' ? 'Sake Dubawa' : 'Check Again'}</span>
+            </button>
           </div>
         </div>
       )}

@@ -124,6 +124,46 @@ export const CROP_HARVEST_PRESETS: Array<{
     criticalTipsEn:
       'Harvest when 90% of leaves drop and pods turn golden-brown and rattle. Avoid over-drying in the field to prevent severe pod shattering losses.',
   },
+  {
+    cropId: 'cassava',
+    name: 'Cassava',
+    hausaName: 'Rogo',
+    maturityDays: 330,
+    criticalTipsHa:
+      'A girbe rogo bayan watanni 10-12 (kwanaki 330) idan kasa ta fara tsagewa a gindin shuka. A kwashe tushen da wuri domin hana tauri ko rubewa a karkashin kasa.',
+    criticalTipsEn:
+      'Harvest cassava at 10-12 months (330 days) when soil around the stem base cracks. Process or market tubers within 48-72 hours of harvest to avoid vascular decay.',
+  },
+  {
+    cropId: 'yam',
+    name: 'Yam',
+    hausaName: 'Doya',
+    maturityDays: 240,
+    criticalTipsHa:
+      'Idan ganyen doya ya fara bushewa ya zama launin ruwan kasa a watan Nuwamba/Disamba (kwanaki 240), lokacin tono ya yi. A tono da hankali ba tare da raunata dankalin ba.',
+    criticalTipsEn:
+      'Harvest when foliage completely dies back in November-January (approx. 240 days). Dig carefully with wooden or blunt tools to avoid wounding tubers.',
+  },
+  {
+    cropId: 'pepper',
+    name: 'Pepper (Chili / Atarodo)',
+    hausaName: 'Barkono',
+    maturityDays: 90,
+    criticalTipsHa:
+      'A tsinke barkono idan ya yi ja ko koren da ya cika girma a kowanne kwanaki 5-7 (kwanaki 90 bayan shuka). Tsinke akai-akai yana sa shukar ta sake fitar da sabbin fure da ya ya.',
+    criticalTipsEn:
+      'Harvest ripe red or firm mature green peppers every 5-7 days (approx. 90 days from transplant). Frequent picking encourages continuous fruit setting.',
+  },
+  {
+    cropId: 'millet',
+    name: 'Pearl Millet',
+    hausaName: 'Gero',
+    maturityDays: 75,
+    criticalTipsHa:
+      'A yanke zangarniyar gero da zaran kwayar hatsi ta bushe kuma ta yi tauri sosai (kwanaki 75). A shanya a rana kafin daka ko adanawa a rumbu don hana kwari.',
+    criticalTipsEn:
+      'Harvest heads when grain hardens and moisture drops below 15% (approx. 75 days). Sun-dry panicles thoroughly before threshing or granary storage to deter weevils.',
+  },
 ];
 
 interface HarvestCountdownCardProps {
@@ -172,6 +212,22 @@ export const HarvestCountdownCard: React.FC<HarvestCountdownCardProps> = ({
   const [fieldLabel, setFieldLabel] = useState<string>('');
   const [isAddingNew, setIsAddingNew] = useState(false);
   const [isSpeakingId, setIsSpeakingId] = useState<string | null>(null);
+  const [isSpeakingHeader, setIsSpeakingHeader] = useState(false);
+
+  const handleSpeakHeader = async () => {
+    if (isSpeakingHeader) {
+      voiceService.stopSpeaking();
+      setIsSpeakingHeader(false);
+      return;
+    }
+    setIsSpeakingHeader(true);
+    const textToSpeak =
+      locale === 'ha'
+        ? 'Ƙididdigar Kwanakin Girbi. Bibiyar kwanakin da suka rage kafin girbin albasa, masara, da sauran amfanin gona.'
+        : 'Harvest Countdown. Track days left to harvest, maturity stages & readiness signs.';
+    await voiceService.speak(textToSpeak, locale);
+    setIsSpeakingHeader(false);
+  };
 
   // Sync with selectedCropId prop if provided
   useEffect(() => {
@@ -313,12 +369,26 @@ export const HarvestCountdownCard: React.FC<HarvestCountdownCardProps> = ({
             <Clock className="w-5 h-5 text-emerald-700" />
           </div>
           <div>
-            <h3 className="font-extrabold text-sm sm:text-base text-slate-800 flex items-center gap-1.5">
-              <span>{locale === 'ha' ? 'Ƙididdigar Kwanakin Girbi' : 'Harvest Countdown'}</span>
+            <div className="flex items-center space-x-2">
+              <h3 className="font-extrabold text-sm sm:text-base text-slate-800 flex items-center gap-1.5">
+                <span>{locale === 'ha' ? 'Ƙididdigar Kwanakin Girbi' : 'Harvest Countdown'}</span>
+              </h3>
+              <button
+                type="button"
+                onClick={handleSpeakHeader}
+                className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
+                  isSpeakingHeader
+                    ? 'bg-emerald-600 text-white border-emerald-700 animate-pulse'
+                    : 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100 shadow-2xs'
+                }`}
+                title={locale === 'ha' ? 'Karanta da Murya' : 'Read Aloud'}
+              >
+                <Volume2 className="w-3.5 h-3.5" />
+              </button>
               <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full">
                 {plantings.length} {locale === 'ha' ? 'shuki' : 'active'}
               </span>
-            </h3>
+            </div>
             <p className="text-[11px] text-slate-500">
               {locale === 'ha'
                 ? 'Bibiyar kwanakin da suka rage kafin girbin albasa, masara, da sauran amfanin gona'
@@ -362,7 +432,9 @@ export const HarvestCountdownCard: React.FC<HarvestCountdownCardProps> = ({
               >
                 {CROP_HARVEST_PRESETS.map((p) => (
                   <option key={p.cropId} value={p.cropId}>
-                    {p.name} ({p.hausaName}) - {p.maturityDays} {locale === 'ha' ? 'kwanaki' : 'days'}
+                    {locale === 'ha'
+                      ? `${p.hausaName} (${p.name}) - kwanaki ${p.maturityDays}`
+                      : `${p.name} (${p.hausaName}) - ${p.maturityDays} days`}
                   </option>
                 ))}
               </select>

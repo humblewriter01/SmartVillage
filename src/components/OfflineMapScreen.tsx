@@ -313,6 +313,23 @@ export const OfflineMapScreen: React.FC<OfflineMapScreenProps> = ({ locale }) =>
     setIsSpeaking(false);
   };
 
+  const [isSpeakingMapHeader, setIsSpeakingMapHeader] = useState(false);
+
+  const handleSpeakMapHeader = async () => {
+    if (isSpeakingMapHeader) {
+      voiceService.stopSpeaking();
+      setIsSpeakingMapHeader(false);
+      return;
+    }
+    setIsSpeakingMapHeader(true);
+    const textToSpeak =
+      locale === 'ha'
+        ? 'Taswira. Sanya alamar cutar gona, tashar yanayi, da wuraren ruwa mai tsabta.'
+        : 'Map. Pin crop outbreaks, weather stations, and clean water points.';
+    await voiceService.speak(textToSpeak, locale);
+    setIsSpeakingMapHeader(false);
+  };
+
   return (
     <div className="max-w-2xl mx-auto px-4 py-4 space-y-4">
       {/* Toast Notification */}
@@ -326,14 +343,28 @@ export const OfflineMapScreen: React.FC<OfflineMapScreenProps> = ({ locale }) =>
       {/* Screen Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl sm:text-2xl font-extrabold text-[#173326] flex items-center gap-2">
-            <MapPinIcon className="w-6 h-6 text-emerald-600" />
-            <span>{t(locale, 'mapSubtitle')}</span>
-          </h1>
+          <div className="flex items-center space-x-2">
+            <h1 className="text-xl sm:text-2xl font-extrabold text-[#173326] flex items-center gap-2">
+              <MapPinIcon className="w-6 h-6 text-emerald-600" />
+              <span>{locale === 'ha' ? 'Taswira' : 'Map'}</span>
+            </h1>
+            <button
+              type="button"
+              onClick={handleSpeakMapHeader}
+              className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
+                isSpeakingMapHeader
+                  ? 'bg-emerald-600 text-white border-emerald-700 animate-pulse'
+                  : 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100 shadow-2xs'
+              }`}
+              title={locale === 'ha' ? 'Karanta da Murya' : 'Read Aloud'}
+            >
+              <Volume2 className="w-4 h-4" />
+            </button>
+          </div>
           <p className="text-xs text-slate-500 mt-0.5">
             {locale === 'ha'
-              ? 'Taswirar lura da cututtukan gona, yanayi, da wuraren ruwa mai tsabta'
-              : 'Cached geographic view for pinning crop outbreaks, weather gauges & water'}
+              ? 'Sanya alamar cutar gona, tashar yanayi, da wuraren ruwa mai tsabta'
+              : 'Pin crop outbreaks, weather stations, and clean water points'}
           </p>
         </div>
 

@@ -54,19 +54,13 @@ export const PlantingCalendarScreen: React.FC<PlantingCalendarScreenProps> = ({ 
   ];
 
   // Filter crops suitable for this month
-  const activePlantingCrops = CROP_CALENDAR.filter((c) => {
-    if (c.plantingStartMonth <= c.plantingEndMonth) {
-      return selectedMonth >= c.plantingStartMonth && selectedMonth <= c.plantingEndMonth;
-    }
-    return selectedMonth >= c.plantingStartMonth || selectedMonth <= c.plantingEndMonth;
-  });
+  const activePlantingCrops = CROP_CALENDAR.filter((c) =>
+    plantingCalendarService.isPlantingActive(c, selectedMonth)
+  );
 
-  const activeHarvestCrops = CROP_CALENDAR.filter((c) => {
-    if (c.harvestStartMonth <= c.harvestEndMonth) {
-      return selectedMonth >= c.harvestStartMonth && selectedMonth <= c.harvestEndMonth;
-    }
-    return selectedMonth >= c.harvestStartMonth || selectedMonth <= c.harvestEndMonth;
-  });
+  const activeHarvestCrops = CROP_CALENDAR.filter((c) =>
+    plantingCalendarService.isHarvestActive(c, selectedMonth)
+  );
 
   const handleSpeakSeason = async () => {
     if (isSpeaking) {
@@ -283,14 +277,28 @@ export const PlantingCalendarScreen: React.FC<PlantingCalendarScreenProps> = ({ 
               : `Crops Ready for Harvest in ${MONTHS[selectedMonth - 1].full}:`}
           </h3>
           <div className="flex flex-wrap gap-2">
-            {activeHarvestCrops.map((crop) => (
-              <span
-                key={crop.id}
-                className="text-xs font-semibold px-3 py-1.5 rounded-xl bg-amber-50 text-amber-900 border border-amber-200"
-              >
-                🌾 {crop.name} ({crop.hausa_name})
-              </span>
-            ))}
+            {activeHarvestCrops.map((crop) => {
+              const activeHarvestWindow = plantingCalendarService.getActiveHarvestWindow(crop, selectedMonth);
+              const seasonLabel = activeHarvestWindow
+                ? locale === 'ha'
+                  ? activeHarvestWindow.seasonLabelHa
+                  : activeHarvestWindow.seasonLabelEn
+                : null;
+
+              return (
+                <span
+                  key={crop.id}
+                  className="text-xs font-semibold px-3 py-1.5 rounded-xl bg-amber-50 text-amber-900 border border-amber-200 inline-flex items-center gap-1.5"
+                >
+                  <span>🌾 {crop.name} ({crop.hausa_name})</span>
+                  {seasonLabel && (
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-amber-200/70 text-amber-950">
+                      {seasonLabel}
+                    </span>
+                  )}
+                </span>
+              );
+            })}
           </div>
         </div>
       )}

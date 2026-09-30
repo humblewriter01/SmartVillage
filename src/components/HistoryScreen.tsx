@@ -26,6 +26,19 @@ export const HistoryScreen: React.FC<HistoryScreenProps> = ({
 }) => {
   const [filter, setFilter] = useState<'all' | 'crop' | 'health' | 'water' | 'livestock'>('all');
   const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [isSpeakingHistoryHeader, setIsSpeakingHistoryHeader] = useState(false);
+
+  const handleSpeakHistoryHeader = async () => {
+    if (isSpeakingHistoryHeader) {
+      voiceService.stopSpeaking();
+      setIsSpeakingHistoryHeader(false);
+      return;
+    }
+    setIsSpeakingHistoryHeader(true);
+    const textToSpeak = locale === 'ha' ? 'Tarihi. Bayanan bincike da aka adana.' : 'History. Saved diagnostic screenings.';
+    await voiceService.speak(textToSpeak, locale);
+    setIsSpeakingHistoryHeader(false);
+  };
 
   const filteredRecords = records.filter((r) =>
     filter === 'all' ? true : r.type === filter
@@ -64,11 +77,25 @@ export const HistoryScreen: React.FC<HistoryScreenProps> = ({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-[#1f7a4c]">
-            {t(locale, 'history')}
-          </h1>
+          <div className="flex items-center space-x-2">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-[#1f7a4c]">
+              {t(locale, 'history')}
+            </h1>
+            <button
+              type="button"
+              onClick={handleSpeakHistoryHeader}
+              className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
+                isSpeakingHistoryHeader
+                  ? 'bg-emerald-600 text-white border-emerald-700 animate-pulse'
+                  : 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100 shadow-2xs'
+              }`}
+              title={locale === 'ha' ? 'Karanta da Murya' : 'Read Aloud'}
+            >
+              <Volume2 className="w-4 h-4" />
+            </button>
+          </div>
           <p className="text-xs sm:text-sm text-slate-600 mt-0.5">
-            {records.length} saved diagnostic screenings
+            {records.length} {locale === 'ha' ? 'bayanan binciken da aka adana' : 'saved diagnostic screenings'}
           </p>
         </div>
 

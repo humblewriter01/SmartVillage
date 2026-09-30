@@ -47,6 +47,23 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     setTimeout(() => setToastMessage(null), 3500);
   };
 
+  const [isSpeakingHero, setIsSpeakingHero] = useState(false);
+
+  const handleSpeakHero = async () => {
+    if (isSpeakingHero) {
+      voiceService.stopSpeaking();
+      setIsSpeakingHero(false);
+      return;
+    }
+    setIsSpeakingHero(true);
+    const textToSpeak =
+      locale === 'ha'
+        ? 'Taimako ba tare da intanet ba ga gonaki da iyalai masu lafiya. Danna ko yi magana da murya domin duba amfanin gona, lafiya, ruwa, dabbobi da yanayin noma.'
+        : 'Offline help for healthier farms and families. Tap or speak in English or Hausa for crop health, symptom triage, water purity, livestock checks and maps.';
+    await voiceService.speak(textToSpeak, locale);
+    setIsSpeakingHero(false);
+  };
+
   const handleVoiceListen = async () => {
     if (isListening) {
       const rec = await voiceService.stopListening();
@@ -123,25 +140,20 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             </span>
 
             <div className="flex items-center space-x-2">
-              {recordedVoiceUrl && (
-                <button
-                  type="button"
-                  onClick={() =>
-                    voiceService.playAudioUrl(
-                      recordedVoiceUrl,
-                      locale === 'ha'
-                        ? 'Barka dai, an dauki muryarka cikin nasara a SmartVillage'
-                        : 'Welcome, your voice note was recorded successfully in SmartVillage',
-                      locale === 'ha' ? 'ha' : 'en'
-                    )
-                  }
-                  className="flex items-center space-x-1 px-2.5 py-1.5 rounded-full text-xs font-bold bg-white/20 hover:bg-white/30 text-white backdrop-blur-xs transition-all cursor-pointer shadow-xs active:scale-95"
-                  title={locale === 'ha' ? 'Saurari muryarka' : 'Play recorded voice'}
-                >
-                  <Volume2 className="w-3.5 h-3.5" />
-                  <span>{locale === 'ha' ? 'Saurari Murya' : 'Play Voice'}</span>
-                </button>
-              )}
+              {/* Read Aloud Button (Replaced old playback icon) */}
+              <button
+                type="button"
+                onClick={handleSpeakHero}
+                className={`flex items-center space-x-1 px-2.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-95 ${
+                  isSpeakingHero
+                    ? 'bg-emerald-400 text-emerald-950 animate-pulse'
+                    : 'bg-white/20 hover:bg-white/30 text-white backdrop-blur-xs'
+                }`}
+                title={locale === 'ha' ? 'Karanta da Murya' : 'Read Aloud'}
+              >
+                <Volume2 className="w-3.5 h-3.5" />
+                <span>{locale === 'ha' ? 'Saurara' : 'Listen'}</span>
+              </button>
 
               {/* Grandma Mic Button */}
               <button
