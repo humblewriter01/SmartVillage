@@ -271,10 +271,10 @@ export const CropScreen: React.FC<CropScreenProps> = ({
         };
       } else if (photoUrl) {
         // Offline vision analysis prioritized for the selected crop
-        r = await analyzeCropImage(photoUrl, selectedCropId, spokenTranscript);
+        r = await analyzeCropImage(photoUrl, selectedCropId);
       } else {
-        // Diagnosis based on selected crop and spoken symptoms
-        r = diagnoseCropSelection(selectedCropId, undefined, spokenTranscript);
+        // Diagnosis based on selected crop
+        r = diagnoseCropSelection(selectedCropId, undefined);
       }
 
       setResult(r);

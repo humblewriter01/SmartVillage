@@ -6,7 +6,7 @@ import { Capacitor } from '@capacitor/core';
 import { speakText, stopSpeakingText } from './ttsService';
 
 export type VoiceMode = 'developer' | 'system';
-export type VoiceCategory = 'greeting' | 'crop' | 'health';
+export type VoiceCategory = 'greeting' | 'crop' | 'health' | 'livestock' | 'water' | 'soil' | 'weather';
 
 export interface VoiceContext {
   type: 'crop' | 'health' | 'livestock' | 'water' | 'general';

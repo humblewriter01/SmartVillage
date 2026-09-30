@@ -10,6 +10,7 @@ import {
   X,
   HeartPulse,
   RotateCcw,
+  Activity,
 } from 'lucide-react';
 import { Language, t } from '../utils/translations';
 import {
@@ -337,49 +338,6 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
           placeholder={t(locale, 'symptomsHint')}
           className="w-full p-3.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent shadow-2xs"
         />
-
-        {/* Recorded Voice Note Card */}
-        {recordedVoiceUrl && (
-          <div className="p-3 bg-red-50 rounded-2xl border border-red-200 text-xs text-slate-800 flex items-center justify-between gap-2 shadow-2xs">
-            <div className="flex items-center space-x-2 min-w-0">
-              <div className="w-7 h-7 rounded-lg bg-red-100 flex items-center justify-center text-red-700 shrink-0">
-                <Volume2 className="w-4 h-4" />
-              </div>
-              <div className="min-w-0">
-                <span className="font-black text-red-950 block">
-                  {locale === 'ha' ? 'Muryar da ka Ɗauka' : 'Your Recorded Voice Note'}
-                </span>
-                <span className="text-[11px] text-slate-600 truncate block max-w-[190px] sm:max-w-xs">
-                  {symptoms ? `"${symptoms}"` : locale === 'ha' ? 'Muryar alamun lafiya' : 'Health voice note'}
-                </span>
-              </div>
-            </div>
-            <div className="flex items-center space-x-2 shrink-0">
-              <button
-                type="button"
-                onClick={() =>
-                  voiceService.playAudioUrl(
-                    recordedVoiceUrl,
-                    symptoms || (locale === 'ha' ? 'Muryar alamomin lafiya da aka ɗauka' : 'Recorded health symptoms voice note'),
-                    locale === 'ha' ? 'ha' : 'en'
-                  )
-                }
-                className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-black bg-red-700 hover:bg-red-800 text-white transition-all cursor-pointer shadow-xs active:scale-95"
-                title={locale === 'ha' ? 'Saurari muryar' : 'Play recorded voice'}
-              >
-                <Volume2 className="w-3.5 h-3.5" />
-                <span>{locale === 'ha' ? 'Saurari Murya' : 'Play Voice'}</span>
-              </button>
-              <button
-                onClick={() => setRecordedVoiceUrl(null)}
-                className="text-slate-400 hover:text-slate-700 text-xs cursor-pointer p-1.5 rounded-lg hover:bg-slate-200/60"
-                title={locale === 'ha' ? 'Goge muryar' : 'Remove recording'}
-              >
-                ✕
-              </button>
-            </div>
-          </div>
-        )}
 
         {/* Quick Symptom Chips */}
         <div className="flex flex-wrap gap-1.5 pt-1">
