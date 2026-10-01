@@ -62,6 +62,8 @@ export const PlantingCalendarScreen: React.FC<PlantingCalendarScreenProps> = ({ 
     plantingCalendarService.isHarvestActive(c, selectedMonth)
   );
 
+  const [isSpeakingHarvest, setIsSpeakingHarvest] = useState(false);
+
   const handleSpeakSeason = async () => {
     if (isSpeaking) {
       voiceService.stopSpeaking();
@@ -69,6 +71,7 @@ export const PlantingCalendarScreen: React.FC<PlantingCalendarScreenProps> = ({ 
       return;
     }
 
+    voiceService.stopSpeaking();
     setIsSpeaking(true);
     const seasonText = locale === 'ha' ? seasonInfo.name_hausa : seasonInfo.name;
     const descText = locale === 'ha' ? seasonInfo.description_hausa : seasonInfo.description;
@@ -89,6 +92,47 @@ export const PlantingCalendarScreen: React.FC<PlantingCalendarScreenProps> = ({ 
       showToast(warning);
     });
     setIsSpeaking(false);
+  };
+
+  const handleSpeakHarvestList = async () => {
+    if (isSpeakingHarvest) {
+      voiceService.stopSpeaking();
+      setIsSpeakingHarvest(false);
+      return;
+    }
+
+    voiceService.stopSpeaking();
+    setIsSpeakingHarvest(true);
+
+    if (activeHarvestCrops.length === 0) {
+      const emptyText =
+        locale === 'ha'
+          ? 'Babu amfanin gona da ake girbi a wannan watan.'
+          : 'No crops are ready for harvest this month.';
+      await voiceService.speak(emptyText, locale);
+      setIsSpeakingHarvest(false);
+      return;
+    }
+
+    const monthName =
+      locale === 'ha'
+        ? MONTHS[selectedMonth - 1].hausa
+        : MONTHS[selectedMonth - 1].full;
+
+    const headerText =
+      locale === 'ha'
+        ? `Amfanin gonar da ake girbi a watan ${monthName}.`
+        : `Crops ready for harvest in ${monthName}.`;
+
+    const cropList = activeHarvestCrops
+      .map((c) => (locale === 'ha' ? `${c.hausa_name} (${c.name})` : `${c.name} (${c.hausa_name})`))
+      .join('. ');
+
+    const fullSpeech = `${headerText} ${cropList}.`;
+    await voiceService.speak(fullSpeech, locale, (warning) => {
+      showToast(warning);
+    });
+    setIsSpeakingHarvest(false);
   };
 
   return (
@@ -269,13 +313,32 @@ export const PlantingCalendarScreen: React.FC<PlantingCalendarScreenProps> = ({ 
       </div>
 
       {/* Harvest Window in this Month */}
-      {activeHarvestCrops.length > 0 && (
-        <div className="space-y-2 pt-2">
+      <div className="space-y-2 pt-2">
+        <div className="flex items-center justify-between">
           <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
             {locale === 'ha'
               ? `Amfanin Gonar da Ake Girbi a Watan ${MONTHS[selectedMonth - 1].hausa}:`
               : `Crops Ready for Harvest in ${MONTHS[selectedMonth - 1].full}:`}
           </h3>
+
+          <button
+            type="button"
+            onClick={handleSpeakHarvestList}
+            className={`p-1.5 rounded-lg border transition-all cursor-pointer flex items-center gap-1 active:scale-95 ${
+              isSpeakingHarvest
+                ? 'bg-amber-400 text-amber-950 border-amber-500 animate-pulse'
+                : 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-200'
+            }`}
+            title={locale === 'ha' ? 'Saurari Amfanin Girbi' : 'Read Aloud Harvest List'}
+          >
+            <Volume2 className={`w-3.5 h-3.5 ${isSpeakingHarvest ? 'animate-bounce text-amber-950' : ''}`} />
+            <span className="text-[10px] font-bold">
+              {locale === 'ha' ? 'Saurara' : 'Listen'}
+            </span>
+          </button>
+        </div>
+
+        {activeHarvestCrops.length > 0 ? (
           <div className="flex flex-wrap gap-2">
             {activeHarvestCrops.map((crop) => {
               const activeHarvestWindow = plantingCalendarService.getActiveHarvestWindow(crop, selectedMonth);
@@ -300,8 +363,14 @@ export const PlantingCalendarScreen: React.FC<PlantingCalendarScreenProps> = ({ 
               );
             })}
           </div>
-        </div>
-      )}
+        ) : (
+          <div className="bg-white rounded-xl p-3.5 border border-slate-200 text-xs text-slate-500 italic">
+            {locale === 'ha'
+              ? 'Babu amfanin gona da ake girbi a wannan watan.'
+              : 'No crops are ready for harvest this month.'}
+          </div>
+        )}
+      </div>
     </div>
   );
 };

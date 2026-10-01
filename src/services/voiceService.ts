@@ -463,11 +463,11 @@ export const voiceService = {
     try {
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
       if (!AudioCtx) return;
-      if (!currentAudioContext) {
+      if (!currentAudioContext || currentAudioContext.state === 'closed') {
         currentAudioContext = new AudioCtx();
       }
       if (currentAudioContext.state === 'suspended') {
-        currentAudioContext.resume();
+        currentAudioContext.resume().catch(() => {});
       }
 
       const ctx = currentAudioContext;

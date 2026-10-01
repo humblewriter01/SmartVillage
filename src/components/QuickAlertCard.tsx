@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   AlertTriangle,
   MapPin,
@@ -34,7 +34,7 @@ interface DistressType {
 const DISTRESS_TYPES: DistressType[] = [
   {
     id: 'medical',
-    nameEn: 'Medical / Snakebite',
+    nameEn: 'Medical Emergency / Snake Bite',
     nameHa: 'Gaggawar Lafiya / Cizon Maciji',
     emoji: '🚑',
     defaultMessageEn: 'Critical medical emergency / snakebite in the field! Urgent medical help needed.',
@@ -42,7 +42,7 @@ const DISTRESS_TYPES: DistressType[] = [
   },
   {
     id: 'security',
-    nameEn: 'Security Alert / Threat',
+    nameEn: 'Security Alert / Kidnapping',
     nameHa: 'Faɗakarwar Tsaro / Neman Ɗauki',
     emoji: '🛡️',
     defaultMessageEn: 'Security threat / distress at farmland! Immediate community or security assistance needed.',
@@ -50,7 +50,7 @@ const DISTRESS_TYPES: DistressType[] = [
   },
   {
     id: 'breakdown',
-    nameEn: 'Stranded / Tractor Breakdown',
+    nameEn: 'Stranding / Vehicle Breakdown',
     nameHa: 'Makalewa / Lalacewar Taraktoci',
     emoji: '🚜',
     defaultMessageEn: 'Machinery breakdown / vehicle stranded in remote farmland. Assistance required.',
@@ -58,7 +58,7 @@ const DISTRESS_TYPES: DistressType[] = [
   },
   {
     id: 'fire',
-    nameEn: 'Farm Fire Outbreak',
+    nameEn: 'Bush / Farm Fire',
     nameHa: 'Gobarar Daji / Gona',
     emoji: '🔥',
     defaultMessageEn: 'Wildfire / bushfire threatening farms and crop storage! Urgent firefighting help needed.',
@@ -66,7 +66,7 @@ const DISTRESS_TYPES: DistressType[] = [
   },
   {
     id: 'flood',
-    nameEn: 'Flash Flood / Dam Overflow',
+    nameEn: 'Farm Flood',
     nameHa: 'Ambaliyar Ruwa a Gona',
     emoji: '🌊',
     defaultMessageEn: 'Flash flood or river overflow submerging farm fields! Urgent evacuation or flood response needed.',
@@ -105,6 +105,12 @@ export const QuickAlertCard: React.FC<QuickAlertCardProps> = ({ locale }) => {
   const [copied, setCopied] = useState(false);
   const [isAlarmPlaying, setIsAlarmPlaying] = useState(false);
   const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const oscillatorRef = useRef<OscillatorNode | null>(null);
+  const sirenTimeoutRef = useRef<number | null>(null);
+  const [isSpeakingSosHeader, setIsSpeakingSosHeader] = useState(false);
+  const [isSpeakingInnerBox, setIsSpeakingInnerBox] = useState(false);
+  const [speakingTypeId, setSpeakingTypeId] = useState<string | null>(null);
 
   // Automatically fetch GPS when card is mounted or requested
   const fetchLocation = () => {
@@ -231,25 +237,64 @@ Please send help immediately! / A tura agaji cikin gaggawa!`;
     }
   };
 
+  // Safely stop siren synthesizer and release audio resources
+  const stopSiren = () => {
+    if (sirenTimeoutRef.current) {
+      clearTimeout(sirenTimeoutRef.current);
+      sirenTimeoutRef.current = null;
+    }
+    if (oscillatorRef.current) {
+      try {
+        oscillatorRef.current.stop();
+        oscillatorRef.current.disconnect();
+      } catch {}
+      oscillatorRef.current = null;
+    }
+    if (audioContextRef.current) {
+      try {
+        if (audioContextRef.current.state !== 'closed') {
+          audioContextRef.current.close().catch(() => {});
+        }
+      } catch {}
+      audioContextRef.current = null;
+    }
+    if (audioContext) {
+      try {
+        if (audioContext.state !== 'closed') {
+          audioContext.close().catch(() => {});
+        }
+      } catch {}
+      setAudioContext(null);
+    }
+    setIsAlarmPlaying(false);
+  };
+
+  // Cleanup on unmount to prevent leaks or closed AudioContext errors
+  useEffect(() => {
+    return () => {
+      stopSiren();
+    };
+  }, []);
+
   // Audible Siren Beep via Web Audio API (100% offline, synthetic synthesizer)
   const toggleSiren = () => {
     if (isAlarmPlaying) {
-      if (audioContext) {
-        audioContext.close();
-        setAudioContext(null);
-      }
-      setIsAlarmPlaying(false);
+      stopSiren();
       return;
     }
 
     try {
+      stopSiren();
       const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      if (!AudioCtx) return;
       const ctx = new AudioCtx();
+      audioContextRef.current = ctx;
       setAudioContext(ctx);
       setIsAlarmPlaying(true);
 
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
+      oscillatorRef.current = osc;
 
       osc.type = 'sawtooth';
       gain.gain.setValueAtTime(0.3, ctx.currentTime);
@@ -267,16 +312,11 @@ Please send help immediately! / A tura agaji cikin gaggawa!`;
       osc.start();
 
       // Automatically stop after 6.4 seconds
-      setTimeout(() => {
-        try {
-          osc.stop();
-          ctx.close();
-        } catch {}
-        setIsAlarmPlaying(false);
-        setAudioContext(null);
+      sirenTimeoutRef.current = window.setTimeout(() => {
+        stopSiren();
       }, 6400);
     } catch {
-      setIsAlarmPlaying(false);
+      stopSiren();
     }
   };
 
@@ -289,30 +329,93 @@ Please send help immediately! / A tura agaji cikin gaggawa!`;
     voiceService.speak(speech, locale);
   };
 
+  // Read-Aloud for SOS Header
+  const handleSpeakSosHeader = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isSpeakingSosHeader) {
+      voiceService.stopSpeaking();
+      setIsSpeakingSosHeader(false);
+      return;
+    }
+    voiceService.stopSpeaking();
+    setIsSpeakingSosHeader(true);
+    const textToSpeak = locale === 'ha' ? 'S.O.S. Faɗakarwar Gaggawa.' : 'SOS. Emergency Alert.';
+    await voiceService.speak(textToSpeak, locale);
+    setIsSpeakingSosHeader(false);
+  };
+
+  // Read-Aloud for each Emergency Type
+  const handleSpeakEmergencyType = async (type: DistressType, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (speakingTypeId === type.id) {
+      voiceService.stopSpeaking();
+      setSpeakingTypeId(null);
+      return;
+    }
+    voiceService.stopSpeaking();
+    setSpeakingTypeId(type.id);
+    const textToSpeak = locale === 'ha' ? type.nameHa : type.nameEn;
+    await voiceService.speak(textToSpeak, locale);
+    setSpeakingTypeId(null);
+  };
+
+  // Read-Aloud for inner GPS & Contact box
+  const handleSpeakInnerBox = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isSpeakingInnerBox) {
+      voiceService.stopSpeaking();
+      setIsSpeakingInnerBox(false);
+      return;
+    }
+    voiceService.stopSpeaking();
+    setIsSpeakingInnerBox(true);
+    const textToSpeak =
+      locale === 'ha'
+        ? `Wurin GPS na gaggawa: latitude ${lat}, longitude ${lng}. Lambar tuntuba ta gaggawa: ${emergencyPhone}.`
+        : `Emergency GPS location: latitude ${lat}, longitude ${lng}. Emergency contact: ${emergencyPhone}.`;
+    await voiceService.speak(textToSpeak, locale);
+    setIsSpeakingInnerBox(false);
+  };
+
   return (
     <div className="bg-gradient-to-br from-rose-900 via-red-800 to-rose-950 text-white rounded-3xl p-4 sm:p-5 shadow-lg shadow-rose-950/30 border border-rose-600/40 relative overflow-hidden transition-all">
       {/* Background Decorative Pulsing Radar Glow */}
       <div className="absolute -top-12 -right-12 w-40 h-40 bg-rose-500/20 rounded-full blur-2xl pointer-events-none" />
 
       {/* Header Bar */}
-      <div className="relative z-10 flex items-center justify-between">
-        <div className="flex items-center space-x-2.5">
-          <div className="relative flex items-center justify-center">
+      <div className="relative z-10 flex items-start sm:items-center justify-between gap-2">
+        <div className="flex items-center space-x-2 sm:space-x-2.5 min-w-0 flex-1">
+          <div className="relative flex items-center justify-center shrink-0">
             <span className="w-3 h-3 bg-rose-400 rounded-full animate-ping absolute" />
             <div className="w-9 h-9 bg-rose-600 text-white rounded-2xl flex items-center justify-center shadow-md border border-rose-400/50">
               <ShieldAlert className="w-5 h-5 animate-pulse" />
             </div>
           </div>
-          <div>
-            <div className="flex items-center space-x-2">
-              <h2 className="font-black text-sm sm:text-base tracking-wide text-white uppercase flex items-center gap-1.5">
-                <span>{locale === 'ha' ? 'S.O.S Faɗakarwar Gaggawa' : 'Quick Alert SOS'}</span>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <h2 className="font-black text-xs sm:text-base tracking-wide text-white uppercase flex items-center gap-1">
+                <span>{locale === 'ha' ? 'S.O.S — Faɗakarwar Gaggawa' : 'SOS — Emergency Alert'}</span>
               </h2>
-              <span className="text-[10px] font-extrabold bg-rose-500/80 px-2 py-0.5 rounded-full uppercase tracking-wider text-rose-100 border border-rose-400/40">
+
+              {/* Read Aloud Icon for SOS Header */}
+              <button
+                type="button"
+                onClick={handleSpeakSosHeader}
+                className={`p-1 sm:p-1.5 rounded-lg border transition-all cursor-pointer active:scale-95 flex items-center justify-center shrink-0 ${
+                  isSpeakingSosHeader
+                    ? 'bg-amber-400 text-slate-900 border-amber-300 animate-pulse'
+                    : 'bg-white/10 hover:bg-white/20 text-rose-100 border-white/20'
+                }`}
+                title={locale === 'ha' ? 'Karanta da Murya' : 'Read Aloud'}
+              >
+                <Volume2 className={`w-3 h-3 sm:w-3.5 sm:h-3.5 ${isSpeakingSosHeader ? 'animate-bounce text-slate-900' : ''}`} />
+              </button>
+
+              <span className="text-[9px] sm:text-[10px] font-extrabold bg-rose-500/80 px-1.5 sm:px-2 py-0.5 rounded-full uppercase tracking-wider text-rose-100 border border-rose-400/40 shrink-0">
                 Offline SMS
               </span>
             </div>
-            <p className="text-[11px] text-rose-200 mt-0.5 line-clamp-1">
+            <p className="text-[11px] text-rose-200 mt-0.5 truncate">
               {locale === 'ha'
                 ? 'Aika coordinates na GPS da saƙon neman ɗauki ta SMS ba tare da intanet ba'
                 : 'Broadcast live GPS coordinates & distress signal via SMS without internet'}
@@ -323,7 +426,7 @@ Please send help immediately! / A tura agaji cikin gaggawa!`;
         {/* Toggle Expand / Collapse Button */}
         <button
           onClick={() => setIsExpanded(!isExpanded)}
-          className="bg-white/10 hover:bg-white/20 active:scale-95 text-white px-2.5 py-1.5 rounded-xl border border-white/20 text-xs font-bold flex items-center space-x-1 cursor-pointer transition-all shrink-0"
+          className="bg-white/10 hover:bg-white/20 active:scale-95 text-white px-2 sm:px-2.5 py-1.5 rounded-xl border border-white/20 text-xs font-bold flex items-center space-x-1 cursor-pointer transition-all shrink-0 ml-1"
         >
           <span>{isExpanded ? (locale === 'ha' ? 'Rage' : 'Collapse') : (locale === 'ha' ? 'Faɗaɗa' : 'Open')}</span>
           {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
@@ -356,6 +459,19 @@ Please send help immediately! / A tura agaji cikin gaggawa!`;
         </div>
 
         <div className="flex items-center space-x-2">
+          {/* Read Aloud Inner Box Info */}
+          <button
+            onClick={handleSpeakInnerBox}
+            title={locale === 'ha' ? 'Karanta bayanan akwati da murya' : 'Read box details aloud'}
+            className={`p-2 rounded-xl transition-all cursor-pointer active:scale-95 shrink-0 border ${
+              isSpeakingInnerBox
+                ? 'bg-amber-400 text-slate-900 border-amber-300 animate-pulse'
+                : 'bg-white/10 hover:bg-white/20 text-rose-100 border-white/15'
+            }`}
+          >
+            <Volume2 className={`w-4 h-4 ${isSpeakingInnerBox ? 'animate-bounce text-slate-900' : ''}`} />
+          </button>
+
           {/* Refresh GPS */}
           <button
             onClick={fetchLocation}
@@ -398,24 +514,45 @@ Please send help immediately! / A tura agaji cikin gaggawa!`;
             <label className="text-[11px] font-bold uppercase tracking-wider text-rose-200 block mb-2">
               {locale === 'ha' ? 'Zaɓi Nau\'in Gaggawa:' : 'Select Distress Reason:'}
             </label>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
               {DISTRESS_TYPES.map((type) => {
                 const isSelected = type.id === selectedDistressId;
+                const isSpeakingThis = speakingTypeId === type.id;
                 return (
-                  <button
+                  <div
                     key={type.id}
-                    onClick={() => setSelectedDistressId(type.id)}
-                    className={`p-2.5 rounded-xl text-left border transition-all cursor-pointer flex items-center space-x-2 ${
+                    className={`p-2 rounded-xl text-left border transition-all flex items-center justify-between gap-1.5 ${
                       isSelected
                         ? 'bg-white text-rose-950 border-white font-extrabold shadow-sm'
                         : 'bg-rose-950/60 hover:bg-rose-900/60 text-rose-200 border-rose-700/60 text-xs'
                     }`}
                   >
-                    <span className="text-lg shrink-0">{type.emoji}</span>
-                    <span className="text-xs truncate">
-                      {locale === 'ha' ? type.nameHa : type.nameEn}
-                    </span>
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedDistressId(type.id)}
+                      className="flex items-center space-x-2 flex-1 min-w-0 cursor-pointer text-left py-1"
+                    >
+                      <span className="text-lg shrink-0">{type.emoji}</span>
+                      <span className="text-xs truncate">
+                        {locale === 'ha' ? type.nameHa : type.nameEn}
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={(e) => handleSpeakEmergencyType(type, e)}
+                      className={`p-1.5 rounded-lg shrink-0 transition-all cursor-pointer active:scale-95 ${
+                        isSpeakingThis
+                          ? 'bg-amber-400 text-rose-950 animate-pulse'
+                          : isSelected
+                          ? 'hover:bg-rose-100 text-rose-700'
+                          : 'hover:bg-rose-800 text-rose-300'
+                      }`}
+                      title={locale === 'ha' ? 'Karanta da Murya' : 'Read Aloud'}
+                    >
+                      <Volume2 className={`w-3.5 h-3.5 ${isSpeakingThis ? 'animate-bounce' : ''}`} />
+                    </button>
+                  </div>
                 );
               })}
             </div>

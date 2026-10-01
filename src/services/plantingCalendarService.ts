@@ -94,11 +94,11 @@ export const CROP_CALENDAR: CropCalendarSchedule[] = [
     id: 'maize',
     name: 'Maize',
     hausa_name: 'Masara',
-    seasonType: 'rainfed',
+    seasonType: 'both',
     plantingStartMonth: 5, // May 15
     plantingStartDay: 15,
-    plantingEndMonth: 6, // June 10
-    plantingEndDay: 10,
+    plantingEndMonth: 6, // June 20
+    plantingEndDay: 20,
     harvestStartMonth: 9,
     harvestEndMonth: 10,
     plantingWindows: [
@@ -108,7 +108,15 @@ export const CROP_CALENDAR: CropCalendarSchedule[] = [
         startMonth: 5,
         startDay: 15,
         endMonth: 6,
-        endDay: 10,
+        endDay: 20,
+      },
+      {
+        seasonLabelEn: 'Dry Season (Fadama / Irrigated)',
+        seasonLabelHa: 'Noman Fadama da Rani',
+        startMonth: 11,
+        startDay: 15,
+        endMonth: 12,
+        endDay: 31,
       },
     ],
     harvestWindows: [
@@ -118,25 +126,31 @@ export const CROP_CALENDAR: CropCalendarSchedule[] = [
         startMonth: 9,
         endMonth: 10,
       },
+      {
+        seasonLabelEn: 'Dry Season Harvest',
+        seasonLabelHa: 'Girbin Rani',
+        startMonth: 3,
+        endMonth: 5,
+      },
     ],
     carePeriodWeeks: 3,
-    idealRainfall: '600 - 900 mm',
-    idealTemp: '21°C - 30°C',
-    advice: 'Wait for at least 2 consecutive soaking rains (>25mm total) before planting to avoid seed scorching in dry soil.',
-    advice_hausa: 'A jira a samu ruwan sama mai ƙarfi sau 2 a jere kafin a shuka masara don kada ƙasa mai zafi ta ƙona irin.',
+    idealRainfall: '600 - 900 mm / Irrigated furrow',
+    idealTemp: '21°C - 32°C',
+    advice: 'Wait for at least 2 consecutive soaking rains (>25mm total) before planting in Damina. For dry season irrigated maize, sow in Nov-Dec for harvest in Mar-May.',
+    advice_hausa: 'A jira a samu ruwan sama mai ƙarfi sau 2 a jere kafin a shuka masara a damina. Don noman rani kuma, a shuka a Nuwamba zuwa Disamba don girbi a Maris zuwa Mayu.',
     babyPlantCare: 'Weed at 2 and 5 weeks after sprouting. Apply basal NPK 15:15:15 at planting, and topdress with Urea at 4 weeks.',
     babyPlantCare_hausa: 'Yi ciyawa a mako na 2 da na 5. Sanya takin NPK yayin shuka, sannan a sanya takin Urea a mako na 4.',
   },
   {
     id: 'tomato',
-    name: 'Tomato (Fadama / Dry Season)',
+    name: 'Tomato',
     hausa_name: 'Tumatir',
     seasonType: 'both',
     plantingStartMonth: 11, // Nov 15
     plantingStartDay: 15,
     plantingEndMonth: 2, // Feb 28
     plantingEndDay: 28,
-    harvestStartMonth: 3,
+    harvestStartMonth: 2,
     harvestEndMonth: 5,
     plantingWindows: [
       {
@@ -147,20 +161,34 @@ export const CROP_CALENDAR: CropCalendarSchedule[] = [
         endMonth: 2,
         endDay: 28,
       },
+      {
+        seasonLabelEn: 'Rainy Season (Damina)',
+        seasonLabelHa: 'Noman Damina',
+        startMonth: 5,
+        startDay: 15,
+        endMonth: 7,
+        endDay: 15,
+      },
     ],
     harvestWindows: [
       {
         seasonLabelEn: 'Dry Season Harvest',
         seasonLabelHa: 'Girbin Rani',
-        startMonth: 3,
+        startMonth: 2,
         endMonth: 5,
+      },
+      {
+        seasonLabelEn: 'Rainy Season Harvest',
+        seasonLabelHa: 'Girbin Damina',
+        startMonth: 8,
+        endMonth: 10,
       },
     ],
     carePeriodWeeks: 3,
-    idealRainfall: 'Furrow / Drip irrigation',
-    idealTemp: '18°C - 29°C',
-    advice: 'Dry season planting reduces severe early and late blight pressure typical of the rainy season.',
-    advice_hausa: 'Nomawa a lokacin rani yana rage cututtukan da ruwan sama ke jawowa sosai.',
+    idealRainfall: 'Furrow / Drip irrigation or well-drained raised beds',
+    idealTemp: '18°C - 30°C',
+    advice: 'Dry season planting reduces severe early and late blight pressure. For rainy season, transplant nursery seedlings onto high ridges with good drainage in May–July for August–October harvest.',
+    advice_hausa: 'Nomawa a lokacin rani yana rage cututtuka sosai. A lokacin damina, a dashe a kan manyan kunyoyi masu magudanar ruwa a watannin Mayu zuwa Yuli don girbi a Agusta zuwa Oktoba.',
     babyPlantCare: 'Stake young plants with bamboo or reeds at 3 weeks to keep foliage off wet soil and mulch heavily with dry grass.',
     babyPlantCare_hausa: 'Ɗaura jikin sandar kara a mako na 3 don ganye ya nisanci ƙasa mai laima, kuma a shimfiɗa ciyawa a ƙasa.',
   },
@@ -168,7 +196,7 @@ export const CROP_CALENDAR: CropCalendarSchedule[] = [
     id: 'rice',
     name: 'Rice (Lowland / Upland)',
     hausa_name: 'Shinkafa',
-    seasonType: 'rainfed',
+    seasonType: 'both',
     plantingStartMonth: 6, // June 15
     plantingStartDay: 15,
     plantingEndMonth: 7, // July 25
@@ -184,6 +212,14 @@ export const CROP_CALENDAR: CropCalendarSchedule[] = [
         endMonth: 7,
         endDay: 25,
       },
+      {
+        seasonLabelEn: 'Dry Season Irrigated Rice (Shinkafar Rani)',
+        seasonLabelHa: 'Noman Shinkafar Rani (Fadama)',
+        startMonth: 12,
+        startDay: 1,
+        endMonth: 2,
+        endDay: 20,
+      },
     ],
     harvestWindows: [
       {
@@ -192,12 +228,18 @@ export const CROP_CALENDAR: CropCalendarSchedule[] = [
         startMonth: 10,
         endMonth: 11,
       },
+      {
+        seasonLabelEn: 'Dry Season Harvest',
+        seasonLabelHa: 'Girbin Rani',
+        startMonth: 4,
+        endMonth: 5,
+      },
     ],
     carePeriodWeeks: 4,
-    idealRainfall: '900 - 1400 mm',
+    idealRainfall: '900 - 1400 mm / Irrigated basin',
     idealTemp: '24°C - 32°C',
-    advice: 'Direct seed in puddled lowlands or transplant 21-day nursery seedlings when steady flooding is established.',
-    advice_hausa: 'Dashe shinkafar bayan kwanaki 21 daga reno yayin da ruwa ya fara tsayawa a fadama.',
+    advice: 'Direct seed in puddled lowlands or transplant 21-day nursery seedlings when steady flooding is established. In dry season (Fadama), transplant in Dec–Feb for abundant April–May harvest.',
+    advice_hausa: 'Dashe shinkafar bayan kwanaki 21 daga reno yayin da ruwa ya fara tsayawa a fadama. A noman rani kuma, a dashe a Disamba zuwa Fabrairu don girbi a Afirilu zuwa Mayu.',
     babyPlantCare: 'Maintain 3-5 cm water layer in lowland paddies to suppress weeds naturally. Apply Urea in two splits.',
     babyPlantCare_hausa: 'Kula da tsayin ruwa na santimita 3-5 a fadama don hana ciyawa fita. Zuba takin Urea sau biyu.',
   },
@@ -242,11 +284,11 @@ export const CROP_CALENDAR: CropCalendarSchedule[] = [
     id: 'cowpea',
     name: 'Cowpeas (Beans)',
     hausa_name: 'Wake',
-    seasonType: 'rainfed',
+    seasonType: 'both',
     plantingStartMonth: 6, // June 1
     plantingStartDay: 1,
-    plantingEndMonth: 7, // July 1
-    plantingEndDay: 1,
+    plantingEndMonth: 7, // July 15
+    plantingEndDay: 15,
     harvestStartMonth: 10,
     harvestEndMonth: 11,
     plantingWindows: [
@@ -256,7 +298,15 @@ export const CROP_CALENDAR: CropCalendarSchedule[] = [
         startMonth: 6,
         startDay: 1,
         endMonth: 7,
-        endDay: 1,
+        endDay: 15,
+      },
+      {
+        seasonLabelEn: 'Dry Season / Fadama (Waken Rani)',
+        seasonLabelHa: 'Noman Fadama da Rani',
+        startMonth: 1,
+        startDay: 15,
+        endMonth: 2,
+        endDay: 28,
       },
     ],
     harvestWindows: [
@@ -266,12 +316,18 @@ export const CROP_CALENDAR: CropCalendarSchedule[] = [
         startMonth: 10,
         endMonth: 11,
       },
+      {
+        seasonLabelEn: 'Dry Season Harvest',
+        seasonLabelHa: 'Girbin Rani',
+        startMonth: 4,
+        endMonth: 5,
+      },
     ],
     carePeriodWeeks: 3,
-    idealRainfall: '400 - 650 mm',
+    idealRainfall: '400 - 650 mm / Furrow irrigation for dry season',
     idealTemp: '24°C - 32°C',
-    advice: 'Can be planted as sole crop in late June or intercropped with sorghum. Avoid excessive nitrogen fertilizer.',
-    advice_hausa: 'Za a iya shuka shi kaɗai a ƙarshen Yuni ko a haɗa da dawa. Kada a sanya takin zamani mai nitrogen da yawa.',
+    advice: 'Can be planted as sole crop in late June or intercropped with sorghum. For dry season fadama cowpea, plant in Jan-Feb with light irrigation for April-May harvest.',
+    advice_hausa: 'Za a iya shuka shi kaɗai a ƙarshen Yuni ko a haɗa da dawa. A noman rani a fadama, a shuka a Janairu zuwa Fabrairu don girbi a Afirilu zuwa Mayu.',
     babyPlantCare: 'Protect against maruca pod borer and aphids starting at flowering with organic neem or registered bio-pesticide.',
     babyPlantCare_hausa: 'Kare furen wake daga kwarin maruca da kudan wake ta amfani da ruwan dogon yaro yayin fitar fure.',
   },
@@ -284,7 +340,7 @@ export const CROP_CALENDAR: CropCalendarSchedule[] = [
     plantingStartDay: 25,
     plantingEndMonth: 6, // June 20
     plantingEndDay: 20,
-    harvestStartMonth: 10,
+    harvestStartMonth: 9,
     harvestEndMonth: 11,
     plantingWindows: [
       {
@@ -300,7 +356,7 @@ export const CROP_CALENDAR: CropCalendarSchedule[] = [
       {
         seasonLabelEn: 'Rainy Season Harvest',
         seasonLabelHa: 'Girbin Damina',
-        startMonth: 10,
+        startMonth: 9,
         endMonth: 11,
       },
     ],
@@ -395,8 +451,8 @@ export const CROP_CALENDAR: CropCalendarSchedule[] = [
     plantingStartDay: 1,
     plantingEndMonth: 5, // May 31
     plantingEndDay: 31,
-    harvestStartMonth: 2, // 11 months later: Feb - Mar
-    harvestEndMonth: 3,
+    harvestStartMonth: 1, // Jan - Apr
+    harvestEndMonth: 4,
     plantingWindows: [
       {
         seasonLabelEn: 'Start of Rains (Early Damina)',
@@ -409,10 +465,10 @@ export const CROP_CALENDAR: CropCalendarSchedule[] = [
     ],
     harvestWindows: [
       {
-        seasonLabelEn: 'Matured Tubers Harvest (11 months later)',
-        seasonLabelHa: 'Girbin Rogo (Bayan watanni 11)',
-        startMonth: 2,
-        endMonth: 3,
+        seasonLabelEn: 'Matured Tubers Harvest',
+        seasonLabelHa: 'Girbin Rogo',
+        startMonth: 1,
+        endMonth: 4,
       },
     ],
     carePeriodWeeks: 6,
@@ -496,6 +552,12 @@ export const CROP_CALENDAR: CropCalendarSchedule[] = [
         startMonth: 2,
         endMonth: 5,
       },
+      {
+        seasonLabelEn: 'Rainy Season Harvest',
+        seasonLabelHa: 'Girbin Damina',
+        startMonth: 8,
+        endMonth: 10,
+      },
     ],
     carePeriodWeeks: 4,
     idealRainfall: '600 - 1200 mm / Furrow or drip irrigation',
@@ -514,7 +576,7 @@ export const CROP_CALENDAR: CropCalendarSchedule[] = [
     plantingStartDay: 1,
     plantingEndMonth: 6, // June 20
     plantingEndDay: 20,
-    harvestStartMonth: 10,
+    harvestStartMonth: 9,
     harvestEndMonth: 11,
     plantingWindows: [
       {
@@ -530,7 +592,7 @@ export const CROP_CALENDAR: CropCalendarSchedule[] = [
       {
         seasonLabelEn: 'Rainy Season Harvest',
         seasonLabelHa: 'Girbin Damina',
-        startMonth: 10,
+        startMonth: 9,
         endMonth: 11,
       },
     ],

@@ -200,6 +200,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
   };
 
   const [isSpeakingHealthHeader, setIsSpeakingHealthHeader] = useState(false);
+  const [isSpeakingSymptomsText, setIsSpeakingSymptomsText] = useState(false);
 
   const handleSpeakHealthHeader = async () => {
     if (isSpeakingHealthHeader) {
@@ -214,6 +215,26 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
         : 'Health. Check symptoms of fever, vomiting, snake bites, and family health.';
     await voiceService.speak(textToSpeak, locale);
     setIsSpeakingHealthHeader(false);
+  };
+
+  const handleSpeakSymptomsText = async () => {
+    if (isSpeakingSymptomsText) {
+      voiceService.stopSpeaking();
+      setIsSpeakingSymptomsText(false);
+      return;
+    }
+    voiceService.stopSpeaking();
+    setIsSpeakingSymptomsText(true);
+
+    const trimmed = symptoms.trim();
+    const textToSpeak = trimmed
+      ? (locale === 'ha' ? `Alamomin da aka rubuta a cikin akwati: ${trimmed}.` : `Observed symptoms in box: ${trimmed}.`)
+      : (locale === 'ha' ? 'Babu alamomin cuta da aka rubuta a cikin akwatin tukuna.' : 'No symptoms entered in the box yet.');
+
+    await voiceService.speak(textToSpeak, locale, (warning) => {
+      showToast(warning);
+    }, 'health');
+    setIsSpeakingSymptomsText(false);
   };
 
   const addSymptomChip = (chip: { label: string; hausa: string }) => {
@@ -311,9 +332,23 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
       {/* Symptoms Text Area */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-            {t(locale, 'symptoms')}
-          </label>
+          <div className="flex items-center space-x-2">
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+              {t(locale, 'symptoms')}
+            </label>
+            <button
+              type="button"
+              onClick={handleSpeakSymptomsText}
+              className={`p-1 rounded-lg border transition-all cursor-pointer active:scale-95 flex items-center justify-center ${
+                isSpeakingSymptomsText
+                  ? 'bg-rose-600 text-white border-rose-700 animate-pulse'
+                  : 'bg-rose-50 text-rose-800 border-rose-200 hover:bg-rose-100 shadow-2xs'
+              }`}
+              title={locale === 'ha' ? 'Karanta rubutun akwati da murya' : 'Read box text aloud'}
+            >
+              <Volume2 className={`w-3.5 h-3.5 ${isSpeakingSymptomsText ? 'animate-bounce text-white' : 'text-rose-700'}`} />
+            </button>
+          </div>
           <div className="flex items-center space-x-2">
             {symptoms && (
               <button

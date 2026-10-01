@@ -251,12 +251,12 @@ export const waterQualityService = {
   getCleanBoreholeResult(): WaterQualityResult {
     return {
       status: 'clean',
-      turbidityScore: 6,
+      turbidityScore: 8,
       colorAssessment: 'Clear transparent water',
       colorAssessmentHausa: 'Ruwa mai haske da tsabta',
       hasParticles: false,
-      verdictTitle: '✅ Clean Water',
-      verdictTitleHausa: '✅ Ruwa Mai Kyau',
+      verdictTitle: 'Clean – Safe to Drink',
+      verdictTitleHausa: 'Ruwa Mai Kyau',
       advice:
         'Water appears visually clear and free of heavy sediment. For drinking, ensure the container is covered and sanitized. If from an open shallow well, boiling is still recommended.',
       adviceHausa:
@@ -278,8 +278,8 @@ export const waterQualityService = {
       colorAssessment: 'Brownish silt / clay sediment detected',
       colorAssessmentHausa: 'An ga laka ko yashi mai launin kasa',
       hasParticles: true,
-      verdictTitle: '⚠️ Not Clean – Boil Before Use',
-      verdictTitleHausa: '⚠️ Ba shi da Tsabta – Tafasa Kafin Sha',
+      verdictTitle: 'Not Clean – Boil Before Use',
+      verdictTitleHausa: 'Ba shi da Tsabta – Tafasa Kafin Sha',
       advice:
         'High turbidity, silt, and suspended particles detected. DO NOT drink untreated. Settle for 2 hours, filter through clean folded cloth or sand filter, and bring to a rolling boil for 1-3 minutes. Alternatively, apply WaterGuard chlorine drops or flocculant powder.',
       adviceHausa:
@@ -301,8 +301,8 @@ export const waterQualityService = {
       colorAssessment: 'Greenish tint / algae growth detected',
       colorAssessmentHausa: 'An ga launin kore na toka-toka ko ciyawar ruwa',
       hasParticles: true,
-      verdictTitle: '⚠️ Not Clean – Boil Before Use',
-      verdictTitleHausa: '⚠️ Ba shi da Tsabta – Tafasa Kafin Sha',
+      verdictTitle: 'Not Clean – Boil Before Use',
+      verdictTitleHausa: 'Ba shi da Tsabta – Tafasa Kafin Sha',
       advice:
         'Green coloration and algae growth detected. Stagnant surface waters often contain cyanobacteria toxins and protozoan parasites. Skim off surface scum, filter through clean cloth, and boil thoroughly. Avoid using for infants.',
       adviceHausa:
