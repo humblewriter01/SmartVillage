@@ -237,14 +237,25 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
     setIsSpeakingSymptomsText(false);
   };
 
-  const addSymptomChip = (chip: { label: string; hausa: string }) => {
-    const textToAdd = locale === 'ha' ? chip.hausa : chip.label;
-    setSymptoms((prev) => {
-      const trimmed = prev.trim();
-      if (!trimmed) return textToAdd;
-      if (trimmed.toLowerCase().includes(textToAdd.toLowerCase())) return prev;
-      return `${trimmed}, ${textToAdd}`;
-    });
+  // Single-select symptom chip handler (radio button behavior)
+  const handleToggleSymptomChip = (chip: { label: string; hausa: string }) => {
+    const textToSet = locale === 'ha' ? chip.hausa : chip.label;
+    const isCurrentlySelected =
+      symptoms.trim().toLowerCase() === chip.hausa.toLowerCase() ||
+      symptoms.trim().toLowerCase() === chip.label.toLowerCase();
+
+    // 1. If currently selected, tapping again deselects it (empties text box)
+    if (isCurrentlySelected) {
+      setSymptoms('');
+    } else {
+      // 2. Selects this symptom as the ONLY one (replaces any previous symptom)
+      setSymptoms(textToSet);
+    }
+
+    // 3. Tapping any symptom speaks it aloud in the current language
+    voiceService.stopSpeaking();
+    const textToSpeak = locale === 'ha' ? chip.hausa : chip.label;
+    voiceService.speak(textToSpeak, locale, undefined, 'health');
   };
 
   const filteredConditions = MANUAL_HEALTH_CONDITIONS.filter((c) => {
@@ -374,17 +385,20 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
           className="w-full p-3.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent shadow-2xs"
         />
 
-        {/* Quick Symptom Chips */}
+        {/* Quick Symptom Chips (Single-select radio button behavior) */}
         <div className="flex flex-wrap gap-1.5 pt-1">
           {COMMON_SYMPTOM_CHIPS.map((chip, idx) => {
             const label = locale === 'ha' ? chip.hausa : chip.label;
-            const isIncluded = symptoms.toLowerCase().includes(label.toLowerCase());
+            const isSelected =
+              symptoms.trim().toLowerCase() === chip.hausa.toLowerCase() ||
+              symptoms.trim().toLowerCase() === chip.label.toLowerCase();
             return (
               <button
                 key={idx}
-                onClick={() => addSymptomChip(chip)}
+                type="button"
+                onClick={() => handleToggleSymptomChip(chip)}
                 className={`text-[11px] px-2.5 py-1 rounded-lg border transition-colors cursor-pointer ${
-                  isIncluded
+                  isSelected
                     ? 'bg-red-700 text-white border-red-700 font-bold'
                     : 'bg-white text-slate-700 border-slate-200 hover:bg-red-50/60'
                 }`}

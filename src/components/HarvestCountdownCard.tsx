@@ -10,9 +10,13 @@ import {
   Trash2,
   ChevronRight,
   Sparkles,
+  Bell,
+  BellOff,
+  BellRing,
 } from 'lucide-react';
 import { Language } from '../utils/translations';
 import { voiceService } from '../services/voiceService';
+import { reminderService, StoredReminder } from '../services/reminderService';
 
 export interface PlantedCrop {
   id: string;
@@ -213,6 +217,63 @@ export const HarvestCountdownCard: React.FC<HarvestCountdownCardProps> = ({
   const [isAddingNew, setIsAddingNew] = useState(false);
   const [isSpeakingId, setIsSpeakingId] = useState<string | null>(null);
   const [isSpeakingHeader, setIsSpeakingHeader] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [reminders, setReminders] = useState<Record<string, StoredReminder>>({});
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  useEffect(() => {
+    reminderService.getStoredReminders().then(setReminders);
+  }, []);
+
+  const handleToggleHarvestReminder = async (p: PlantedCrop) => {
+    const isSet = Boolean(reminders[`harvest-${p.id}`]);
+    if (isSet) {
+      await reminderService.cancelHarvestReminders(p.id);
+      setReminders((prev) => {
+        const next = { ...prev };
+        delete next[`harvest-${p.id}`];
+        delete next[`harvest-${p.id}-3d`];
+        delete next[`harvest-${p.id}-day`];
+        return next;
+      });
+      showToast(
+        locale === 'ha'
+          ? `An soke tunatarwar girbin ${p.hausaName}.`
+          : `Cancelled harvest reminders for ${p.name}.`
+      );
+      return;
+    }
+
+    const perm = await reminderService.checkPermission();
+    if (perm !== 'granted') {
+      const granted = await reminderService.requestPermission();
+      if (!granted) {
+        showToast(
+          locale === 'ha'
+            ? 'Ba a ba da izinin sanarwa ba. Za ka iya kunna shi a saitunan waya.'
+            : 'Notifications not allowed. You can enable them in phone settings.'
+        );
+        return;
+      }
+    }
+
+    const pDate = new Date(p.plantingDate);
+    const harvestDate = new Date(pDate.getTime() + p.maturityDays * 24 * 60 * 60 * 1000);
+    harvestDate.setHours(8, 0, 0, 0);
+
+    await reminderService.scheduleHarvestReminders(p.id, p.name, p.hausaName, p.fieldLabel, harvestDate);
+    const updated = await reminderService.getStoredReminders();
+    setReminders(updated);
+    showToast(
+      locale === 'ha'
+        ? `An saita tunatarwar girbi (kwanaki 3 kafin + ranar girbi) don ${p.hausaName}!`
+        : `Harvest reminders scheduled (3 days prior + harvest day) for ${p.name}!`
+    );
+  };
 
   const handleSpeakHeader = async () => {
     if (isSpeakingHeader) {
@@ -344,6 +405,7 @@ export const HarvestCountdownCard: React.FC<HarvestCountdownCardProps> = ({
   };
 
   const handleDelete = (id: string) => {
+    reminderService.cancelHarvestReminders(id);
     const updated = plantings.filter((p) => p.id !== id);
     persistUpdatedPlantings(updated);
   };
@@ -362,6 +424,13 @@ export const HarvestCountdownCard: React.FC<HarvestCountdownCardProps> = ({
 
   return (
     <div className="bg-white rounded-2xl border border-emerald-200/90 shadow-sm p-4 space-y-4">
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white text-xs sm:text-sm px-4 py-2.5 rounded-xl shadow-lg border border-slate-700 animate-fade-in">
+          {toastMessage}
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between border-b border-emerald-100 pb-3">
         <div className="flex items-center space-x-2.5">
@@ -631,6 +700,51 @@ export const HarvestCountdownCard: React.FC<HarvestCountdownCardProps> = ({
                   {locale === 'ha' ? p.criticalTipsHa : p.criticalTipsEn}
                 </span>
               </div>
+
+              {/* Harvest Notification Reminder (3 Days Before + On Harvest Day) */}
+              <div className="mt-3 pt-2.5 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center space-x-1.5 text-xs text-slate-600 font-semibold">
+                  <Calendar className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>
+                    {locale === 'ha'
+                      ? `Ranar Girbi: ${status.formattedHarvestDate}`
+                      : `Harvest: ${status.formattedHarvestDate}`}
+                  </span>
+                </div>
+
+                {reminders[`harvest-${p.id}`] ? (
+                  <button
+                    type="button"
+                    onClick={() => handleToggleHarvestReminder(p)}
+                    className="px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs active:scale-95"
+                    title={locale === 'ha' ? 'Soke Tunatarwar Girbi' : 'Cancel Harvest Reminders'}
+                  >
+                    <BellOff className="w-3.5 h-3.5 text-amber-700" />
+                    <span>{locale === 'ha' ? 'Soke Tunatarwa' : 'Cancel Reminder'}</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => handleToggleHarvestReminder(p)}
+                    className="px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-700 hover:bg-emerald-800 text-white transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs active:scale-95"
+                    title={locale === 'ha' ? 'Saita Tunatarwa (Kwanaki 3 kafin + Ranar girbi)' : 'Set Harvest Reminder (3 days prior + on harvest day)'}
+                  >
+                    <Bell className="w-3.5 h-3.5 text-emerald-200" />
+                    <span>{locale === 'ha' ? 'Saita Tunatarwar Girbi' : 'Set Harvest Reminder'}</span>
+                  </button>
+                )}
+              </div>
+
+              {reminders[`harvest-${p.id}`] && (
+                <div className="mt-2 flex items-center gap-1.5 text-[11px] font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200/80 px-2.5 py-1.5 rounded-lg">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  <span>
+                    {locale === 'ha'
+                      ? `An saita faɗakarwa biyu: Kwanaki 3 kafin girbi da kuma ainihin ranar girbi.`
+                      : `2 reminders scheduled: 3 days prior + on harvest day.`}
+                  </span>
+                </div>
+              )}
             </div>
           );
         })}

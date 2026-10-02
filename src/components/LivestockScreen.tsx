@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   AlertTriangle,
   Volume2,
@@ -10,6 +10,10 @@ import {
   Music,
   Info,
   ChevronRight,
+  Bell,
+  BellOff,
+  BellRing,
+  Calendar,
 } from 'lucide-react';
 import { Language, t } from '../utils/translations';
 import {
@@ -21,6 +25,7 @@ import {
 } from '../services/livestockService';
 import { voiceService } from '../services/voiceService';
 import { historyService } from '../services/historyService';
+import { reminderService, StoredReminder, getNotificationIdForKey } from '../services/reminderService';
 
 interface LivestockScreenProps {
   locale: Language;
@@ -37,10 +42,65 @@ export const LivestockScreen: React.FC<LivestockScreenProps> = ({
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [playingAnimalId, setPlayingAnimalId] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [reminders, setReminders] = useState<Record<string, StoredReminder>>({});
+
+  useEffect(() => {
+    reminderService.getStoredReminders().then(setReminders);
+  }, []);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  const handleToggleVaccineReminder = async (
+    v: { id: string; nameEn: string; nameHa: string; intervalDays: number }
+  ) => {
+    const key = `livestock-${selectedAnimal.id}-${getNotificationIdForKey(v.nameEn)}`;
+    if (reminders[key]) {
+      await reminderService.cancelLivestockReminder(key);
+      setReminders((prev) => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+      showToast(
+        locale === 'ha'
+          ? `An soke tunatarwar ${v.nameHa}.`
+          : `Cancelled reminder for ${v.nameEn}.`
+      );
+      return;
+    }
+
+    const perm = await reminderService.checkPermission();
+    if (perm !== 'granted') {
+      const granted = await reminderService.requestPermission();
+      if (!granted) {
+        showToast(
+          locale === 'ha'
+            ? 'Ba a ba da izinin sanarwa ba. Za ka iya kunna shi a saitunan waya.'
+            : 'Notifications not allowed. You can enable them in phone settings.'
+        );
+        return;
+      }
+    }
+
+    await reminderService.scheduleLivestockVaccination(
+      selectedAnimal.id,
+      selectedAnimal.name,
+      selectedAnimal.hausa_name,
+      v.nameEn,
+      v.nameHa,
+      v.intervalDays
+    );
+
+    const updated = await reminderService.getStoredReminders();
+    setReminders(updated);
+    showToast(
+      locale === 'ha'
+        ? `An saita tunatarwar ${v.nameHa} (bayan kwanaki ${v.intervalDays})!`
+        : `Vaccination reminder scheduled for ${v.nameEn} (in ${v.intervalDays} days)!`
+    );
   };
 
   // Live Text-to-Speech on symptom tap (single-selection radio button behavior)
@@ -324,6 +384,177 @@ export const LivestockScreen: React.FC<LivestockScreenProps> = ({
                 : `Play ${selectedAnimal.name} Sound`}
             </span>
           </button>
+        </div>
+      </div>
+
+      {/* Vaccination & Routine Prevention Reminders */}
+      <div className="bg-white rounded-2xl p-4 sm:p-5 border border-emerald-100 shadow-sm space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <BellRing className="w-4 h-4 text-emerald-700" />
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
+              {locale === 'ha'
+                ? `Rigakafi da Jadawalin Alluran ${selectedAnimal.hausa_name}`
+                : `Vaccination & Prevention for ${selectedAnimal.name}`}
+            </h3>
+          </div>
+          <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full">
+            {locale === 'ha' ? 'Tunatarwar Waya' : 'Local Reminders'}
+          </span>
+        </div>
+
+        <div className="space-y-2.5">
+          {((selectedAnimal.id === 'kaza'
+            ? [
+                {
+                  id: 'newcastle',
+                  nameEn: 'Newcastle Disease Vaccine (LaSota / I-2)',
+                  nameHa: 'Allurar Cutar Ɗangana (Newcastle)',
+                  intervalDays: 90,
+                  descEn: 'Routine vaccination every 3 months protects flock from sudden paralysis and high mortality.',
+                  descHa: 'Allurar kowane wata 3 domin kiyaye kaji daga cutar ɗangana mai kisa ba zato.',
+                },
+                {
+                  id: 'deworm_poultry',
+                  nameEn: 'Flock Deworming & Vitamin Booster',
+                  nameHa: 'Maganin Tsutsar Ciki da Sinadarin Ƙarfi',
+                  intervalDays: 60,
+                  descEn: 'Water-soluble dewormer every 60 days to boost egg production and weight gain.',
+                  descHa: 'Ba da maganin tsutsar ciki a cikin ruwan sha kowane kwanaki 60.',
+                },
+              ]
+            : selectedAnimal.id === 'akuya'
+            ? [
+                {
+                  id: 'ppr_goat',
+                  nameEn: 'PPR Vaccine (Peste des Petits Ruminants)',
+                  nameHa: 'Allurar Rigakafin Ciwon Huhu da Zawayi (PPR)',
+                  intervalDays: 180,
+                  descEn: 'Bi-annual protective vaccination against viral pneumonia and diarrhea in goats.',
+                  descHa: 'Kariyar watanni 6 daga ciwon huhu da gudawa mai kashe awaki.',
+                },
+                {
+                  id: 'deworm_goat',
+                  nameEn: 'Quarterly Deworming (Albendazole)',
+                  nameHa: 'Maganin Tsutsa na Awaki',
+                  intervalDays: 90,
+                  descEn: 'Parasite control every 90 days to prevent bottle jaw and severe anemia.',
+                  descHa: 'Shafe tsutsar ciki kowane wata 3 don hana kumburin haba da rashin jini.',
+                },
+              ]
+            : selectedAnimal.id === 'tunkiya'
+            ? [
+                {
+                  id: 'ppr_sheep',
+                  nameEn: 'PPR & Sheep Pox Vaccine',
+                  nameHa: 'Allurar PPR da Cutar Ƙyandar Tumaki',
+                  intervalDays: 180,
+                  descEn: 'Protects flock against respiratory distress and fever lesions.',
+                  descHa: 'Kariya daga ciwon numfashi da zazzabin tumaki.',
+                },
+                {
+                  id: 'deworm_sheep',
+                  nameEn: 'Fluke & Worm Drenching',
+                  nameHa: 'Maganin Tsutsar Hanta da Ciki',
+                  intervalDays: 90,
+                  descEn: 'Essential every 3 months, especially after grazing in low-lying fadama plains.',
+                  descHa: 'Maganin tsutsa a kowanne wata 3 musamman a wuraren kiwon fadama.',
+                },
+              ]
+            : selectedAnimal.id === 'saniya'
+            ? [
+                {
+                  id: 'cbpp_cattle',
+                  nameEn: 'CBPP & Blackleg Cattle Vaccine',
+                  nameHa: 'Allurar Cutar Huhu (CBPP) da Harba na Shanu',
+                  intervalDays: 180,
+                  descEn: 'Herd vaccination twice yearly before rainy season grazing migration.',
+                  descHa: 'Yi wa garken shanu allura sau biyu a shekara kafin damina.',
+                },
+                {
+                  id: 'deworm_cattle',
+                  nameEn: 'Herd Deworming & Trypanosomiasis Check',
+                  nameHa: 'Maganin Tsutsa da Kariya daga Cutar Sammore',
+                  intervalDays: 90,
+                  descEn: 'Routine deworming every 3 months for optimal milk yield and draft power.',
+                  descHa: 'Bada maganin tsutsa kowane wata 3 don samun ƙarin madara da ƙarfin noma.',
+                },
+              ]
+            : [
+                {
+                  id: `routine_deworm_${selectedAnimal.id}`,
+                  nameEn: `Routine Deworming (${selectedAnimal.name})`,
+                  nameHa: `Maganin Tsutsar Ciki na ${selectedAnimal.hausa_name}`,
+                  intervalDays: 90,
+                  descEn: `Every 90 days internal parasite drenching keeps ${selectedAnimal.name} healthy and resilient.`,
+                  descHa: `Maganin tsutsa kowane wata 3 domin kiyaye lafiyar ${selectedAnimal.hausa_name}.`,
+                },
+                {
+                  id: `vitamin_booster_${selectedAnimal.id}`,
+                  nameEn: `Seasonal Vitamin & Mineral Booster`,
+                  nameHa: `Sinadaran Ƙarfi da Lafiyar Jiki`,
+                  intervalDays: 60,
+                  descEn: `Multivitamin booster protects against dry and harmattan season stress.`,
+                  descHa: `Sinadaran ƙarin ƙarfi kafin lokacin sanyin harmattan ko rani.`,
+                },
+              ])
+          ).map((v) => {
+            const key = `livestock-${selectedAnimal.id}-${getNotificationIdForKey(v.nameEn)}`;
+            const isReminderSet = Boolean(reminders[key]);
+
+            return (
+              <div
+                key={v.id}
+                className="p-3 bg-slate-50 hover:bg-emerald-50/40 rounded-xl border border-slate-200 transition-all space-y-2"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <h4 className="font-extrabold text-xs sm:text-sm text-slate-800">
+                      {locale === 'ha' ? v.nameHa : v.nameEn}
+                    </h4>
+                    <span className="text-[10px] font-bold text-emerald-700 block mt-0.5">
+                      {locale === 'ha' ? `Kowane kwanaki ${v.intervalDays}` : `Every ${v.intervalDays} days`}
+                    </span>
+                  </div>
+
+                  {isReminderSet ? (
+                    <button
+                      type="button"
+                      onClick={() => handleToggleVaccineReminder(v)}
+                      className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 transition-all cursor-pointer flex items-center gap-1 shadow-2xs active:scale-95 shrink-0"
+                    >
+                      <BellOff className="w-3 h-3 text-amber-700" />
+                      <span>{locale === 'ha' ? 'Soke' : 'Cancel'}</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => handleToggleVaccineReminder(v)}
+                      className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-emerald-700 hover:bg-emerald-800 text-white transition-all cursor-pointer flex items-center gap-1 shadow-2xs active:scale-95 shrink-0"
+                    >
+                      <Bell className="w-3 h-3 text-emerald-200" />
+                      <span>{locale === 'ha' ? 'Saita Tunatarwa' : 'Set Reminder'}</span>
+                    </button>
+                  )}
+                </div>
+
+                <p className="text-[11px] text-slate-600 leading-relaxed">
+                  {locale === 'ha' ? v.descHa : v.descEn}
+                </p>
+
+                {isReminderSet && (
+                  <div className="flex items-center gap-1.5 text-[10px] font-semibold text-emerald-800 bg-emerald-100/70 border border-emerald-300 px-2 py-1 rounded-md">
+                    <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
+                    <span>
+                      {locale === 'ha'
+                        ? `An saita faɗakarwa: Za a sanar da kai a kan waya lokacin allurar ${v.nameHa}.`
+                        : `Reminder scheduled: You will be alerted when ${v.nameEn} is due.`}
+                    </span>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
 

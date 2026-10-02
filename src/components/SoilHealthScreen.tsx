@@ -14,6 +14,9 @@ import {
   Calendar,
   Compass,
   ArrowRight,
+  Bell,
+  BellOff,
+  BellRing,
 } from 'lucide-react';
 import { Language } from '../utils/translations';
 import {
@@ -23,6 +26,7 @@ import {
   evaluateSoilConditions,
 } from '../services/soilService';
 import { voiceService } from '../services/voiceService';
+import { reminderService, StoredReminder, getNotificationIdForKey } from '../services/reminderService';
 
 interface SoilHealthScreenProps {
   locale: Language;
@@ -43,10 +47,55 @@ export const SoilHealthScreen: React.FC<SoilHealthScreenProps> = ({ locale }) =>
 
   // Selected Record Modal or Expanded view
   const [expandedRecordId, setExpandedRecordId] = useState<string | null>(null);
+  const [reminders, setReminders] = useState<Record<string, StoredReminder>>({});
+
+  useEffect(() => {
+    reminderService.getStoredReminders().then(setReminders);
+  }, []);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  const handleToggleSoilReminder = async (plotNameStr: string, daysAhead = 60) => {
+    const key = `soil-${getNotificationIdForKey(plotNameStr)}`;
+    if (reminders[key]) {
+      await reminderService.cancelSoilReminder(plotNameStr);
+      setReminders((prev) => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+      showToast(
+        locale === 'ha'
+          ? `An soke tunatarwar gwajin ƙasar ${plotNameStr}.`
+          : `Cancelled soil re-test reminder for ${plotNameStr}.`
+      );
+      return;
+    }
+
+    const perm = await reminderService.checkPermission();
+    if (perm !== 'granted') {
+      const granted = await reminderService.requestPermission();
+      if (!granted) {
+        showToast(
+          locale === 'ha'
+            ? 'Ba a ba da izinin sanarwa ba. Za ka iya kunna shi a saitunan waya.'
+            : 'Notifications not allowed. You can enable them in phone settings.'
+        );
+        return;
+      }
+    }
+
+    await reminderService.scheduleSoilRetestReminder(plotNameStr, daysAhead);
+    const updated = await reminderService.getStoredReminders();
+    setReminders(updated);
+    showToast(
+      locale === 'ha'
+        ? `An saita tunatarwar sake gwajin ƙasar ${plotNameStr} bayan kwanaki ${daysAhead}!`
+        : `Soil re-test reminder scheduled for ${plotNameStr} (in ${daysAhead} days)!`
+    );
   };
 
   useEffect(() => {
@@ -78,6 +127,10 @@ export const SoilHealthScreen: React.FC<SoilHealthScreenProps> = ({ locale }) =>
 
   const handleDelete = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    const rec = records.find(r => r.id === id);
+    if (rec) {
+      reminderService.cancelSoilReminder(rec.plotName);
+    }
     soilService.deleteRecord(id);
     setRecords(soilService.getRecords());
     showToast(locale === 'ha' ? 'An goge bayanin.' : 'Record deleted.');
@@ -602,7 +655,52 @@ export const SoilHealthScreen: React.FC<SoilHealthScreenProps> = ({ locale }) =>
                     </div>
                   )}
 
-                  <div className="text-right">
+                  {/* Soil Re-Testing Reminder (60 Days Ahead) */}
+                  <div className="pt-2.5 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-[11px] text-slate-500 font-semibold flex items-center gap-1">
+                      <Calendar className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>{locale === 'ha' ? 'Sake Gwaji: kowane kwanaki 60' : 'Re-test: every 60 days'}</span>
+                    </span>
+
+                    {reminders[`soil-${getNotificationIdForKey(r.plotName)}`] ? (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleToggleSoilReminder(r.plotName);
+                        }}
+                        className="px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 transition-all cursor-pointer flex items-center gap-1 shadow-2xs"
+                      >
+                        <BellOff className="w-3 h-3 text-amber-700" />
+                        <span>{locale === 'ha' ? 'Soke Tunatarwa' : 'Cancel Reminder'}</span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleToggleSoilReminder(r.plotName);
+                        }}
+                        className="px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-700 hover:bg-emerald-800 text-white transition-all cursor-pointer flex items-center gap-1 shadow-2xs"
+                      >
+                        <Bell className="w-3 h-3 text-emerald-200" />
+                        <span>{locale === 'ha' ? 'Saita Tunatarwar Kwanaki 60' : 'Set 60-Day Reminder'}</span>
+                      </button>
+                    )}
+                  </div>
+
+                  {reminders[`soil-${getNotificationIdForKey(r.plotName)}`] && (
+                    <div className="flex items-center gap-1.5 text-[10px] font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded-md">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      <span>
+                        {locale === 'ha'
+                          ? `An saita faɗakarwa: Za a tura maka sanarwa a kan waya lokacin sake gwajin ƙasar ${r.plotName}.`
+                          : `Scheduled: You will be alerted in 60 days to re-test ${r.plotName}.`}
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="text-right pt-1">
                     <span className="text-[10px] text-emerald-700 font-bold hover:underline">
                       {isExpanded
                         ? (locale === 'ha' ? 'Rage Cikakken Bayani ▲' : 'Show Less ▲')

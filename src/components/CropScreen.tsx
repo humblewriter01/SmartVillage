@@ -16,6 +16,9 @@ import {
   Clock,
   RotateCcw,
   Calendar,
+  Bell,
+  BellOff,
+  BellRing,
 } from 'lucide-react';
 import { Language, t } from '../utils/translations';
 import {
@@ -26,6 +29,7 @@ import {
 } from '../services/cropService';
 import { voiceService } from '../services/voiceService';
 import { historyService } from '../services/historyService';
+import { reminderService, StoredReminder, getNotificationIdForKey } from '../services/reminderService';
 import {
   CROP_REFERENCE_DATA,
   CropCategoryReference,
@@ -71,6 +75,58 @@ export const CropScreen: React.FC<CropScreenProps> = ({
   const [isSpeakingHarvestTab, setIsSpeakingHarvestTab] = useState(false);
   const [expandedDetails, setExpandedDetails] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [cropReminders, setCropReminders] = useState<Record<string, StoredReminder>>({});
+
+  useEffect(() => {
+    reminderService.getStoredReminders().then(setCropReminders);
+  }, []);
+
+  const handleToggleCropFollowupReminder = async () => {
+    if (!result) return;
+    const cropName = selectedCropCategory.crop;
+    const cropHa = selectedCropCategory.hausa_name;
+    const diseaseName = result.referenceDetail
+      ? (locale === 'ha' ? result.referenceDetail.hausa_name : result.referenceDetail.name)
+      : (result.predictions[0]?.label || 'Treatment');
+    const key = `crop-followup-${getNotificationIdForKey(cropName + diseaseName)}`;
+
+    if (cropReminders[key]) {
+      await reminderService.cancelCropFollowupReminder(key);
+      setCropReminders((prev) => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+      showToast(
+        locale === 'ha'
+          ? 'An soke tunatarwar duba shuka.'
+          : 'Cancelled 7-day crop follow-up reminder.'
+      );
+      return;
+    }
+
+    const perm = await reminderService.checkPermission();
+    if (perm !== 'granted') {
+      const granted = await reminderService.requestPermission();
+      if (!granted) {
+        showToast(
+          locale === 'ha'
+            ? 'Ba a ba da izinin sanarwa ba. Za ka iya kunna shi a saitunan waya.'
+            : 'Notifications not allowed. You can enable them in phone settings.'
+        );
+        return;
+      }
+    }
+
+    await reminderService.scheduleCropFollowupReminder(cropName, cropHa, diseaseName, 7);
+    const updated = await reminderService.getStoredReminders();
+    setCropReminders(updated);
+    showToast(
+      locale === 'ha'
+        ? `An saita tunatarwar duba warakar ${cropHa} bayan kwanaki 7!`
+        : `7-day field recovery check scheduled for ${cropName}!`
+    );
+  };
 
   // Helper: Live read-aloud when a crop is selected or tapped (Part 6)
   const speakCropName = (crop: CropCategoryReference) => {
@@ -147,6 +203,12 @@ export const CropScreen: React.FC<CropScreenProps> = ({
     }
   }, [initialSelectedCrop, initialSelectedDisease]);
 
+  useEffect(() => {
+    return () => {
+      voiceService.stopSpeaking();
+    };
+  }, []);
+
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
@@ -178,6 +240,8 @@ export const CropScreen: React.FC<CropScreenProps> = ({
 
   // Select a specific suspected disease from the catalog: Sets target WITHOUT immediately showing results!
   const handleSelectDiseaseOnly = (crop: CropCategoryReference, disease: CropDiseaseReference) => {
+    voiceService.stopSpeaking();
+    setSpeakingDiseaseCardId(null);
     setSelectedCropId(crop.id);
     setSelectedDisease(disease);
     setResult(null); // Clear previous results so user can click Analyze
@@ -207,7 +271,38 @@ export const CropScreen: React.FC<CropScreenProps> = ({
     e.target.value = '';
   };
 
+  const [speakingDiseaseCardId, setSpeakingDiseaseCardId] = useState<string | null>(null);
+
+  // Toggle read-aloud on individual disease card in manual picker modal (Task 1)
+  const handleToggleSpeakDiseaseCard = async (e: React.MouseEvent, disease: CropDiseaseReference) => {
+    e.stopPropagation();
+    if (speakingDiseaseCardId === disease.id) {
+      voiceService.stopSpeaking();
+      setSpeakingDiseaseCardId(null);
+      return;
+    }
+
+    voiceService.stopSpeaking();
+    setSpeakingDiseaseCardId(disease.id);
+
+    const diseaseName = locale === 'ha' ? disease.hausa_name : disease.name;
+    const diseaseDesc = locale === 'ha' ? disease.symptoms_hausa : disease.symptoms;
+    const textToSpeak = `${diseaseName}. ${diseaseDesc}`;
+
+    await voiceService.speak(textToSpeak, locale, (warning) => {
+      showToast(warning);
+    });
+    setSpeakingDiseaseCardId(null);
+  };
+
+  // Live TTS when tapping sample disease buttons (Task 2)
   const handleSelectSample = (disease: CropDiseaseReference) => {
+    // 1. Immediately stop any previous speech & speak full disease name
+    voiceService.stopSpeaking();
+    const fullDiseaseName = locale === 'ha' ? disease.hausa_name : disease.name;
+    voiceService.speak(fullDiseaseName, locale);
+
+    // 2. Existing sample load behavior unchanged
     setPhoto(disease.image);
     setPhotoUrl(disease.image);
     setSelectedDisease(disease);
@@ -803,6 +898,69 @@ export const CropScreen: React.FC<CropScreenProps> = ({
                 </div>
               </div>
 
+              {/* 7-Day Field Recovery & Spraying Inspection Reminder */}
+              {(() => {
+                const diseaseName = result.referenceDetail
+                  ? (locale === 'ha' ? result.referenceDetail.hausa_name : result.referenceDetail.name)
+                  : (result.predictions[0]?.label || 'Treatment');
+                const key = `crop-followup-${getNotificationIdForKey(selectedCropCategory.crop + diseaseName)}`;
+                const isFollowupSet = Boolean(cropReminders[key]);
+
+                return (
+                  <div className="p-3.5 bg-gradient-to-r from-emerald-50 to-teal-50/70 border border-emerald-300 rounded-xl space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-1.5 font-bold text-xs text-emerald-950">
+                        <BellRing className="w-4 h-4 text-emerald-700" />
+                        <span>
+                          {locale === 'ha'
+                            ? 'Tunatarwar Duba Warakar Shuka (Kwanaki 7)'
+                            : '7-Day Field Recovery & Spraying Reminder'}
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full">
+                        {locale === 'ha' ? 'Duba Gona' : 'Field Inspection'}
+                      </span>
+                    </div>
+
+                    <p className="text-[11px] text-slate-600 leading-relaxed">
+                      {locale === 'ha'
+                        ? `Saita tunatarwa domin komawa gonar ${selectedCropCategory.hausa_name} bayan kwanaki 7 don duba ko cutar ta lafa ko ana buƙatar ƙarin feshin magani.`
+                        : `Get alerted in 7 days to inspect your ${selectedCropCategory.crop} field for recovery and assess if a second booster spray is needed.`}
+                    </p>
+
+                    {isFollowupSet ? (
+                      <div className="space-y-1.5 pt-0.5">
+                        <div className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-800 bg-white/90 border border-emerald-300 px-2 py-1 rounded-lg">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                          <span>
+                            {locale === 'ha'
+                              ? `An saita faɗakarwa: Za a sanar da kai a kan waya bayan kwanaki 7.`
+                              : `Scheduled: You will be alerted in 7 days to re-inspect this field.`}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleToggleCropFollowupReminder}
+                          className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1 shadow-2xs"
+                        >
+                          <BellOff className="w-3.5 h-3.5 text-amber-700" />
+                          <span>{locale === 'ha' ? 'Soke Tunatarwa' : 'Cancel Reminder'}</span>
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleToggleCropFollowupReminder}
+                        className="w-full py-2 px-3 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-xs active:scale-95"
+                      >
+                        <Bell className="w-3.5 h-3.5 text-emerald-200" />
+                        <span>{locale === 'ha' ? 'Saita Tunatarwar Kwanaki 7' : 'Set 7-Day Follow-up Reminder'}</span>
+                      </button>
+                    )}
+                  </div>
+                );
+              })()}
+
               {/* Direct Link to Harvest Countdown for this crop */}
               <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between">
                 <div className="flex items-center space-x-2">
@@ -864,7 +1022,11 @@ export const CropScreen: React.FC<CropScreenProps> = ({
                 </h3>
               </div>
               <button
-                onClick={() => setShowManualModal(false)}
+                onClick={() => {
+                  voiceService.stopSpeaking();
+                  setSpeakingDiseaseCardId(null);
+                  setShowManualModal(false);
+                }}
                 className="text-white/80 hover:text-white p-1 rounded-lg hover:bg-emerald-800 cursor-pointer"
               >
                 <X className="w-5 h-5" />
@@ -932,7 +1094,11 @@ export const CropScreen: React.FC<CropScreenProps> = ({
                   {/* Step 2 Header with Change Plant Button */}
                   <div className="flex items-center justify-between bg-slate-50 p-2.5 rounded-xl border border-slate-200">
                     <button
-                      onClick={() => setModalStep(1)}
+                      onClick={() => {
+                        voiceService.stopSpeaking();
+                        setSpeakingDiseaseCardId(null);
+                        setModalStep(1);
+                      }}
                       className="flex items-center space-x-1 text-xs font-bold text-emerald-800 bg-white hover:bg-emerald-50 border border-emerald-300 px-2.5 py-1.5 rounded-lg cursor-pointer transition-colors shadow-2xs"
                     >
                       <span>← {locale === 'ha' ? 'Canza Shuka' : 'Change Crop'}</span>
@@ -985,32 +1151,51 @@ export const CropScreen: React.FC<CropScreenProps> = ({
                     </div>
 
                     <div className="space-y-2.5">
-                      {selectedCropCategory.diseases.map((d) => (
-                        <div
-                          key={d.id}
-                          onClick={() => handleSelectDiseaseOnly(selectedCropCategory, d)}
-                          className="min-h-[72px] p-3 rounded-xl border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/40 transition-all cursor-pointer flex items-start space-x-3 bg-white shadow-2xs"
-                        >
-                          <img
-                            src={d.image}
-                            alt={d.name}
-                            className="w-12 h-12 rounded-lg object-contain shrink-0 border border-slate-200 bg-slate-50 mt-0.5"
-                          />
-                          <div className="flex-1 min-w-0 space-y-1">
-                            <div className="flex items-start justify-between gap-2">
-                              <h4 className="font-extrabold text-xs sm:text-sm text-slate-800 leading-snug break-words">
-                                {locale === 'ha' ? d.hausa_name : d.name}
-                              </h4>
-                              <span className="shrink-0 text-[10px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                                {locale === 'ha' ? 'Zaɓa' : 'Select'}
-                              </span>
+                      {selectedCropCategory.diseases.map((d) => {
+                        const isSpeakingThis = speakingDiseaseCardId === d.id;
+                        return (
+                          <div
+                            key={d.id}
+                            onClick={() => handleSelectDiseaseOnly(selectedCropCategory, d)}
+                            className="min-h-[72px] p-3 rounded-xl border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/40 transition-all cursor-pointer flex items-start space-x-3 bg-white shadow-2xs"
+                          >
+                            <img
+                              src={d.image}
+                              alt={d.name}
+                              className="w-12 h-12 rounded-lg object-contain shrink-0 border border-slate-200 bg-slate-50 mt-0.5"
+                            />
+                            <div className="flex-1 min-w-0 space-y-1">
+                              <div className="flex items-start justify-between gap-2">
+                                <h4 className="font-extrabold text-xs sm:text-sm text-slate-800 leading-snug break-words">
+                                  {locale === 'ha' ? d.hausa_name : d.name}
+                                </h4>
+                                <div className="flex items-center space-x-1.5 shrink-0">
+                                  {/* Read-Aloud Toggle Button for this disease card */}
+                                  <button
+                                    type="button"
+                                    onClick={(e) => handleToggleSpeakDiseaseCard(e, d)}
+                                    className={`p-1.5 rounded-lg border transition-all cursor-pointer active:scale-95 flex items-center justify-center ${
+                                      isSpeakingThis
+                                        ? 'bg-emerald-600 text-white border-emerald-700 animate-pulse'
+                                        : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-200 shadow-2xs'
+                                    }`}
+                                    title={locale === 'ha' ? 'Karanta da Murya' : 'Read Aloud'}
+                                    aria-label={locale === 'ha' ? 'Karanta bayanin cuta da murya' : 'Read disease details aloud'}
+                                  >
+                                    <Volume2 className={`w-3.5 h-3.5 ${isSpeakingThis ? 'animate-bounce text-white' : 'text-emerald-700'}`} />
+                                  </button>
+                                  <span className="shrink-0 text-[10px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                                    {locale === 'ha' ? 'Zaɓa' : 'Select'}
+                                  </span>
+                                </div>
+                              </div>
+                              <p className="text-[11px] text-slate-600 font-medium leading-relaxed break-words">
+                                {locale === 'ha' ? d.symptoms_hausa : d.symptoms}
+                              </p>
                             </div>
-                            <p className="text-[11px] text-slate-600 font-medium leading-relaxed break-words">
-                              {locale === 'ha' ? d.symptoms_hausa : d.symptoms}
-                            </p>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
@@ -1025,7 +1210,11 @@ export const CropScreen: React.FC<CropScreenProps> = ({
                   : 'Selection will return to the analysis screen'}
               </span>
               <button
-                onClick={() => setShowManualModal(false)}
+                onClick={() => {
+                  voiceService.stopSpeaking();
+                  setSpeakingDiseaseCardId(null);
+                  setShowManualModal(false);
+                }}
                 className="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-xs font-bold cursor-pointer"
               >
                 {t(locale, 'close')}
