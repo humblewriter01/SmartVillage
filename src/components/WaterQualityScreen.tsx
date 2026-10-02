@@ -132,7 +132,7 @@ export const WaterQualityScreen: React.FC<WaterQualityScreenProps> = ({
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  const handleToggleWaterReminder = async (type: 'waterguard_30min' | 'storage_refresh_24h') => {
+  const handleToggleWaterReminder = async (type: 'waterguard_30min') => {
     const key = `water-${type}`;
     if (reminders[key]) {
       await reminderService.cancelWaterReminder(type);
@@ -143,8 +143,8 @@ export const WaterQualityScreen: React.FC<WaterQualityScreenProps> = ({
       });
       showToast(
         locale === 'ha'
-          ? 'An soke tunatarwar tsaftar ruwa.'
-          : 'Cancelled water safety reminder.'
+          ? 'An soke awon minti 30 na WaterGuard.'
+          : 'Cancelled 30-minute WaterGuard timer.'
       );
       return;
     }
@@ -167,8 +167,8 @@ export const WaterQualityScreen: React.FC<WaterQualityScreenProps> = ({
     setReminders(updated);
     showToast(
       locale === 'ha'
-        ? (type === 'waterguard_30min' ? 'An saita awon minti 30 na WaterGuard!' : 'An saita tunatarwar awanni 24 ta ruwan sha!')
-        : (type === 'waterguard_30min' ? '30-minute WaterGuard disinfection timer active!' : '24-hour safe water refresh reminder scheduled!')
+        ? 'An saita awon minti 30 na WaterGuard!'
+        : '30-minute WaterGuard disinfection timer active!'
     );
   };
 
@@ -629,10 +629,10 @@ export const WaterQualityScreen: React.FC<WaterQualityScreenProps> = ({
           </span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3">
           {/* WaterGuard 30-Minute Chlorination Timer */}
-          <div className="p-3.5 bg-sky-50/70 border border-sky-200 rounded-xl flex flex-col justify-between space-y-2.5">
-            <div>
+          <div className="p-3.5 bg-sky-50/70 border border-sky-200 rounded-xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="max-w-md">
               <div className="flex items-center space-x-1.5 font-bold text-xs text-sky-950">
                 <Clock className="w-4 h-4 text-sky-700" />
                 <span>{locale === 'ha' ? 'Awon Minti 30 na WaterGuard' : '30-Min WaterGuard Timer'}</span>
@@ -644,72 +644,33 @@ export const WaterQualityScreen: React.FC<WaterQualityScreenProps> = ({
               </p>
             </div>
 
-            {reminders['water-waterguard_30min'] ? (
-              <div className="space-y-1.5">
-                <div className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-800 bg-white/90 border border-emerald-300 px-2 py-1 rounded-lg">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                  <span>{locale === 'ha' ? 'Awo na tafiya: Za a sanar da kai a minti 30' : 'Timer active: You will be alerted in 30 mins'}</span>
+            <div className="shrink-0 sm:w-56">
+              {reminders['water-waterguard_30min'] ? (
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-800 bg-white/90 border border-emerald-300 px-2 py-1 rounded-lg">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <span>{locale === 'ha' ? 'Awo na tafiya: Za a sanar da kai a minti 30' : 'Timer active: You will be alerted in 30 mins'}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleToggleWaterReminder('waterguard_30min')}
+                    className="w-full py-1.5 px-2 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1 shadow-2xs active:scale-95"
+                  >
+                    <BellOff className="w-3 h-3 text-amber-700" />
+                    <span>{locale === 'ha' ? 'Soke Awon' : 'Cancel Timer'}</span>
+                  </button>
                 </div>
+              ) : (
                 <button
                   type="button"
                   onClick={() => handleToggleWaterReminder('waterguard_30min')}
-                  className="w-full py-1.5 px-2 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1 shadow-2xs"
+                  className="w-full py-2 px-3 bg-sky-700 hover:bg-sky-800 text-white rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs active:scale-95"
                 >
-                  <BellOff className="w-3 h-3 text-amber-700" />
-                  <span>{locale === 'ha' ? 'Soke Awon' : 'Cancel Timer'}</span>
+                  <Bell className="w-3.5 h-3.5 text-sky-200" />
+                  <span>{locale === 'ha' ? 'Fara Awon Minti 30' : 'Start 30-Min Timer'}</span>
                 </button>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => handleToggleWaterReminder('waterguard_30min')}
-                className="w-full py-2 px-3 bg-sky-700 hover:bg-sky-800 text-white rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs active:scale-95"
-              >
-                <Bell className="w-3.5 h-3.5 text-sky-200" />
-                <span>{locale === 'ha' ? 'Fara Awon Minti 30' : 'Start 30-Min Timer'}</span>
-              </button>
-            )}
-          </div>
-
-          {/* 24-Hour Safe Storage Refresh */}
-          <div className="p-3.5 bg-emerald-50/70 border border-emerald-200 rounded-xl flex flex-col justify-between space-y-2.5">
-            <div>
-              <div className="flex items-center space-x-1.5 font-bold text-xs text-emerald-950">
-                <ShieldCheck className="w-4 h-4 text-emerald-700" />
-                <span>{locale === 'ha' ? 'Sabunta Ruwan Sha (Awanni 24)' : '24-Hour Safe Storage Check'}</span>
-              </div>
-              <p className="text-[11px] text-slate-600 mt-1 leading-relaxed">
-                {locale === 'ha'
-                  ? 'Kiyaye ruwan sha a rufe; a sabunta ko a sake tafasa ruwan da ya wuce awanni 24 a kwano.'
-                  : 'WHO guideline: inspect covered containers and replenish fresh treated drinking water daily.'}
-              </p>
+              )}
             </div>
-
-            {reminders['water-storage_refresh_24h'] ? (
-              <div className="space-y-1.5">
-                <div className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-800 bg-white/90 border border-emerald-300 px-2 py-1 rounded-lg">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                  <span>{locale === 'ha' ? 'An saita tunatarwar gobe a kan waya' : 'Reminder active for tomorrow'}</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => handleToggleWaterReminder('storage_refresh_24h')}
-                  className="w-full py-1.5 px-2 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1 shadow-2xs"
-                >
-                  <BellOff className="w-3 h-3 text-amber-700" />
-                  <span>{locale === 'ha' ? 'Soke Tunatarwa' : 'Cancel Reminder'}</span>
-                </button>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => handleToggleWaterReminder('storage_refresh_24h')}
-                className="w-full py-2 px-3 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs active:scale-95"
-              >
-                <Bell className="w-3.5 h-3.5 text-emerald-200" />
-                <span>{locale === 'ha' ? 'Saita Tunatarwar Awanni 24' : 'Set 24-Hour Reminder'}</span>
-              </button>
-            )}
           </div>
         </div>
       </div>
