@@ -17,6 +17,7 @@ import {
   Volume2,
   Mic,
   Layers,
+  Info,
 } from 'lucide-react';
 import { Language, t } from './utils/translations';
 import { weatherService, WeatherDay } from './services/weatherService';
@@ -34,6 +35,7 @@ import { OfflineMapScreen } from './components/OfflineMapScreen';
 import { PlantingCalendarScreen } from './components/PlantingCalendarScreen';
 import { CropReferenceLibraryScreen } from './components/CropReferenceLibraryScreen';
 import { SoilHealthScreen } from './components/SoilHealthScreen';
+import { AboutScreen } from './components/AboutScreen';
 import { MicrophonePermissionModal } from './components/MicrophonePermissionModal';
 import {
   CropCategoryReference,
@@ -227,6 +229,13 @@ export function App() {
       subtitle: locale === 'ha' ? 'Hotunan cututtuka da magunguna' : 'Disease visual catalog',
       icon: BookOpen,
       emoji: '📚',
+    },
+    {
+      id: 12,
+      label: locale === 'ha' ? 'Game da SmartVillage' : 'About SmartVillage',
+      subtitle: locale === 'ha' ? 'Bayanai, lambobin tuntuɓa da lasisi' : 'App info, creator & licensing',
+      icon: Info,
+      emoji: 'ℹ️',
     },
   ];
 
@@ -502,6 +511,12 @@ export function App() {
           />
         )}
         {tab === 11 && <SoilHealthScreen locale={locale} />}
+        {tab === 12 && (
+          <AboutScreen
+            locale={locale}
+            onNavigateBack={() => navigateToTab(0)}
+          />
+        )}
       </main>
 
       {/* Bottom Sticky Navigation Bar: Responsive for both mobile and laptop */}

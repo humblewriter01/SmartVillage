@@ -172,7 +172,7 @@ export function generateAnimalSoundWaveform(rawAnimalId: string, durationSeconds
           (0.4 + 0.6 * tremolo);
         samples[i] = wave * env * 0.42;
       }
-    } else if (animalId.includes('sheep') || animalId.includes('tinkiya')) {
+    } else if (animalId.includes('sheep') || animalId.includes('tinkiya') || animalId.includes('tunkiya')) {
       // SHEEP: Warm resonant "Baa-aa-aa" (185Hz with 7.5Hz tremolo)
       for (let i = 0; i < numSamples; i++) {
         const t = i / sampleRate;
@@ -252,7 +252,7 @@ export function generateAnimalSoundWaveform(rawAnimalId: string, durationSeconds
           pulse;
         samples[i] = wave * env * 0.42;
       }
-    } else if (animalId.includes('turkey') || animalId.includes('talotalo')) {
+    } else if (animalId.includes('turkey') || animalId.includes('talotalo') || animalId.includes('talo-talo')) {
       // TURKEY: Rapid "Gobble-gobble-gobble" (18Hz warbling frequency modulation)
       for (let i = 0; i < numSamples; i++) {
         const t = i / sampleRate;

@@ -82,7 +82,7 @@ export const LIVESTOCK_ANIMALS: LivestockAnimal[] = [
   {
     id: 'sheep',
     name: 'Sheep',
-    hausa_name: 'Tinkiya',
+    hausa_name: 'Tunkiya',
     emoji: '🐑',
     commonSymptoms: [
       'Sores around mouth & nostrils',

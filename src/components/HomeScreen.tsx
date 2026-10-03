@@ -15,6 +15,7 @@ import {
   VolumeX,
   Clock,
   Layers,
+  Info,
 } from 'lucide-react';
 import { Language, t } from '../utils/translations';
 import { WeatherDay } from '../services/weatherService';
@@ -442,6 +443,23 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </div>
           <ArrowRight className="w-4 h-4 text-slate-400" />
         </div>
+      </div>
+
+      {/* Footer About Link */}
+      <div className="pt-2 pb-2 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 border-t border-emerald-100/80 gap-2">
+        <div className="flex items-center space-x-2 text-[11px]">
+          <span className="font-bold text-slate-700">SmartVillage</span>
+          <span>•</span>
+          <span className="text-emerald-700 font-semibold">100% Offline Ready</span>
+        </div>
+
+        <button
+          onClick={() => onNavigate(12)}
+          className="flex items-center space-x-1.5 font-bold text-emerald-800 hover:text-emerald-950 transition-colors cursor-pointer bg-white px-3 py-1.5 rounded-xl border border-emerald-200/90 shadow-2xs hover:bg-emerald-50 text-xs"
+        >
+          <Info className="w-3.5 h-3.5 text-emerald-700" />
+          <span>{locale === 'ha' ? 'Game da SmartVillage' : 'About SmartVillage'}</span>
+        </button>
       </div>
     </div>
   );
