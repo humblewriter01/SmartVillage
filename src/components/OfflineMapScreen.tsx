@@ -126,7 +126,8 @@ export const OfflineMapScreen: React.FC<OfflineMapScreenProps> = ({ locale }) =>
 
       const position = await Geolocation.getCurrentPosition({
         enableHighAccuracy: true,
-        timeout: 9000,
+        timeout: 30000,
+        maximumAge: 0,
       });
 
       if (position?.coords) {
@@ -149,7 +150,7 @@ export const OfflineMapScreen: React.FC<OfflineMapScreenProps> = ({ locale }) =>
                 resolve();
               },
               (err) => reject(err),
-              { enableHighAccuracy: true, timeout: 8000 }
+              { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 }
             );
           });
         } catch (navErr) {

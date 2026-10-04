@@ -14,7 +14,10 @@ import {
   ChevronDown,
   ChevronUp,
   Settings,
+  X,
+  Info,
 } from 'lucide-react';
+import { Geolocation } from '@capacitor/geolocation';
 import { Language } from '../utils/translations';
 import { voiceService } from '../services/voiceService';
 
@@ -91,15 +94,29 @@ export const QuickAlertCard: React.FC<QuickAlertCardProps> = ({ locale }) => {
   const [isEditingPhone, setIsEditingPhone] = useState(false);
   const [tempPhone, setTempPhone] = useState(emergencyPhone);
 
-  // GPS State
+  // High-Precision GPS Multi-Read & Warm-Up State
   const [coords, setCoords] = useState<{
     latitude: number;
     longitude: number;
-    accuracy?: number;
-    timestamp?: number;
+    accuracy: number;
+    timestamp: number;
   } | null>(null);
+  const [liveAccuracy, setLiveAccuracy] = useState<number | null>(null);
   const [gpsLoading, setGpsLoading] = useState(false);
   const [gpsError, setGpsError] = useState<string | null>(null);
+  const [readingsCount, setReadingsCount] = useState(0);
+  const [isUnreliable, setIsUnreliable] = useState(false);
+
+  const bestCoordsRef = useRef<{
+    latitude: number;
+    longitude: number;
+    accuracy: number;
+    timestamp: number;
+  } | null>(null);
+
+  const activeWatchIdRef = useRef<string | null>(null);
+  const activeWebWatchIdRef = useRef<number | null>(null);
+  const isCancelledRef = useRef<boolean>(false);
 
   // Status flags
   const [copied, setCopied] = useState(false);
@@ -112,67 +129,193 @@ export const QuickAlertCard: React.FC<QuickAlertCardProps> = ({ locale }) => {
   const [isSpeakingInnerBox, setIsSpeakingInnerBox] = useState(false);
   const [speakingTypeId, setSpeakingTypeId] = useState<string | null>(null);
 
-  // Automatically fetch GPS when card is mounted or requested
-  const fetchLocation = () => {
+  // Helper to fetch single position with Capacitor and browser fallback
+  const fetchSinglePosition = async (
+    enableHigh = true,
+    timeoutMs = 12000
+  ): Promise<{ coords: { latitude: number; longitude: number; accuracy: number }; timestamp?: number } | null> => {
+    // 1. Try Capacitor Geolocation plugin
+    try {
+      const pos = await Geolocation.getCurrentPosition({
+        enableHighAccuracy: enableHigh,
+        timeout: timeoutMs,
+        maximumAge: 0,
+      });
+      if (pos?.coords) return pos;
+    } catch {}
+
+    // 2. Try browser navigator.geolocation
+    if (typeof navigator !== 'undefined' && navigator.geolocation) {
+      try {
+        const navPos = await new Promise<{ coords: { latitude: number; longitude: number; accuracy: number }; timestamp?: number } | null>((resolve) => {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => resolve(pos),
+            () => resolve(null),
+            { enableHighAccuracy: enableHigh, timeout: timeoutMs, maximumAge: 0 }
+          );
+        });
+        if (navPos) return navPos;
+      } catch {}
+    }
+    return null;
+  };
+
+  // Process incoming GPS fix and update coordinates immediately with the best reading
+  const processReading = (pos: { coords: { latitude: number; longitude: number; accuracy: number }; timestamp?: number }) => {
+    if (!pos?.coords) return;
+    const lat = Number(pos.coords.latitude.toFixed(6));
+    const lng = Number(pos.coords.longitude.toFixed(6));
+    const acc = Math.round(pos.coords.accuracy);
+    const timestamp = pos.timestamp || Date.now();
+
+    setLiveAccuracy(acc);
+    setReadingsCount((prev) => prev + 1);
+
+    const reading = { latitude: lat, longitude: lng, accuracy: acc, timestamp };
+
+    // Always update if we don't have coords yet, OR if this reading is more accurate!
+    if (!bestCoordsRef.current || acc < bestCoordsRef.current.accuracy) {
+      bestCoordsRef.current = reading;
+      setCoords(reading);
+      setIsUnreliable(acc > 100);
+      setGpsError(null);
+    }
+  };
+
+  // Start warm-up phase as soon as card is mounted
+  const startGpsAcquisition = async () => {
+    isCancelledRef.current = false;
     setGpsLoading(true);
     setGpsError(null);
+    setIsUnreliable(false);
+    setReadingsCount(0);
+    setLiveAccuracy(null);
 
-    if (!('geolocation' in navigator)) {
-      setGpsError(
-        locale === 'ha'
-          ? 'Wayarka ba ta da na\'urar GPS ko an kashe ta.'
-          : 'Geolocation is not supported by your device.'
-      );
-      setGpsLoading(false);
-      return;
+    // 1. Clear previous watch listeners if active
+    if (activeWatchIdRef.current) {
+      try {
+        await Geolocation.clearWatch({ id: activeWatchIdRef.current });
+      } catch {}
+      activeWatchIdRef.current = null;
+    }
+    if (activeWebWatchIdRef.current !== null && typeof navigator !== 'undefined' && navigator.geolocation) {
+      try {
+        navigator.geolocation.clearWatch(activeWebWatchIdRef.current);
+      } catch {}
+      activeWebWatchIdRef.current = null;
     }
 
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setCoords({
-          latitude: Number(pos.coords.latitude.toFixed(6)),
-          longitude: Number(pos.coords.longitude.toFixed(6)),
-          accuracy: Math.round(pos.coords.accuracy),
-          timestamp: pos.timestamp,
-        });
-        setGpsLoading(false);
-      },
-      (err) => {
-        console.warn('GPS Error:', err.message);
-        // Fallback default coordinates (e.g., Kano Agricultural Zone: 11.9604, 8.5167)
-        setCoords({
-          latitude: 11.9604,
-          longitude: 8.5167,
-          accuracy: 50,
-          timestamp: Date.now(),
-        });
+    // 2. Request native permissions with @capacitor/geolocation
+    try {
+      await Geolocation.requestPermissions().catch(() => null);
+    } catch {}
+
+    // 3. Register native watchPosition for real-time satellite updates
+    try {
+      const watchId = await Geolocation.watchPosition(
+        {
+          enableHighAccuracy: true,
+          timeout: 30000,
+          maximumAge: 0,
+        },
+        (position) => {
+          if (isCancelledRef.current) return;
+          if (position?.coords) {
+            processReading(position);
+          }
+        }
+      );
+      activeWatchIdRef.current = watchId;
+    } catch {}
+
+    // Also register web navigator.geolocation.watchPosition as safety fallback
+    if (!activeWatchIdRef.current && typeof navigator !== 'undefined' && navigator.geolocation) {
+      try {
+        const webWatchId = navigator.geolocation.watchPosition(
+          (position) => {
+            if (isCancelledRef.current) return;
+            if (position?.coords) {
+              processReading(position);
+            }
+          },
+          () => {},
+          { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 }
+        );
+        activeWebWatchIdRef.current = webWatchId;
+      } catch {}
+    }
+
+    // 4. Sequential multi-read acquisition loop:
+    (async () => {
+      // Step A: Immediate fast initial reading (5s timeout)
+      const initialFix = await fetchSinglePosition(true, 5000);
+      if (initialFix && !isCancelledRef.current) {
+        processReading(initialFix);
+      }
+
+      // Step B: Refinement iterations (up to 5 reads) to maximize satellite precision
+      for (let i = 1; i <= 5; i++) {
+        if (isCancelledRef.current) break;
+
+        // If high precision satellite lock (<= 15m) reached, we are already at peak accuracy!
+        if (bestCoordsRef.current && bestCoordsRef.current.accuracy <= 15) {
+          break;
+        }
+
+        const fix = await fetchSinglePosition(true, 10000);
+        if (fix && !isCancelledRef.current) {
+          processReading(fix);
+        }
+
+        if (i < 5 && (!bestCoordsRef.current || bestCoordsRef.current.accuracy > 15)) {
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+        }
+      }
+
+      setGpsLoading(false);
+
+      if (!bestCoordsRef.current) {
         setGpsError(
           locale === 'ha'
-            ? 'Ba a samu cikakken GPS ba. An sanya coordinates na yankin noma na kusa.'
-            : 'Using estimated agricultural coordinates. Enable GPS permissions for high accuracy.'
+            ? 'Ba a iya samun daidaiton GPS ba. Bincika ko an kunna izinin wuri.'
+            : 'Could not obtain GPS lock. Please check location permissions.'
         );
-        setGpsLoading(false);
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 60000,
       }
-    );
+    })();
   };
 
   useEffect(() => {
-    fetchLocation();
+    startGpsAcquisition();
+    return () => {
+      isCancelledRef.current = true;
+      if (activeWatchIdRef.current) {
+        Geolocation.clearWatch({ id: activeWatchIdRef.current }).catch(() => {});
+      }
+      if (activeWebWatchIdRef.current !== null && typeof navigator !== 'undefined' && navigator.geolocation) {
+        navigator.geolocation.clearWatch(activeWebWatchIdRef.current);
+      }
+      stopSiren();
+    };
   }, []);
 
   const selectedDistress =
     DISTRESS_TYPES.find((d) => d.id === selectedDistressId) || DISTRESS_TYPES[0];
 
-  // Compose SMS text
-  const lat = coords ? coords.latitude.toFixed(5) : '11.96040';
-  const lng = coords ? coords.longitude.toFixed(5) : '8.51670';
-  const mapsUrl = `https://maps.google.com/?q=${lat},${lng}`;
-  const accuracyStr = coords?.accuracy ? ` (~${coords.accuracy}m accuracy)` : '';
+  // Compose SMS text with highest precision reading
+  const activeDisplayCoords = coords || bestCoordsRef.current;
+  const hasCoords = activeDisplayCoords !== null;
+  const lat = hasCoords ? activeDisplayCoords.latitude.toFixed(5) : '0.00000';
+  const lng = hasCoords ? activeDisplayCoords.longitude.toFixed(5) : '0.00000';
+  const mapsUrl = hasCoords ? `https://maps.google.com/?q=${lat},${lng}` : '';
+  const accuracyStr = activeDisplayCoords?.accuracy ? ` (±${activeDisplayCoords.accuracy}m)` : '';
+  const warningLine =
+    activeDisplayCoords?.accuracy && (activeDisplayCoords.accuracy > 100 || isUnreliable)
+      ? `\n⚠️ ${
+          locale === 'ha'
+            ? `GARGAƊI: Ƙarancin daidaiton GPS (±${activeDisplayCoords.accuracy}m). Wurin na iya zama na kusan (hasumiyar waya).`
+            : `WARNING: Low GPS accuracy (±${activeDisplayCoords.accuracy}m). Location is approximate (cell tower).`
+        }`
+      : '';
 
   const distressHeadlineEn = selectedDistress.nameEn;
   const distressHeadlineHa = selectedDistress.nameHa;
@@ -184,9 +327,8 @@ ${selectedDistress.emoji} ${distressHeadlineEn} (${distressHeadlineHa})
 ${locale === 'ha' ? distressMsgHa : distressMsgEn}
 ${customNote ? `Note: "${customNote}"` : ''}
 
-📍 GPS: Lat ${lat}, Long ${lng}${accuracyStr}
-🗺️ Map: ${mapsUrl}
-⏱️ Time: ${new Date().toLocaleTimeString()}
+📍 GPS: Lat ${lat}, Long ${lng}${accuracyStr}${warningLine}
+${mapsUrl ? `🗺️ Map: ${mapsUrl}\n` : ''}⏱️ Time: ${new Date().toLocaleTimeString()}
 
 Please send help immediately! / A tura agaji cikin gaggawa!`;
 
@@ -435,23 +577,63 @@ Please send help immediately! / A tura agaji cikin gaggawa!`;
 
       {/* Quick 1-Tap Trigger Banner (Always visible) */}
       <div className="mt-3.5 bg-black/25 backdrop-blur-xs rounded-2xl p-3 border border-rose-500/30 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
-        <div className="flex items-center space-x-2 text-xs">
-          <div className="p-1.5 bg-rose-500/30 rounded-lg text-rose-300">
+        <div className="flex items-center space-x-2 text-xs min-w-0">
+          <div className="p-1.5 bg-rose-500/30 rounded-lg text-rose-300 shrink-0">
             <MapPin className="w-4 h-4" />
           </div>
           <div className="min-w-0">
-            <div className="font-bold text-rose-100 flex items-center space-x-1">
+            <div className="font-bold text-rose-100 flex flex-wrap items-center gap-1.5">
               <span>GPS:</span>
-              <span className="font-mono text-white font-black text-xs">
-                {lat}, {lng}
-              </span>
-              {coords?.accuracy && (
-                <span className="text-[10px] text-rose-300 font-normal">
-                  (±{coords.accuracy}m)
+              {coords ? (
+                <>
+                  <span className="font-mono text-white font-black text-xs">
+                    {lat}, {lng}
+                  </span>
+                  <span
+                    className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-black border ${
+                      !isUnreliable && coords.accuracy < 30
+                        ? 'bg-emerald-500/30 text-emerald-200 border-emerald-400/60'
+                        : !isUnreliable && coords.accuracy <= 100
+                        ? 'bg-amber-500/30 text-amber-200 border-amber-400/60'
+                        : 'bg-rose-500/40 text-rose-200 border-rose-400/70'
+                    }`}
+                  >
+                    <span>±{coords.accuracy}m</span>
+                    {isUnreliable && (
+                      <span className="text-[9px] uppercase tracking-wide bg-rose-950/70 px-1 py-0.2 rounded border border-rose-400/40">
+                        {locale === 'ha' ? 'Kusan / Hasumiya' : 'Approx / Cell'}
+                      </span>
+                    )}
+                    {gpsLoading && (
+                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-current animate-ping" />
+                    )}
+                  </span>
+                </>
+              ) : (
+                <span className="text-amber-200 text-xs font-semibold animate-pulse flex items-center gap-1">
+                  <span>{locale === 'ha' ? 'Ana neman GPS...' : 'Searching for GPS...'}</span>
+                  {liveAccuracy && (
+                    <span className="text-[10px] text-amber-300/80 font-normal">
+                      ({locale === 'ha' ? 'Hasumiya' : 'Cell'}: ±{liveAccuracy}m)
+                    </span>
+                  )}
+                </span>
+              )}
+
+              {gpsLoading && (
+                <span className="text-[10px] text-amber-200/90 font-medium whitespace-nowrap">
+                  {coords && !isUnreliable
+                    ? locale === 'ha'
+                      ? 'Ana ƙara inganta daidaito...'
+                      : 'Refining satellite accuracy...'
+                    : locale === 'ha'
+                    ? 'Ana haɗawa da tauraron GPS...'
+                    : 'Connecting to GPS satellites...'}
+                  {readingsCount > 0 ? ` (${readingsCount}/5)` : ''}
                 </span>
               )}
             </div>
-            <div className="text-[10px] text-rose-300/90 truncate">
+            <div className="text-[10px] text-rose-300/90 truncate mt-0.5">
               {locale === 'ha' ? 'Lambar Tuntuba:' : 'Contact:'}{' '}
               <span className="font-mono font-bold text-white">{emergencyPhone}</span>
             </div>
@@ -474,7 +656,7 @@ Please send help immediately! / A tura agaji cikin gaggawa!`;
 
           {/* Refresh GPS */}
           <button
-            onClick={fetchLocation}
+            onClick={startGpsAcquisition}
             disabled={gpsLoading}
             title={locale === 'ha' ? 'Sake bincika GPS' : 'Refresh GPS'}
             className="p-2 bg-white/10 hover:bg-white/20 text-rose-100 rounded-xl transition-all cursor-pointer active:scale-95 shrink-0"
