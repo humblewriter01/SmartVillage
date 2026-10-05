@@ -20,6 +20,12 @@ import {
 import { Geolocation } from '@capacitor/geolocation';
 import { Language } from '../utils/translations';
 import { voiceService } from '../services/voiceService';
+import {
+  getLastKnownLocation,
+  saveLastKnownLocation,
+  formatLocationAge,
+  fetchQuickPosition,
+} from '../services/locationService';
 
 interface QuickAlertCardProps {
   locale: Language;
@@ -100,7 +106,21 @@ export const QuickAlertCard: React.FC<QuickAlertCardProps> = ({ locale }) => {
     longitude: number;
     accuracy: number;
     timestamp: number;
-  } | null>(null);
+    isCached?: boolean;
+  } | null>(() => {
+    // Instant offline retrieval (<1ms): state is never empty!
+    const cached = getLastKnownLocation();
+    if (cached) {
+      return {
+        latitude: cached.latitude,
+        longitude: cached.longitude,
+        accuracy: cached.accuracy,
+        timestamp: cached.timestamp,
+        isCached: true,
+      };
+    }
+    return null;
+  });
   const [liveAccuracy, setLiveAccuracy] = useState<number | null>(null);
   const [gpsLoading, setGpsLoading] = useState(false);
   const [gpsError, setGpsError] = useState<string | null>(null);
@@ -112,7 +132,13 @@ export const QuickAlertCard: React.FC<QuickAlertCardProps> = ({ locale }) => {
     longitude: number;
     accuracy: number;
     timestamp: number;
-  } | null>(null);
+    isCached?: boolean;
+  } | null>(
+    (() => {
+      const cached = getLastKnownLocation();
+      return cached ? { ...cached, isCached: true } : null;
+    })()
+  );
 
   const activeWatchIdRef = useRef<string | null>(null);
   const activeWebWatchIdRef = useRef<number | null>(null);
@@ -161,7 +187,10 @@ export const QuickAlertCard: React.FC<QuickAlertCardProps> = ({ locale }) => {
   };
 
   // Process incoming GPS fix and update coordinates immediately with the best reading
-  const processReading = (pos: { coords: { latitude: number; longitude: number; accuracy: number }; timestamp?: number }) => {
+  const processReading = (
+    pos: { coords: { latitude: number; longitude: number; accuracy: number }; timestamp?: number },
+    isLive = true
+  ) => {
     if (!pos?.coords) return;
     const lat = Number(pos.coords.latitude.toFixed(6));
     const lng = Number(pos.coords.longitude.toFixed(6));
@@ -171,10 +200,15 @@ export const QuickAlertCard: React.FC<QuickAlertCardProps> = ({ locale }) => {
     setLiveAccuracy(acc);
     setReadingsCount((prev) => prev + 1);
 
-    const reading = { latitude: lat, longitude: lng, accuracy: acc, timestamp };
+    const reading = { latitude: lat, longitude: lng, accuracy: acc, timestamp, isCached: !isLive };
 
-    // Always update if we don't have coords yet, OR if this reading is more accurate!
-    if (!bestCoordsRef.current || acc < bestCoordsRef.current.accuracy) {
+    // When a live GPS fix arrives, persist to offline storage immediately
+    if (isLive) {
+      saveLastKnownLocation(reading);
+    }
+
+    // Always replace cached location with fresh reading, or upgrade if more accurate!
+    if (!bestCoordsRef.current || bestCoordsRef.current.isCached || acc < bestCoordsRef.current.accuracy) {
       bestCoordsRef.current = reading;
       setCoords(reading);
       setIsUnreliable(acc > 100);
@@ -221,7 +255,7 @@ export const QuickAlertCard: React.FC<QuickAlertCardProps> = ({ locale }) => {
         (position) => {
           if (isCancelledRef.current) return;
           if (position?.coords) {
-            processReading(position);
+            processReading(position, true);
           }
         }
       );
@@ -235,7 +269,7 @@ export const QuickAlertCard: React.FC<QuickAlertCardProps> = ({ locale }) => {
           (position) => {
             if (isCancelledRef.current) return;
             if (position?.coords) {
-              processReading(position);
+              processReading(position, true);
             }
           },
           () => {},
@@ -245,29 +279,29 @@ export const QuickAlertCard: React.FC<QuickAlertCardProps> = ({ locale }) => {
       } catch {}
     }
 
-    // 4. Sequential multi-read acquisition loop:
+    // 4. Fast-pass & Sequential multi-read acquisition loop:
     (async () => {
-      // Step A: Immediate fast initial reading (5s timeout)
-      const initialFix = await fetchSinglePosition(true, 5000);
-      if (initialFix && !isCancelledRef.current) {
-        processReading(initialFix);
+      // Step A: Instant hardware buffer check (<100ms with maximumAge: 60000 = 60s)
+      const quickPos = await fetchQuickPosition(3000, 60000);
+      if (quickPos && !isCancelledRef.current && (!bestCoordsRef.current || bestCoordsRef.current.isCached)) {
+        processReading({ coords: quickPos, timestamp: quickPos.timestamp }, true);
       }
 
-      // Step B: Refinement iterations (up to 5 reads) to maximize satellite precision
+      // Step B: Live satellite refinement iterations (up to 5 reads) to lock fresh satellite ephemeris
       for (let i = 1; i <= 5; i++) {
         if (isCancelledRef.current) break;
 
-        // If high precision satellite lock (<= 15m) reached, we are already at peak accuracy!
-        if (bestCoordsRef.current && bestCoordsRef.current.accuracy <= 15) {
+        // If high precision satellite lock (<= 15m) reached, stop early
+        if (bestCoordsRef.current && !bestCoordsRef.current.isCached && bestCoordsRef.current.accuracy <= 15) {
           break;
         }
 
         const fix = await fetchSinglePosition(true, 10000);
         if (fix && !isCancelledRef.current) {
-          processReading(fix);
+          processReading(fix, true);
         }
 
-        if (i < 5 && (!bestCoordsRef.current || bestCoordsRef.current.accuracy > 15)) {
+        if (i < 5 && (!bestCoordsRef.current || bestCoordsRef.current.isCached || bestCoordsRef.current.accuracy > 15)) {
           await new Promise((resolve) => setTimeout(resolve, 2000));
         }
       }
@@ -286,13 +320,36 @@ export const QuickAlertCard: React.FC<QuickAlertCardProps> = ({ locale }) => {
 
   useEffect(() => {
     startGpsAcquisition();
+
+    // Foreground-only enforcement: stop GPS tracking whenever app is backgrounded
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        isCancelledRef.current = true;
+        if (activeWatchIdRef.current) {
+          Geolocation.clearWatch({ id: activeWatchIdRef.current }).catch(() => {});
+          activeWatchIdRef.current = null;
+        }
+        if (activeWebWatchIdRef.current !== null && typeof navigator !== 'undefined' && navigator.geolocation) {
+          navigator.geolocation.clearWatch(activeWebWatchIdRef.current);
+          activeWebWatchIdRef.current = null;
+        }
+      } else {
+        startGpsAcquisition();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
     return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       isCancelledRef.current = true;
       if (activeWatchIdRef.current) {
         Geolocation.clearWatch({ id: activeWatchIdRef.current }).catch(() => {});
+        activeWatchIdRef.current = null;
       }
       if (activeWebWatchIdRef.current !== null && typeof navigator !== 'undefined' && navigator.geolocation) {
         navigator.geolocation.clearWatch(activeWebWatchIdRef.current);
+        activeWebWatchIdRef.current = null;
       }
       stopSiren();
     };
@@ -308,26 +365,43 @@ export const QuickAlertCard: React.FC<QuickAlertCardProps> = ({ locale }) => {
   const lng = hasCoords ? activeDisplayCoords.longitude.toFixed(5) : '0.00000';
   const mapsUrl = hasCoords ? `https://maps.google.com/?q=${lat},${lng}` : '';
   const accuracyStr = activeDisplayCoords?.accuracy ? ` (±${activeDisplayCoords.accuracy}m)` : '';
-  const warningLine =
-    activeDisplayCoords?.accuracy && (activeDisplayCoords.accuracy > 100 || isUnreliable)
-      ? `\n⚠️ ${
-          locale === 'ha'
-            ? `GARGAƊI: Ƙarancin daidaiton GPS (±${activeDisplayCoords.accuracy}m). Wurin na iya zama na kusan (hasumiyar waya).`
-            : `WARNING: Low GPS accuracy (±${activeDisplayCoords.accuracy}m). Location is approximate (cell tower).`
-        }`
-      : '';
+
+  const ageMeta = activeDisplayCoords?.timestamp ? formatLocationAge(activeDisplayCoords.timestamp) : null;
+  const isCachedLocation = activeDisplayCoords?.isCached === true;
+
+  const cachedNotice = isCachedLocation
+    ? ` [${locale === 'ha' ? `Wurin da aka sani: ${ageMeta?.ageLabelHa}` : `Last Known: ${ageMeta?.ageLabelEn}`}]`
+    : '';
+
+  const warningLine = isCachedLocation
+    ? `\n⚠️ ${
+        locale === 'ha'
+          ? `NOTE: Wannan wurin na baya ne (${ageMeta?.ageLabelHa}). Yayin da ake neman Live GPS a fili.`
+          : `NOTE: This is the last known location (${ageMeta?.ageLabelEn}) while live satellite lock is acquiring.`
+      }`
+    : activeDisplayCoords?.accuracy && (activeDisplayCoords.accuracy > 100 || isUnreliable)
+    ? `\n⚠️ ${
+        locale === 'ha'
+          ? `GARGAƊI: Ƙarancin daidaiton GPS (±${activeDisplayCoords.accuracy}m). Wurin na iya zama na kusan (hasumiyar waya).`
+          : `WARNING: Low GPS accuracy (±${activeDisplayCoords.accuracy}m). Location is approximate (cell tower).`
+      }`
+    : '';
 
   const distressHeadlineEn = selectedDistress.nameEn;
   const distressHeadlineHa = selectedDistress.nameHa;
   const distressMsgEn = selectedDistress.defaultMessageEn;
   const distressMsgHa = selectedDistress.defaultMessageHa;
 
+  const gpsLine = hasCoords
+    ? `📍 GPS: Lat ${lat}, Long ${lng}${accuracyStr}${cachedNotice}${warningLine}`
+    : `📍 GPS: ${locale === 'ha' ? 'Ana neman GPS... (Ana haɗawa da tauraro a fili)' : 'Searching for GPS... (Satellite lock acquiring)'}`;
+
   const fullSmsBody = `[EMERGENCY / GAGGAWA - SMARTVILLAGE]
 ${selectedDistress.emoji} ${distressHeadlineEn} (${distressHeadlineHa})
 ${locale === 'ha' ? distressMsgHa : distressMsgEn}
 ${customNote ? `Note: "${customNote}"` : ''}
 
-📍 GPS: Lat ${lat}, Long ${lng}${accuracyStr}${warningLine}
+${gpsLine}
 ${mapsUrl ? `🗺️ Map: ${mapsUrl}\n` : ''}⏱️ Time: ${new Date().toLocaleTimeString()}
 
 Please send help immediately! / A tura agaji cikin gaggawa!`;
@@ -511,10 +585,13 @@ Please send help immediately! / A tura agaji cikin gaggawa!`;
     }
     voiceService.stopSpeaking();
     setIsSpeakingInnerBox(true);
-    const textToSpeak =
-      locale === 'ha'
+    const textToSpeak = hasCoords
+      ? locale === 'ha'
         ? `Wurin GPS na gaggawa: latitude ${lat}, longitude ${lng}. Lambar tuntuba ta gaggawa: ${emergencyPhone}.`
-        : `Emergency GPS location: latitude ${lat}, longitude ${lng}. Emergency contact: ${emergencyPhone}.`;
+        : `Emergency GPS location: latitude ${lat}, longitude ${lng}. Emergency contact: ${emergencyPhone}.`
+      : locale === 'ha'
+        ? `Ana neman GPS a halin yanzu. Lambar tuntuba ta gaggawa: ${emergencyPhone}.`
+        : `Searching for GPS. Emergency contact: ${emergencyPhone}.`;
     await voiceService.speak(textToSpeak, locale);
     setIsSpeakingInnerBox(false);
   };
@@ -591,18 +668,34 @@ Please send help immediately! / A tura agaji cikin gaggawa!`;
                   </span>
                   <span
                     className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-black border ${
-                      !isUnreliable && coords.accuracy < 30
+                      coords.isCached
+                        ? 'bg-amber-500/25 text-amber-200 border-amber-400/50'
+                        : !isUnreliable && coords.accuracy < 30
                         ? 'bg-emerald-500/30 text-emerald-200 border-emerald-400/60'
                         : !isUnreliable && coords.accuracy <= 100
                         ? 'bg-amber-500/30 text-amber-200 border-amber-400/60'
                         : 'bg-rose-500/40 text-rose-200 border-rose-400/70'
                     }`}
                   >
-                    <span>±{coords.accuracy}m</span>
-                    {isUnreliable && (
-                      <span className="text-[9px] uppercase tracking-wide bg-rose-950/70 px-1 py-0.2 rounded border border-rose-400/40">
-                        {locale === 'ha' ? 'Kusan / Hasumiya' : 'Approx / Cell'}
+                    {coords.isCached ? (
+                      <span className="flex items-center gap-1">
+                        <span className="text-[9px] uppercase tracking-wide bg-amber-950/70 px-1 py-0.2 rounded border border-amber-400/30">
+                          {locale === 'ha' ? 'Wurin Baya' : 'Last Known'}
+                        </span>
+                        <span>({formatLocationAge(coords.timestamp)[locale === 'ha' ? 'ageLabelHa' : 'ageLabelEn']} • ±{coords.accuracy}m)</span>
                       </span>
+                    ) : (
+                      <>
+                        <span className="text-[9px] uppercase tracking-wide bg-emerald-950/70 px-1 py-0.2 rounded border border-emerald-400/40 text-emerald-300">
+                          Live
+                        </span>
+                        <span>±{coords.accuracy}m</span>
+                        {isUnreliable && (
+                          <span className="text-[9px] uppercase tracking-wide bg-rose-950/70 px-1 py-0.2 rounded border border-rose-400/40">
+                            {locale === 'ha' ? 'Kusan' : 'Approx'}
+                          </span>
+                        )}
+                      </>
                     )}
                     {gpsLoading && (
                       <span className="inline-block w-1.5 h-1.5 rounded-full bg-current animate-ping" />
@@ -622,7 +715,11 @@ Please send help immediately! / A tura agaji cikin gaggawa!`;
 
               {gpsLoading && (
                 <span className="text-[10px] text-amber-200/90 font-medium whitespace-nowrap">
-                  {coords && !isUnreliable
+                  {coords?.isCached
+                    ? locale === 'ha'
+                      ? 'Ana binciken Live GPS a fili...'
+                      : 'Acquiring live satellite lock...'
+                    : coords && !isUnreliable
                     ? locale === 'ha'
                       ? 'Ana ƙara inganta daidaito...'
                       : 'Refining satellite accuracy...'
@@ -637,6 +734,11 @@ Please send help immediately! / A tura agaji cikin gaggawa!`;
               {locale === 'ha' ? 'Lambar Tuntuba:' : 'Contact:'}{' '}
               <span className="font-mono font-bold text-white">{emergencyPhone}</span>
             </div>
+            {coords?.isCached && (
+              <div className="text-[10px] text-amber-300/95 font-medium mt-0.5 flex items-center gap-1">
+                <span>⚠️ {locale === 'ha' ? 'Wannan wuri na baya ne — ana neman sabon GPS.' : 'This is a last-known location — acquiring live GPS.'}</span>
+              </div>
+            )}
           </div>
         </div>
 

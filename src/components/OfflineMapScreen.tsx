@@ -19,6 +19,12 @@ import { Geolocation } from '@capacitor/geolocation';
 import { Language, t } from '../utils/translations';
 import { MapPin, mapService } from '../services/mapService';
 import { voiceService } from '../services/voiceService';
+import {
+  getLastKnownLocation,
+  saveLastKnownLocation,
+  fetchQuickPosition,
+  formatLocationAge,
+} from '../services/locationService';
 
 interface OfflineMapScreenProps {
   locale: Language;
@@ -68,10 +74,14 @@ export const OfflineMapScreen: React.FC<OfflineMapScreenProps> = ({ locale }) =>
     if (!mapContainerRef.current) return;
 
     if (!mapInstanceRef.current) {
-      // Center of Nigeria
+      // Check last known location for instant offline centering (< 1ms)
+      const cached = getLastKnownLocation();
+      const initialCenter: [number, number] = cached ? [cached.latitude, cached.longitude] : [9.082, 8.6753];
+      const initialZoom = cached ? 13 : 6;
+
       const map = L.map(mapContainerRef.current, {
-        center: [9.082, 8.6753],
-        zoom: 6,
+        center: initialCenter,
+        zoom: initialZoom,
         minZoom: 4,
         maxZoom: 18,
         attributionControl: false,
@@ -85,6 +95,19 @@ export const OfflineMapScreen: React.FC<OfflineMapScreenProps> = ({ locale }) =>
 
       const markersGroup = L.layerGroup().addTo(map);
       markersLayerRef.current = markersGroup;
+
+      // If cached location exists, render last known pin immediately
+      if (cached) {
+        const cachedIcon = L.divIcon({
+          html: `<div style="background:#f59e0b;width:18px;height:18px;border-radius:50%;border:3px solid white;box-shadow:0 0 10px rgba(245,158,11,0.7);"></div>`,
+          className: 'user-cached-pin',
+          iconSize: [18, 18],
+          iconAnchor: [9, 9],
+        });
+        const marker = L.marker([cached.latitude, cached.longitude], { icon: cachedIcon });
+        marker.addTo(map);
+        userMarkerRef.current = marker;
+      }
 
       // Click on map to add pin
       map.on('click', (e: L.LeafletMouseEvent) => {
@@ -106,7 +129,7 @@ export const OfflineMapScreen: React.FC<OfflineMapScreenProps> = ({ locale }) =>
     };
   }, []);
 
-  // Robust GPS location fetch with Capacitor Geolocation & web fallback
+  // Robust fast-pass GPS location fetch with Capacitor Geolocation & web fallback
   const fetchGpsLocation = async (isManualPin = false) => {
     setGpsStatus('loading');
     setDismissErrorBanner(false);
@@ -114,7 +137,20 @@ export const OfflineMapScreen: React.FC<OfflineMapScreenProps> = ({ locale }) =>
     let lat: number | null = null;
     let lng: number | null = null;
 
-    // 1. Try Capacitor Geolocation Plugin
+    // Fast-pass 1: Check OS hardware buffer (<100ms) with acceptable cached age (60s)
+    const quick = await fetchQuickPosition(3000, 60000);
+    if (quick) {
+      lat = quick.latitude;
+      lng = quick.longitude;
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.setView([lat, lng], 13);
+        if (userMarkerRef.current) {
+          userMarkerRef.current.setLatLng([lat, lng]);
+        }
+      }
+    }
+
+    // Fast-pass 2: Try Capacitor Geolocation Plugin for fresh high-accuracy satellite lock
     try {
       const permCheck = await Geolocation.checkPermissions().catch(() => null);
       if (permCheck && permCheck.location !== 'granted') {
@@ -126,7 +162,7 @@ export const OfflineMapScreen: React.FC<OfflineMapScreenProps> = ({ locale }) =>
 
       const position = await Geolocation.getCurrentPosition({
         enableHighAccuracy: true,
-        timeout: 30000,
+        timeout: 15000,
         maximumAge: 0,
       });
 
@@ -138,7 +174,7 @@ export const OfflineMapScreen: React.FC<OfflineMapScreenProps> = ({ locale }) =>
       console.warn('Capacitor Geolocation exception, attempting navigator fallback:', pluginErr);
     }
 
-    // 2. Fallback to browser navigator.geolocation for Vercel PWA
+    // Fallback to browser navigator.geolocation
     if (lat === null || lng === null) {
       if (typeof navigator !== 'undefined' && navigator.geolocation) {
         try {
@@ -150,7 +186,7 @@ export const OfflineMapScreen: React.FC<OfflineMapScreenProps> = ({ locale }) =>
                 resolve();
               },
               (err) => reject(err),
-              { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 }
+              { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
             );
           });
         } catch (navErr) {
@@ -159,9 +195,12 @@ export const OfflineMapScreen: React.FC<OfflineMapScreenProps> = ({ locale }) =>
       }
     }
 
-    // 3. Handle Three States: Loading, Success, Error
+    // Handle Three States: Loading, Success, Error
     if (lat !== null && lng !== null) {
       setGpsStatus('success');
+
+      // Persist to offline storage for future instant boots
+      saveLastKnownLocation({ latitude: lat, longitude: lng, accuracy: 10 });
 
       if (mapInstanceRef.current) {
         mapInstanceRef.current.setView([lat, lng], 13);
@@ -169,6 +208,13 @@ export const OfflineMapScreen: React.FC<OfflineMapScreenProps> = ({ locale }) =>
         // Add or update live position marker
         if (userMarkerRef.current) {
           userMarkerRef.current.setLatLng([lat, lng]);
+          const userIcon = L.divIcon({
+            html: `<div style="background:#2563eb;width:18px;height:18px;border-radius:50%;border:3px solid white;box-shadow:0 0 10px rgba(37,99,235,0.7);"></div>`,
+            className: 'user-loc-pin',
+            iconSize: [18, 18],
+            iconAnchor: [9, 9],
+          });
+          userMarkerRef.current.setIcon(userIcon);
         } else {
           const userIcon = L.divIcon({
             html: `<div style="background:#2563eb;width:18px;height:18px;border-radius:50%;border:3px solid white;box-shadow:0 0 10px rgba(37,99,235,0.7);"></div>`,
