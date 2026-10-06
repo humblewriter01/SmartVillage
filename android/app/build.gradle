@@ -23,6 +23,13 @@ android {
                 storePassword System.getenv("CM_KEYSTORE_PASSWORD")
                 keyAlias System.getenv("CM_KEY_ALIAS")
                 keyPassword System.getenv("CM_KEY_PASSWORD")
+                // Enable all signing schemes for maximum device compatibility
+                // v1 is required for Android 7.0-8.1 devices (like Vivo)
+                // v2/v3/v4 are for newer Android versions
+                enableV1Signing = true
+                enableV2Signing = true
+                enableV3Signing = true
+                enableV4Signing = true
             }
         }
     }
