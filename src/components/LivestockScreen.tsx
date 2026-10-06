@@ -371,10 +371,10 @@ export const LivestockScreen: React.FC<LivestockScreenProps> = ({
     );
   };
 
-  // Live Text-to-Speech on symptom tap (toggle checkbox behavior)
+  // Live Text-to-Speech on symptom tap (single-select radio behavior)
   const handleToggleSymptom = (sym: string, symHausa?: string) => {
     setCheckedSymptoms((prev) =>
-      prev.includes(sym) ? prev.filter((s) => s !== sym) : [...prev, sym]
+      prev.includes(sym) ? [] : [sym]
     );
 
     // Immediately speak the tapped symptom aloud in the selected language
