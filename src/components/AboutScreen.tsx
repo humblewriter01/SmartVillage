@@ -394,10 +394,10 @@ export const AboutScreen: React.FC<AboutScreenProps> = ({ locale, onNavigateBack
                 </div>
                 <div>
                   <h3 className="text-sm font-black text-slate-800">
-                    {locale === 'ha' ? 'Lasisi da Mallaka' : 'License'}
+                    {locale === 'ha' ? 'Lasisi da Mallaka' : 'Dual License'}
                   </h3>
                   <span className="text-[11px] text-slate-500">
-                    {locale === 'ha' ? 'Sharuɗɗan amfani' : 'Terms & copyright'}
+                    {locale === 'ha' ? 'AGPL-3.0 + Lasisin Kasuwanci' : 'AGPL-3.0 + Commercial'}
                   </span>
                 </div>
               </div>
@@ -407,8 +407,8 @@ export const AboutScreen: React.FC<AboutScreenProps> = ({ locale, onNavigateBack
                 onClick={() =>
                   handleToggleSpeak(
                     'license',
-                    'License: MIT License. Copyright 2026 Hausa Cybertech.',
-                    'Lasisi: Lasisin MIT License. Haƙƙin mallaka 2026 Hausa Cybertech.'
+                    'License: Dual-licensed under AGPL-3.0 for open-source community use, and commercial license for proprietary use. Copyright 2026 Hausa Cybertech.',
+                    'Lasisi: Lasisin hadin gwiwa na AGPL-3.0 domin amfanin al\'umma kyauta, da lasisin kasuwanci domin kamfanoni. Hakkin mallaka 2026 Hausa Cybertech.'
                   )
                 }
                 className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
@@ -422,16 +422,30 @@ export const AboutScreen: React.FC<AboutScreenProps> = ({ locale, onNavigateBack
               </button>
             </div>
 
-            <div className="mt-4 p-3 bg-indigo-50/60 rounded-2xl border border-indigo-100 text-xs space-y-1.5">
-              <div className="font-black text-sm text-indigo-950">MIT License</div>
+            <div className="mt-4 p-3.5 bg-indigo-50/60 rounded-2xl border border-indigo-100 text-xs space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="font-black text-sm text-indigo-950">AGPL-3.0 + Commercial</div>
+                <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-indigo-200/70 text-indigo-900">
+                  Dual License
+                </span>
+              </div>
               <div className="font-semibold text-indigo-800">
                 © 2026 Hausa Cybertech
               </div>
-              <p className="text-[11px] text-indigo-900/80 leading-relaxed pt-1">
-                {locale === 'ha'
-                  ? 'An ba da damar yin amfani da wannan manhaja kyauta domin taimaka wa al\'ummomin manoma da iyalai a karkara.'
-                  : 'Permission is granted, free of charge, to use, copy, modify, and distribute this software for rural community empowerment.'}
-              </p>
+              <div className="space-y-1.5 text-[11px] text-indigo-950/85 leading-relaxed pt-1">
+                <p>
+                  <strong className="text-indigo-950">• AGPL-3.0 (Community):</strong>{' '}
+                  {locale === 'ha'
+                    ? "Kyauta domin amfanin al'umma da manoma. Duk gyare-gyaren da aka yi kan yanar gizo dole ne a buɗe lambobin su a ƙarƙashin AGPL-3.0."
+                    : 'Free for open-source and community empowerment. Any modifications made available over a network must release source code under AGPL-3.0.'}
+                </p>
+                <p>
+                  <strong className="text-indigo-950">• Commercial:</strong>{' '}
+                  {locale === 'ha'
+                    ? 'Akwai lasisin kasuwanci ga kamfanoni da ke buƙatar amfani da manhajar a sirrance ko neman cikakken goyon bayan fasaha.'
+                    : 'Available for organizations wishing to use SmartVillage in proprietary products or needing warranty and commercial support.'}
+                </p>
+              </div>
             </div>
           </div>
         </div>

@@ -10,8 +10,8 @@ To inquire about a commercial license, contact:
 
 **Ameenu Umar Jaafar**
 Hausa Cybertech
-Email: ameenujaafar432@gmail.com
-WhatsApp: +2348063712192
-https://hausacybertech.vercel.app/
+🌐 Website: https://hausacybertech.vercel.app/
+📧 Email: ameenujaafar432@gmail.com
+📱 WhatsApp: +2348063712192
 
 © 2026 Hausa Cybertech. All rights reserved.

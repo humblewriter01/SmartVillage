@@ -30,3 +30,22 @@ npm run build
 
 SmartVillage is a screening and education aid, not a medical diagnostic device. It must not be used to delay urgent care, prescribe medicines, determine pregnancy status, or make treatment decisions without a qualified health worker. Crop recommendations are advisory and should be checked against local extension guidance and approved product labels.
 
+## License
+
+This project is dual-licensed:
+
+- **AGPL-3.0** — Free for open-source and community use. See [LICENSE](LICENSE) for details. Any modified version made available over a network must release its source code under the same license.
+- **Commercial License** — Available for organizations that wish to use SmartVillage in a proprietary product or service, or that require legal indemnification, warranty, or priority support. See [LICENSE-COMMERCIAL.md](LICENSE-COMMERCIAL.md) for details.
+
+If you wish to use SmartVillage in a proprietary product or service without open-sourcing your modifications, you must obtain a commercial license.
+
+### Contact for commercial licensing
+
+**Ameenu Umar Jaafar**
+Hausa Cybertech
+🌐 Website: https://hausacybertech.vercel.app/
+📧 Email: ameenujaafar432@gmail.com
+📱 WhatsApp: +2348063712192
+
+© 2026 Hausa Cybertech. All rights reserved.
+
