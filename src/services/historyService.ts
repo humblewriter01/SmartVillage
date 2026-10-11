@@ -1,3 +1,5 @@
+import { safeStorage } from '../utils/safeStorage';
+
 export interface HistoryRecord {
   id: number;
   type: 'crop' | 'health' | 'water' | 'livestock' | 'map_pin';
@@ -14,7 +16,7 @@ const STORAGE_KEY = 'smartvillage.history.records';
 export const historyService = {
   list(): HistoryRecord[] {
     try {
-      const data = localStorage.getItem(STORAGE_KEY);
+      const data = safeStorage.getItem(STORAGE_KEY);
       if (!data) return [];
       const parsed = JSON.parse(data);
       return Array.isArray(parsed) ? parsed : [];
@@ -31,14 +33,14 @@ export const historyService = {
     };
     const updated = [newRecord, ...records];
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated.slice(0, 100)));
+      safeStorage.setItem(STORAGE_KEY, JSON.stringify(updated.slice(0, 100)));
     } catch {
       // If quota exceeded, trim images
       const trimmed = updated.slice(0, 30).map((r) => ({
         ...r,
         imagePath: r.imagePath?.startsWith('data:') ? undefined : r.imagePath,
       }));
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(trimmed));
+      safeStorage.setItem(STORAGE_KEY, JSON.stringify(trimmed));
     }
     return newRecord;
   },
@@ -46,13 +48,13 @@ export const historyService = {
   delete(id: number): void {
     const records = this.list().filter((r) => r.id !== id);
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+      safeStorage.setItem(STORAGE_KEY, JSON.stringify(records));
     } catch {}
   },
 
   clear(): void {
     try {
-      localStorage.removeItem(STORAGE_KEY);
+      safeStorage.removeItem(STORAGE_KEY);
     } catch {}
   },
 };

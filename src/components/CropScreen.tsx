@@ -47,6 +47,7 @@ interface CropScreenProps {
   onRecordSaved?: () => void;
   initialSelectedCrop?: CropCategoryReference;
   initialSelectedDisease?: CropDiseaseReference;
+  initialSubTab?: 'diagnosis' | 'harvest';
 }
 
 export const CropScreen: React.FC<CropScreenProps> = ({
@@ -54,9 +55,12 @@ export const CropScreen: React.FC<CropScreenProps> = ({
   onRecordSaved,
   initialSelectedCrop,
   initialSelectedDisease,
+  initialSubTab,
 }) => {
   // Navigation mode: Diagnosis vs Harvest Countdown
-  const [activeTab, setActiveTab] = useState<'diagnosis' | 'harvest'>('diagnosis');
+  const [activeTab, setActiveTab] = useState<'diagnosis' | 'harvest'>(
+    initialSubTab || 'diagnosis'
+  );
 
   // Active selected crop state (Defaults to Onion / Albasa)
   const [selectedCropId, setSelectedCropId] = useState<string>(
@@ -201,7 +205,10 @@ export const CropScreen: React.FC<CropScreenProps> = ({
     if (initialSelectedDisease) {
       setSelectedDisease(initialSelectedDisease);
     }
-  }, [initialSelectedCrop, initialSelectedDisease]);
+    if (initialSubTab) {
+      setActiveTab(initialSubTab);
+    }
+  }, [initialSelectedCrop, initialSelectedDisease, initialSubTab]);
 
   useEffect(() => {
     return () => {

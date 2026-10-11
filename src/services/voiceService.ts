@@ -4,6 +4,7 @@
 import { VoiceRecorder } from 'capacitor-voice-recorder';
 import { Capacitor } from '@capacitor/core';
 import { speakText, stopSpeakingText } from './ttsService';
+import { safeStorage } from '../utils/safeStorage';
 
 export type VoiceMode = 'developer' | 'system';
 export type VoiceCategory = 'greeting' | 'crop' | 'health' | 'livestock' | 'water' | 'soil' | 'weather';
@@ -300,11 +301,11 @@ function getSupportedMimeType(): string {
 
 export const voiceService = {
   getVoiceMode(): VoiceMode {
-    return (localStorage.getItem('smartvillage.voice.mode') as VoiceMode) || 'developer';
+    return (safeStorage.getItem('smartvillage.voice.mode') as VoiceMode) || 'developer';
   },
 
   setVoiceMode(mode: VoiceMode): void {
-    localStorage.setItem('smartvillage.voice.mode', mode);
+    safeStorage.setItem('smartvillage.voice.mode', mode);
   },
 
   isRecording(): boolean {
@@ -347,7 +348,7 @@ export const voiceService = {
 
   saveTrainedVoice(category: VoiceCategory, audioDataUrl: string): void {
     try {
-      localStorage.setItem(`smartvillage.grandma_voice.${category}`, audioDataUrl);
+      safeStorage.setItem(`smartvillage.grandma_voice.${category}`, audioDataUrl);
     } catch (e) {
       console.warn('Could not save voice to storage:', e);
     }
@@ -355,7 +356,7 @@ export const voiceService = {
 
   getTrainedVoice(category: VoiceCategory): string | null {
     try {
-      return localStorage.getItem(`smartvillage.grandma_voice.${category}`);
+      return safeStorage.getItem(`smartvillage.grandma_voice.${category}`);
     } catch {
       return null;
     }
@@ -846,7 +847,7 @@ export const voiceService = {
         const perm = await VoiceRecorder.hasAudioRecordingPermission();
         if (perm && perm.value) {
           try {
-            localStorage.setItem('smartvillage.mic_permission', 'granted');
+            safeStorage.setItem('smartvillage.mic_permission', 'granted');
           } catch {}
           return 'granted';
         }
@@ -861,23 +862,23 @@ export const voiceService = {
         const status = await navigator.permissions.query({ name: 'microphone' as PermissionName });
         if (status.state === 'granted') {
           try {
-            localStorage.setItem('smartvillage.mic_permission', 'granted');
+            safeStorage.setItem('smartvillage.mic_permission', 'granted');
           } catch {}
         } else if (status.state === 'denied') {
           try {
-            localStorage.setItem('smartvillage.mic_permission', 'denied');
+            safeStorage.setItem('smartvillage.mic_permission', 'denied');
           } catch {}
         }
 
         status.onchange = () => {
           if (status.state === 'granted') {
             try {
-              localStorage.setItem('smartvillage.mic_permission', 'granted');
+              safeStorage.setItem('smartvillage.mic_permission', 'granted');
             } catch {}
             this.notifyPermissionGranted();
           } else if (status.state === 'denied') {
             try {
-              localStorage.setItem('smartvillage.mic_permission', 'denied');
+              safeStorage.setItem('smartvillage.mic_permission', 'denied');
             } catch {}
             this.notifyPermissionDenied();
           }
@@ -888,7 +889,7 @@ export const voiceService = {
     } catch {}
 
     try {
-      const stored = localStorage.getItem('smartvillage.mic_permission');
+      const stored = safeStorage.getItem('smartvillage.mic_permission');
       if (stored === 'granted') return 'granted';
       if (stored === 'denied') return 'denied';
     } catch {}
@@ -903,7 +904,7 @@ export const voiceService = {
         const perm = await VoiceRecorder.requestAudioRecordingPermission();
         if (perm && perm.value) {
           try {
-            localStorage.setItem('smartvillage.mic_permission', 'granted');
+            safeStorage.setItem('smartvillage.mic_permission', 'granted');
           } catch {}
           this.notifyPermissionGranted();
           return true;
@@ -921,7 +922,7 @@ export const voiceService = {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       stream.getTracks().forEach((track) => track.stop());
       try {
-        localStorage.setItem('smartvillage.mic_permission', 'granted');
+        safeStorage.setItem('smartvillage.mic_permission', 'granted');
       } catch {}
       this.notifyPermissionGranted();
       return true;
@@ -934,7 +935,7 @@ export const voiceService = {
 
       if (isDenied) {
         try {
-          localStorage.setItem('smartvillage.mic_permission', 'denied');
+          safeStorage.setItem('smartvillage.mic_permission', 'denied');
         } catch {}
         this.notifyPermissionDenied();
       }

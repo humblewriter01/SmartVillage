@@ -26,6 +26,7 @@ import {
   formatLocationAge,
   fetchQuickPosition,
 } from '../services/locationService';
+import { safeStorage, formatTimeSafe } from '../utils/safeStorage';
 
 interface QuickAlertCardProps {
   locale: Language;
@@ -92,7 +93,7 @@ export const QuickAlertCard: React.FC<QuickAlertCardProps> = ({ locale }) => {
   const [customNote, setCustomNote] = useState<string>('');
   const [emergencyPhone, setEmergencyPhone] = useState<string>(() => {
     try {
-      return localStorage.getItem(EMERGENCY_CONTACT_KEY) || DEFAULT_CONTACT;
+      return safeStorage.getItem(EMERGENCY_CONTACT_KEY) || DEFAULT_CONTACT;
     } catch {
       return DEFAULT_CONTACT;
     }
@@ -402,7 +403,7 @@ ${locale === 'ha' ? distressMsgHa : distressMsgEn}
 ${customNote ? `Note: "${customNote}"` : ''}
 
 ${gpsLine}
-${mapsUrl ? `🗺️ Map: ${mapsUrl}\n` : ''}⏱️ Time: ${new Date().toLocaleTimeString()}
+${mapsUrl ? `🗺️ Map: ${mapsUrl}\n` : ''}⏱️ Time: ${formatTimeSafe()}
 
 Please send help immediately! / A tura agaji cikin gaggawa!`;
 
@@ -411,7 +412,7 @@ Please send help immediately! / A tura agaji cikin gaggawa!`;
     if (cleaned) {
       setEmergencyPhone(cleaned);
       try {
-        localStorage.setItem(EMERGENCY_CONTACT_KEY, cleaned);
+        safeStorage.setItem(EMERGENCY_CONTACT_KEY, cleaned);
       } catch {}
     }
     setIsEditingPhone(false);

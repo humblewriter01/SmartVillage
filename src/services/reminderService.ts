@@ -1,6 +1,7 @@
 import { LocalNotifications, PermissionStatus } from '@capacitor/local-notifications';
 import { Preferences } from '@capacitor/preferences';
 import { CropCalendarSchedule } from './plantingCalendarService';
+import { safeStorage } from '../utils/safeStorage';
 
 export interface StoredReminder {
   id: number;
@@ -110,7 +111,7 @@ export const reminderService = {
     }
 
     try {
-      const fallback = localStorage.getItem(REMINDERS_STORAGE_KEY) || localStorage.getItem(LEGACY_PLANTING_KEY);
+      const fallback = safeStorage.getItem(REMINDERS_STORAGE_KEY) || safeStorage.getItem(LEGACY_PLANTING_KEY);
       return fallback ? JSON.parse(fallback) : {};
     } catch {
       return {};
@@ -131,7 +132,7 @@ export const reminderService = {
       const json = JSON.stringify(current);
       await Preferences.set({ key: REMINDERS_STORAGE_KEY, value: json });
       try {
-        localStorage.setItem(REMINDERS_STORAGE_KEY, json);
+        safeStorage.setItem(REMINDERS_STORAGE_KEY, json);
       } catch {}
     } catch (err) {
       console.warn('Could not save reminder to Preferences:', err);
@@ -154,7 +155,7 @@ export const reminderService = {
       const json = JSON.stringify(current);
       await Preferences.set({ key: REMINDERS_STORAGE_KEY, value: json });
       try {
-        localStorage.setItem(REMINDERS_STORAGE_KEY, json);
+        safeStorage.setItem(REMINDERS_STORAGE_KEY, json);
       } catch {}
     } catch (err) {
       console.warn('Could not delete reminder from Preferences:', err);

@@ -15,6 +15,8 @@ export interface SoilRecord {
   advice: SoilConditionAdvice;
 }
 
+import { safeStorage } from '../utils/safeStorage';
+
 export interface SoilConditionAdvice {
   phStatus: 'strongly_acidic' | 'slightly_acidic' | 'optimal' | 'alkaline' | 'strongly_alkaline';
   phScoreTextEn: string;
@@ -355,11 +357,11 @@ const INITIAL_RECORDS: SoilRecord[] = [
 export const soilService = {
   getRecords(): SoilRecord[] {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
+      const saved = safeStorage.getItem(STORAGE_KEY);
       if (saved) {
         return JSON.parse(saved);
       }
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_RECORDS));
+      safeStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_RECORDS));
       return INITIAL_RECORDS;
     } catch {
       return INITIAL_RECORDS;
@@ -396,7 +398,7 @@ export const soilService = {
     const current = this.getRecords();
     const updated = [newRecord, ...current];
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      safeStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
       window.dispatchEvent(new Event('smartvillage_soil_updated'));
     } catch {}
 
@@ -407,7 +409,7 @@ export const soilService = {
     const current = this.getRecords();
     const updated = current.filter((r) => r.id !== id);
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      safeStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
       window.dispatchEvent(new Event('smartvillage_soil_updated'));
     } catch {}
   },

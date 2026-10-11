@@ -37,6 +37,8 @@ import { CropReferenceLibraryScreen } from './components/CropReferenceLibraryScr
 import { SoilHealthScreen } from './components/SoilHealthScreen';
 import { AboutScreen } from './components/AboutScreen';
 import { MicrophonePermissionModal } from './components/MicrophonePermissionModal';
+import { WebViewUpdateBanner } from './components/WebViewUpdateBanner';
+import { safeStorage } from './utils/safeStorage';
 import {
   CropCategoryReference,
   CropDiseaseReference,
@@ -46,7 +48,7 @@ export function App() {
   const [tab, setTab] = useState(0);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [locale, setLocale] = useState<Language>(() => {
-    return (localStorage.getItem('smartvillage.locale') as Language) || 'en';
+    return (safeStorage.getItem('smartvillage.locale') as Language) || 'en';
   });
   const [forecast, setForecast] = useState<WeatherDay[]>([]);
   const [weatherLoading, setWeatherLoading] = useState(false);
@@ -59,6 +61,8 @@ export function App() {
   // Selected crop/disease passed from Reference Library into CropScreen
   const [selectedLibraryCrop, setSelectedLibraryCrop] = useState<CropCategoryReference | undefined>();
   const [selectedLibraryDisease, setSelectedLibraryDisease] = useState<CropDiseaseReference | undefined>();
+  // Active sub-tab for CropScreen ('diagnosis' | 'harvest')
+  const [cropSubTab, setCropSubTab] = useState<'diagnosis' | 'harvest'>('diagnosis');
 
   // Monitor network status
   useEffect(() => {
@@ -88,7 +92,8 @@ export function App() {
 
       setTab((currentTab) => {
         if (currentTab !== 0) {
-          // If on another tab, return to Home screen
+          // If on another tab, return to Home screen and reset Gona sub-tab to default
+          setCropSubTab('diagnosis');
           window.history.pushState({ tab: 0 }, '');
           return 0;
         } else {
@@ -116,6 +121,11 @@ export function App() {
   }, [locale, isDrawerOpen]);
 
   const navigateToTab = (newTab: number) => {
+    // When leaving Gona (or navigating to Home or any other bottom-nav tab),
+    // reset Gona sub-tab back to 'diagnosis' (Crop Diagnosis)
+    if (newTab !== 1) {
+      setCropSubTab('diagnosis');
+    }
     setTab(newTab);
     window.history.pushState({ tab: newTab }, '');
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -123,7 +133,7 @@ export function App() {
 
   const handleSetLocale = (newLocale: Language) => {
     setLocale(newLocale);
-    localStorage.setItem('smartvillage.locale', newLocale);
+    safeStorage.setItem('smartvillage.locale', newLocale);
   };
 
   const loadWeather = async (lat?: number, lon?: number) => {
@@ -464,7 +474,18 @@ export function App() {
         {tab === 0 && (
           <HomeScreen
             locale={locale}
-            onNavigate={navigateToTab}
+            onNavigate={(newTab) => {
+              if (newTab === 1) {
+                setCropSubTab('diagnosis');
+              }
+              navigateToTab(newTab);
+            }}
+            onNavigateToCropHarvest={() => {
+              setCropSubTab('harvest');
+              setTab(1);
+              window.history.pushState({ tab: 1 }, '');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
             forecast={forecast}
             weatherLoading={weatherLoading}
             isWeatherCached={isWeatherCached}
@@ -476,6 +497,7 @@ export function App() {
             onRecordSaved={loadHistory}
             initialSelectedCrop={selectedLibraryCrop}
             initialSelectedDisease={selectedLibraryDisease}
+            initialSubTab={cropSubTab}
           />
         )}
         {tab === 2 && <HealthScreen locale={locale} onRecordSaved={loadHistory} />}
@@ -499,6 +521,7 @@ export function App() {
             onSelectDiseaseForCropScreen={(crop, disease) => {
               setSelectedLibraryCrop(crop);
               setSelectedLibraryDisease(disease);
+              setCropSubTab('diagnosis');
               navigateToTab(1); // Jump to Crop Screen
             }}
           />
@@ -565,6 +588,8 @@ export function App() {
         locale={locale}
         onPermissionGranted={handleMicPermissionGranted}
       />
+      {/* Non-blocking Android WebView version diagnostic prompt */}
+      <WebViewUpdateBanner locale={locale} />
     </div>
   );
 }

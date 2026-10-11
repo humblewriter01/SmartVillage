@@ -3,6 +3,7 @@
 // and manages progressive satellite GPS lock.
 
 import { Geolocation, Position } from '@capacitor/geolocation';
+import { safeStorage } from '../utils/safeStorage';
 
 export interface CachedLocation {
   latitude: number;
@@ -27,7 +28,7 @@ const STORAGE_KEY = 'smartvillage.last_known_location';
  */
 export function getLastKnownLocation(): CachedLocation | null {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = safeStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (parsed && typeof parsed.latitude === 'number' && typeof parsed.longitude === 'number') {
@@ -57,7 +58,7 @@ export function saveLastKnownLocation(coords: { latitude: number; longitude: num
       timestamp: coords.timestamp || Date.now(),
       source: 'cached_stored',
     };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+    safeStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
   } catch (err) {
     console.warn('Failed to store cached location:', err);
   }

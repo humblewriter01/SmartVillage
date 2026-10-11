@@ -38,14 +38,16 @@
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-legacy": "^6.0.0",
     "@vitejs/plugin-react": "^4.3.4",
     "tailwindcss": "^4.0.0",
+    "terser": "^5.37.0",
     "typescript": "^5.7.0",
     "vite": "^6.0.0"
   },
   "optionalDependencies": {
-    "@rollup/rollup-darwin-arm64": "4.63.4",
-    "@rollup/rollup-darwin-x64": "4.63.4",
-    "@rollup/rollup-linux-x64-gnu": "4.63.4"
+    "@rollup/rollup-darwin-arm64": "4.64.0",
+    "@tailwindcss/oxide-darwin-arm64": "4.3.3",
+    "lightningcss-darwin-arm64": "1.32.0"
   }
 }

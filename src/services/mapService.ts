@@ -21,6 +21,8 @@ export interface MapPin {
   };
 }
 
+import { safeStorage } from '../utils/safeStorage';
+
 const STORAGE_KEY = 'smartvillage.map.pins';
 
 export const INITIAL_COMMUNITY_PINS: MapPin[] = [
@@ -118,10 +120,10 @@ export const INITIAL_COMMUNITY_PINS: MapPin[] = [
 export const mapService = {
   getPins(): MapPin[] {
     try {
-      const data = localStorage.getItem(STORAGE_KEY);
+      const data = safeStorage.getItem(STORAGE_KEY);
       if (!data) {
         // Seed initial pins
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_COMMUNITY_PINS));
+        safeStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_COMMUNITY_PINS));
         return INITIAL_COMMUNITY_PINS;
       }
       const parsed = JSON.parse(data);
@@ -140,7 +142,7 @@ export const mapService = {
     };
     const updated = [newPin, ...pins];
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      safeStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
     } catch {}
     return newPin;
   },
@@ -148,13 +150,13 @@ export const mapService = {
   deletePin(id: string): void {
     const pins = this.getPins().filter((p) => p.id !== id);
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(pins));
+      safeStorage.setItem(STORAGE_KEY, JSON.stringify(pins));
     } catch {}
   },
 
   resetDefault(): void {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_COMMUNITY_PINS));
+      safeStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_COMMUNITY_PINS));
     } catch {}
   },
 };

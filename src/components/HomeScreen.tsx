@@ -26,6 +26,7 @@ import { QuickAlertCard } from './QuickAlertCard';
 interface HomeScreenProps {
   locale: Language;
   onNavigate: (tab: number) => void;
+  onNavigateToCropHarvest?: () => void;
   forecast: WeatherDay[];
   weatherLoading: boolean;
   isWeatherCached: boolean;
@@ -34,6 +35,7 @@ interface HomeScreenProps {
 export const HomeScreen: React.FC<HomeScreenProps> = ({
   locale,
   onNavigate,
+  onNavigateToCropHarvest,
   forecast,
   weatherLoading,
   isWeatherCached,
@@ -251,7 +253,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       {/* Active Crop Harvest Countdown Component */}
       <HomeHarvestCountdown
         locale={locale}
-        onNavigateToCropHarvest={() => onNavigate(1)}
+        onNavigateToCropHarvest={onNavigateToCropHarvest || (() => onNavigate(1))}
       />
 
       {/* Grid of Primary Action Cards */}

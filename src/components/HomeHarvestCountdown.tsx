@@ -20,6 +20,7 @@ import {
   PlantedCrop,
   CROP_HARVEST_PRESETS,
 } from './HarvestCountdownCard';
+import { safeStorage, formatDateSafe } from '../utils/safeStorage';
 
 interface HomeHarvestCountdownProps {
   locale: Language;
@@ -32,7 +33,7 @@ export const HomeHarvestCountdown: React.FC<HomeHarvestCountdownProps> = ({
 }) => {
   const [plantings, setPlantings] = useState<PlantedCrop[]>(() => {
     try {
-      const saved = localStorage.getItem('smartvillage.harvest_countdowns');
+      const saved = safeStorage.getItem('smartvillage.harvest_countdowns');
       if (saved) return JSON.parse(saved);
     } catch {}
 
@@ -75,7 +76,7 @@ export const HomeHarvestCountdown: React.FC<HomeHarvestCountdownProps> = ({
     ];
 
     try {
-      localStorage.setItem('smartvillage.harvest_countdowns', JSON.stringify(initial));
+      safeStorage.setItem('smartvillage.harvest_countdowns', JSON.stringify(initial));
     } catch {}
 
     return initial;
@@ -166,7 +167,7 @@ export const HomeHarvestCountdown: React.FC<HomeHarvestCountdownProps> = ({
   useEffect(() => {
     const handleSync = () => {
       try {
-        const saved = localStorage.getItem('smartvillage.harvest_countdowns');
+        const saved = safeStorage.getItem('smartvillage.harvest_countdowns');
         if (saved) {
           setPlantings((prev) => {
             if (JSON.stringify(prev) === saved) {
@@ -189,7 +190,7 @@ export const HomeHarvestCountdown: React.FC<HomeHarvestCountdownProps> = ({
   const persistPlantings = (updated: PlantedCrop[]) => {
     setPlantings(updated);
     try {
-      localStorage.setItem('smartvillage.harvest_countdowns', JSON.stringify(updated));
+      safeStorage.setItem('smartvillage.harvest_countdowns', JSON.stringify(updated));
       window.dispatchEvent(new Event('smartvillage_harvest_updated'));
     } catch {}
   };
@@ -208,10 +209,7 @@ export const HomeHarvestCountdown: React.FC<HomeHarvestCountdownProps> = ({
 
     const harvestDate = new Date(pDate);
     harvestDate.setDate(harvestDate.getDate() + maturityDays);
-    const formattedHarvestDate = harvestDate.toLocaleDateString(
-      locale === 'ha' ? 'ha-NG' : 'en-NG',
-      { day: 'numeric', month: 'short' }
-    );
+    const formattedHarvestDate = formatDateSafe(harvestDate, locale, { day: 'numeric', month: 'short' });
 
     let stageHa = 'Shuka da Fitowa';
     let stageEn = 'Sprouting';
