@@ -14,6 +14,9 @@ export default defineConfig({
       modernPolyfills: true,
     }),
   ],
+  optimizeDeps: {
+    exclude: ['onnxruntime-web'],
+  },
   build: {
     target: 'es2015',
     cssTarget: 'chrome61',
