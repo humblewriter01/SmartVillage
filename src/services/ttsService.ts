@@ -1,17 +1,6 @@
 import { TextToSpeech } from '@capacitor-community/text-to-speech';
-import * as ort from 'onnxruntime-web';
+import type { TTSWorkerResponse } from '../workers/ttsProtocol';
 import { preprocessHausaText, splitSpeechChunks } from '../utils/textPreprocessor';
-
-ort.env.wasm.wasmPaths = '/models/murya/';
-ort.env.wasm.numThreads = 1;
-ort.env.wasm.proxy = false;
-
-interface PiperConfig {
-  phoneme_type: string;
-  phoneme_id_map: Record<string, number[]>;
-  audio: { sample_rate: number };
-  inference: { noise_scale: number; length_scale: number; noise_w: number };
-}
 
 export class SystemTTSEngine {
   private finish?: () => void;
@@ -46,86 +35,87 @@ export class SystemTTSEngine {
 }
 
 export class MuryaTTSEngine {
-  private ready?: Promise<{ config: PiperConfig; session: ort.InferenceSession }>;
+  private worker?: Worker;
+  private pending?: { reject: (error: Error) => void };
+  private requestId = 0;
   private context?: AudioContext;
   private source?: AudioBufferSourceNode;
+  private finishPlayback?: () => void;
 
-  // Call before the first await to preserve the browser's user-gesture activation.
   unlock(): void {
     this.context ??= new AudioContext();
     void this.context.resume().catch(() => {});
   }
 
-  private load() {
-    this.ready ??= (async () => {
-      const response = await fetch('/models/murya/murya.onnx.json');
-      if (!response.ok) throw new Error(`Murya config: HTTP ${response.status}`);
-      const config: PiperConfig = await response.json();
-      if (config.phoneme_type !== 'text' || !config.phoneme_id_map) {
-        throw new Error('Murya requires a text-phoneme Piper config');
-      }
-      const session = await ort.InferenceSession.create('/models/murya/murya.onnx', {
-        executionProviders: ['wasm'],
-      });
-      return { config, session };
-    })().catch(error => { this.ready = undefined; throw error; });
-    return this.ready;
+  private generate(text: string): Promise<Extract<TTSWorkerResponse, { type: 'audio' }>> {
+    return new Promise((resolve, reject) => {
+      const id = ++this.requestId;
+      const loading = () => window.dispatchEvent(new CustomEvent('murya-loading', { detail: false }));
+      const finish = () => {
+        clearTimeout(timer);
+        this.pending = undefined;
+        loading();
+      };
+      const fail = (error: Error) => {
+        finish();
+        // ORT session.run cannot be interrupted with a message. Terminate the
+        // worker to abort inference and release its model/WASM memory immediately.
+        this.worker?.terminate();
+        this.worker = undefined;
+        reject(error);
+      };
+      // Includes worker startup, runtime import, model fetch, and inference.
+      const timer = setTimeout(() => fail(new Error('Murya exceeded 2 seconds')), 2000);
+      this.pending = { reject: fail };
+      window.dispatchEvent(new CustomEvent('murya-loading', { detail: true }));
+      try {
+        this.worker ??= new Worker(new URL('../workers/ttsWorker.ts', import.meta.url), { type: 'module' });
+        this.worker.onmessage = ({ data }: MessageEvent<TTSWorkerResponse>) => {
+          if (data.id !== id) return;
+          if (data.type === 'error') { fail(new Error(data.message)); return; }
+          finish();
+          resolve(data);
+        };
+        this.worker.onerror = event => { event.preventDefault(); fail(new Error(event.message || 'Voice worker failed')); };
+        this.worker.onmessageerror = () => fail(new Error('Invalid voice worker response'));
+        this.worker.postMessage({ id, text });
+      } catch (error) { fail(error instanceof Error ? error : new Error(String(error))); }
+    });
   }
 
   async speak(text: string, isCurrent: () => boolean): Promise<void> {
     if (text.length > 240) throw new Error('Chunk too large for Murya');
-    const { config, session } = await this.load();
+    const { samples, sampleRate } = await this.generate(text);
     if (!isCurrent()) return;
-    const map = config.phoneme_id_map;
-    const lookup = (symbol: string) => {
-      if (!map[symbol]?.length) throw new Error(`Unmapped Murya phoneme: ${symbol}`);
-      return map[symbol];
-    };
-    // Piper text phonemes: BOS, padding, then each symbol + padding, EOS.
-    const ids = [...lookup('^'), ...lookup('_')];
-    for (const symbol of text) ids.push(...lookup(symbol), ...lookup('_'));
-    ids.push(...lookup('$'));
-    const feeds: Record<string, ort.Tensor> = {
-      input: new ort.Tensor('int64', BigInt64Array.from(ids, id => BigInt(id)), [1, ids.length]),
-      input_lengths: new ort.Tensor('int64', BigInt64Array.of(BigInt(ids.length)), [1]),
-      scales: new ort.Tensor('float32', Float32Array.of(
-        config.inference.noise_scale, config.inference.length_scale, config.inference.noise_w), [3]),
-    };
-    // The uploaded model has eight speakers; select the first trained voice.
-    if (session.inputNames.includes('sid')) {
-      feeds.sid = new ort.Tensor('int64', BigInt64Array.of(BigInt(0)), [1]);
-    }
-    let outputs: Record<string, ort.Tensor> | undefined;
-    try {
-      outputs = await session.run(feeds);
-      if (!isCurrent()) return;
-      const samples = outputs[session.outputNames[0]].data;
-      if (!(samples instanceof Float32Array) || !samples.length) throw new Error('Invalid Murya audio');
-      this.context ??= new AudioContext();
-      await this.context.resume();
-      if (!isCurrent()) return;
-      const buffer = this.context.createBuffer(1, samples.length, config.audio.sample_rate);
-      buffer.getChannelData(0).set(samples);
-      await new Promise<void>((resolve, reject) => {
-        const source = this.context!.createBufferSource();
-        this.source = source;
-        source.buffer = buffer;
-        source.connect(this.context!.destination);
-        source.onended = () => {
-          source.disconnect();
-          if (this.source === source) this.source = undefined;
-          resolve();
-        };
-        try { source.start(); } catch (error) { source.disconnect(); this.source = undefined; reject(error); }
-      });
-    } finally {
-      Object.values(feeds).forEach(tensor => tensor.dispose());
-      if (outputs) Object.values(outputs).forEach(tensor => tensor.dispose());
-    }
+    this.context ??= new AudioContext();
+    await this.context.resume();
+    if (!isCurrent()) return;
+    const buffer = this.context.createBuffer(1, samples.length, sampleRate);
+    buffer.getChannelData(0).set(samples);
+    await new Promise<void>((resolve, reject) => {
+      const source = this.context!.createBufferSource();
+      this.source = source;
+      source.buffer = buffer;
+      source.connect(this.context!.destination);
+      let ended = false;
+      const finish = () => {
+        if (ended) return;
+        ended = true;
+        source.disconnect();
+        if (this.source === source) this.source = undefined;
+        this.finishPlayback = undefined;
+        resolve();
+      };
+      this.finishPlayback = finish;
+      source.onended = finish;
+      try { source.start(); } catch (error) { finish(); reject(error); }
+    });
   }
 
   stop(): void {
+    this.pending?.reject(new Error('Voice request cancelled'));
     try { this.source?.stop(); } catch { /* Already ended. */ }
+    this.finishPlayback?.();
     this.source = undefined;
   }
 }
@@ -146,13 +136,15 @@ export async function speakText(text: string, langCode: string): Promise<void> {
   const run = async () => {
     await stopped;
     if (!current()) return;
+    let useMurya = hausa;
     for (const original of splitSpeechChunks(text)) {
       if (!current()) break;
-      if (hausa) {
+      if (useMurya) {
         try {
           await murya.speak(preprocessHausaText(original), current);
           continue;
         } catch (error) {
+          useMurya = false; // Don't impose another timeout on every remaining chunk.
           console.warn('Murya chunk failed; using system TTS:', error);
         }
       }

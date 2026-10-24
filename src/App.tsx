@@ -45,6 +45,13 @@ import {
 } from './data/cropReferenceData';
 
 export function App() {
+  const [voiceLoading, setVoiceLoading] = useState(false);
+  useEffect(() => {
+    const onLoading = (event: Event) => setVoiceLoading(Boolean((event as CustomEvent<boolean>).detail));
+    window.addEventListener('murya-loading', onLoading);
+    return () => window.removeEventListener('murya-loading', onLoading);
+  }, []);
+
   const [tab, setTab] = useState(0);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [locale, setLocale] = useState<Language>(() => {
@@ -252,6 +259,12 @@ export function App() {
   return (
     <div className="min-h-screen flex flex-col bg-[#f6faf7] text-slate-800 antialiased selection:bg-emerald-200">
       {/* Toast Notification */}
+      {voiceLoading && (
+        <div role="status" aria-live="polite" className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-2 rounded-full bg-slate-900 px-4 py-3 text-sm text-white shadow-lg pointer-events-none">
+          <span aria-hidden="true" className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+          Loading voice...
+        </div>
+      )}
       {toastMessage && (
         <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white text-xs sm:text-sm px-4 py-2.5 rounded-xl shadow-lg border border-slate-700 animate-fade-in">
           {toastMessage}
