@@ -10,9 +10,7 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 3000",
     "build": "tsc -b && vite build",
-    "preview": "vite preview --port 3000",
-    "postinstall": "node scripts/sync-ort-assets.mjs",
-    "test:tts": "node tests/murya.test.mjs && node tests/tts-worker.test.mjs"
+    "preview": "vite preview --port 3000"
   },
   "dependencies": {
     "@capacitor-community/text-to-speech": "^8.0.2",
@@ -31,7 +29,6 @@
     "clsx": "^2.1.1",
     "leaflet": "^1.9.4",
     "lucide-react": "^1.16.0",
-    "onnxruntime-web": "1.30.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "tailwind-merge": "^3.0.2"
