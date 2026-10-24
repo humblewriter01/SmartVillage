@@ -12,7 +12,7 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview --port 3000",
     "postinstall": "node scripts/sync-ort-assets.mjs",
-    "test:tts": "node tests/murya.test.mjs"
+    "test:tts": "node tests/murya.test.mjs && node tests/tts-worker.test.mjs"
   },
   "dependencies": {
     "@capacitor-community/text-to-speech": "^8.0.2",

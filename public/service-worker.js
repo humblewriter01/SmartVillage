@@ -9,16 +9,8 @@ const MURYA_ASSETS = [
   '/models/murya/ort-wasm-simd-threaded.jsep.mjs',
   '/models/murya/ort-wasm-simd-threaded.jsep.wasm',
 ];
-self.addEventListener('install', event => {
-  // A failed download must not prevent the rest of the app from installing.
-  event.waitUntil((async () => {
-    try {
-      const cache = await caches.open(MURYA_CACHE);
-      await cache.addAll(MURYA_ASSETS);
-    } catch (error) { console.warn('Murya offline download incomplete:', error); }
-    await self.skipWaiting();
-  })());
-});
+// Model/runtime assets are cached only on demand, never during startup.
+self.addEventListener('install', event => { event.waitUntil(self.skipWaiting()); });
 self.addEventListener('activate', event => {
   event.waitUntil((async () => {
     for (const key of await caches.keys()) {

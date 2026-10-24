@@ -14,6 +14,7 @@ export default defineConfig({
       modernPolyfills: true,
     }),
   ],
+  worker: { format: 'es' },
   optimizeDeps: {
     exclude: ['onnxruntime-web'],
   },
