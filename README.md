@@ -55,7 +55,7 @@ SmartVillage is a comprehensive, offline-first web and mobile application engine
 - **Native Local Notifications**: Schedule and manage automated device reminders using `@capacitor/local-notifications` that trigger even when the app is closed.
 
 ### 7. Water Appearance & Safety Guidance
-- **Offline photo estimate**: Capture a photo, choose one from the device gallery, or try one of three bundled illustrative (AI-generated) sample images. A small canvas averages the centre of the image and groups its appearance as clear, green, turbid, or inconclusive.
+- **Offline photo estimate**: Capture a photo, choose one from the device gallery, or preview one of three bundled illustrative (AI-generated) sample images. Tap **Analyze Water / Bincika Ruwa** to run the on-device check; a small canvas averages the centre of the image and groups its appearance as clear, green, turbid, or inconclusive.
 - **Not a drinking-water test**: Lighting and surroundings affect this unvalidated heuristic. A photo cannot measure turbidity, detect microbes or chemicals, or establish whether water is safe; use a laboratory test and a trusted water source.
 - **Bilingual guidance**: Advice distinguishes ordinary disinfection from suspected algae or chemical contamination, for which boiling or chlorine may not make water safe.
 
