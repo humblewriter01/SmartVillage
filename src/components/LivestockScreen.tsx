@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   AlertTriangle,
   Volume2,
@@ -25,6 +25,7 @@ import {
   DifferentialMatch,
 } from '../services/livestockService';
 import { voiceService } from '../services/voiceService';
+import { animalSoundUrl } from '../services/animalSoundService';
 import { historyService } from '../services/historyService';
 import { reminderService, StoredReminder, getNotificationIdForKey } from '../services/reminderService';
 
@@ -288,6 +289,9 @@ export const LivestockScreen: React.FC<LivestockScreenProps> = ({
   const [result, setResult] = useState<LivestockCheckResult | null>(null);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [playingAnimalId, setPlayingAnimalId] = useState<string | null>(null);
+  const animalAudioRef = useRef<HTMLAudioElement | null>(null);
+  const playingAnimalRef = useRef<string | null>(null);
+  const playbackIdRef = useRef(0);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [reminders, setReminders] = useState<Record<string, StoredReminder>>({});
   const [showSchedulesModal, setShowSchedulesModal] = useState(false);
@@ -314,6 +318,16 @@ export const LivestockScreen: React.FC<LivestockScreenProps> = ({
 
   useEffect(() => {
     reminderService.getStoredReminders().then(setReminders);
+    const audio = animalAudioRef.current;
+    return () => {
+      playbackIdRef.current++;
+      playingAnimalRef.current = null;
+      if (audio) {
+        audio.pause();
+        audio.removeAttribute('src');
+        audio.load();
+      }
+    };
   }, []);
 
   const showToast = (msg: string) => {
@@ -431,15 +445,32 @@ export const LivestockScreen: React.FC<LivestockScreenProps> = ({
     setResult(null);
   };
 
+  const handleAnimalAudioError = () => {
+    if (!playingAnimalRef.current) return;
+    playingAnimalRef.current = null;
+    setPlayingAnimalId(null);
+    showToast(locale === 'ha' ? 'Ba a iya kunna sautin dabba ba.' : 'Could not play the animal sound.');
+  };
+
   const handlePlayAnimalSound = async (animal: LivestockAnimal, e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
+    e?.stopPropagation();
+    const audio = animalAudioRef.current;
+    const url = animalSoundUrl(animal.id, import.meta.env.BASE_URL);
+    if (!audio || !url) {
+      showToast(locale === 'ha' ? 'Babu sautin wannan dabba.' : 'No recording is available for this animal.');
+      return;
+    }
+    const playbackId = ++playbackIdRef.current;
+    audio.pause();
+    audio.src = url;
+    playingAnimalRef.current = animal.id;
     setPlayingAnimalId(animal.id);
     try {
-      await voiceService.playAnimalSound(animal.id);
+      // This element plays the bundled MP3 directly; the read-aloud TTS is separate.
+      await audio.play();
     } catch (err) {
-      console.warn('Audio playback error:', err);
-    } finally {
-      setPlayingAnimalId(null);
+      console.warn('Animal audio playback error:', err);
+      if (playbackId === playbackIdRef.current) handleAnimalAudioError();
     }
   };
 
@@ -523,6 +554,12 @@ export const LivestockScreen: React.FC<LivestockScreenProps> = ({
 
   return (
     <div className="max-w-4xl lg:max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+      <audio
+        ref={animalAudioRef}
+        preload="none"
+        onEnded={() => { playingAnimalRef.current = null; setPlayingAnimalId(null); }}
+        onError={handleAnimalAudioError}
+      />
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white text-xs sm:text-sm px-4 py-2.5 rounded-xl shadow-lg border border-slate-700 animate-fade-in flex items-center gap-2">

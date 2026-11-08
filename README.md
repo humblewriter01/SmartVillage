@@ -1,6 +1,6 @@
 # SmartVillage
 
-SmartVillage is a comprehensive, offline-first web and mobile application engineered for rural Nigerian farmers, families, and remote agricultural communities. Developed by **Hausa Cybertech** in Kano, Nigeria, SmartVillage bridges critical information gaps in agrarian regions by delivering on-device computer vision, veterinary diagnostics, water quality testing, seasonal planting calendars, interactive offline maps, and emergency S.O.S distress broadcasting without requiring an active internet connection.
+SmartVillage is a comprehensive, offline-first web and mobile application engineered for rural Nigerian farmers, families, and remote agricultural communities. Developed by **Hausa Cybertech** in Kano, Nigeria, SmartVillage bridges critical information gaps in agrarian regions by delivering on-device computer vision, veterinary diagnostics, water appearance guidance, seasonal planting calendars, interactive offline maps, and emergency S.O.S distress broadcasting without requiring an active internet connection.
 
 🌐 **Website**: [https://hausacybertech.vercel.app/](https://hausacybertech.vercel.app/)  
 📧 **Email**: [ameenujaafar432@gmail.com](mailto:ameenujaafar432@gmail.com)  
@@ -48,16 +48,16 @@ SmartVillage is a comprehensive, offline-first web and mobile application engine
 - **9 Animal Categories**: Targeted veterinary disease models for Chickens, Goats, Sheep, Cattle, Donkeys, Camels, Pigs, Ducks, and Turkeys.
 - **Single-Select Symptom Triage**: Streamlined symptom selection with instant deselect toggling and voice pronunciation.
 - **Weighted Differential Scoring**: Clinically weighted diagnostic engine identifying likely diseases, secondary differentials, severity ratings, and contagious warnings (e.g., CBPP, PPR, Newcastle, Blackhead, ASF).
-- **Authentic Animal Audio**: Native sound effects for each animal species to assist low-literacy identification.
+- **Authentic Animal Audio**: Bundled recordings for each animal species to assist low-literacy identification; see [sound credits](public/sounds/CREDITS.md).
 
 ### 6. Livestock Vaccination Schedules & Notification Reminders
 - **Routine Immunization Timelines**: Species-specific vaccination, deworming, and biosecurity schedules (LaSota, Gumboro, PPR, CBPP, Blackleg, Anthrax, Tetanus).
 - **Native Local Notifications**: Schedule and manage automated device reminders using `@capacitor/local-notifications` that trigger even when the app is closed.
 
-### 7. Drinking Water Quality & Safety Analyzer
-- **Multi-Parameter Physical Evaluation**: Turbidity (clarity), color, odor, and taste assessments.
-- **Standards Benchmarking**: Real-time evaluation against World Health Organization (WHO) and Nigerian Standard for Drinking Water Quality (NSDWQ) potable limits.
-- **Purification Guides**: Step-by-step instructions for Solar Water Disinfection (SODIS), cloth filtration, boiling, and household chlorination (WaterGuard/bleach dosing).
+### 7. Water Appearance & Safety Guidance
+- **Offline photo estimate**: A small canvas averages the centre of the image and groups its appearance as clear, green, turbid, or inconclusive. Manual examples are also available.
+- **Not a drinking-water test**: Lighting and surroundings affect this unvalidated heuristic. A photo cannot measure turbidity, detect microbes or chemicals, or establish whether water is safe; use a laboratory test and a trusted water source.
+- **Bilingual guidance**: Advice distinguishes ordinary disinfection from suspected algae or chemical contamination, for which boiling or chlorine may not make water safe.
 
 ### 8. Seasonal Planting Calendar & Agro-Ecological Zones
 - **Nigerian Ecological Zones**: Tailored planting schedules for Sahel Savanna, Sudan Savanna, Northern/Southern Guinea Savanna, and Rainforest zones.
@@ -135,7 +135,7 @@ This prevents the common `"Parse Error: There was a problem parsing the package"
 ## Getting Started
 
 ### Prerequisites
-- Node.js (v18 or higher)
+- Node.js 22 or higher (also required by the built-in TypeScript test runner)
 - npm (v9 or higher)
 - Android Studio & Android SDK (for native Android builds)
 
@@ -158,6 +158,16 @@ npm run dev
 ```bash
 npm run build
 ```
+
+### Tests
+
+```bash
+npm test                    # Offline classification, camera queue, sound assets and cache tests
+npm run build
+CHROME_BIN=/path/to/chromium npm run test:e2e  # Production browser flows; no test dependency required
+```
+
+The browser tests mock camera hardware and the Capacitor bridge, exercise all nine recordings while offline, and reload the production app offline. The first online web visit must finish caching before offline reload; Android bundles the assets in the app. On a physical Android device, also check permission denial, front/rear switching, flash availability, capture and closing during a permission prompt. Flash is disabled when the selected camera does not support it.
 
 ### Sync & Run Android App
 

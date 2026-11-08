@@ -1,6 +1,17 @@
 @import "tailwindcss";
 @import "leaflet/dist/leaflet.css";
 
+/* Capgo renders the native camera behind the WebView; keep the portal and its
+   controls visible while hiding the otherwise opaque React application. */
+html.native-camera-open,
+html.native-camera-open body {
+  background: transparent !important;
+}
+
+html.native-camera-open #root {
+  visibility: hidden;
+}
+
 @layer base {
   body {
     background-color: #f6faf7;
