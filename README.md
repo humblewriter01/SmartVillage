@@ -55,7 +55,7 @@ SmartVillage is a comprehensive, offline-first web and mobile application engine
 - **Native Local Notifications**: Schedule and manage automated device reminders using `@capacitor/local-notifications` that trigger even when the app is closed.
 
 ### 7. Water Appearance & Safety Guidance
-- **Offline photo estimate**: A small canvas averages the centre of the image and groups its appearance as clear, green, turbid, or inconclusive. Manual examples are also available.
+- **Offline photo estimate**: Capture a photo, choose one from the device gallery, or try one of three bundled illustrative (AI-generated) sample images. A small canvas averages the centre of the image and groups its appearance as clear, green, turbid, or inconclusive.
 - **Not a drinking-water test**: Lighting and surroundings affect this unvalidated heuristic. A photo cannot measure turbidity, detect microbes or chemicals, or establish whether water is safe; use a laboratory test and a trusted water source.
 - **Bilingual guidance**: Advice distinguishes ordinary disinfection from suspected algae or chemical contamination, for which boiling or chlorine may not make water safe.
 
@@ -167,7 +167,7 @@ npm run build
 CHROME_BIN=/path/to/chromium npm run test:e2e  # Production browser flows; no test dependency required
 ```
 
-The browser tests mock camera hardware and the Capacitor bridge, exercise all nine recordings while offline, and reload the production app offline. The first online web visit must finish caching before offline reload; Android bundles the assets in the app. On a physical Android device, also check permission denial, front/rear switching, flash availability, capture and closing during a permission prompt. Flash is disabled when the selected camera does not support it.
+The browser tests exercise gallery selection, offline sample previews and analysis, all nine offline recordings, and offline reload. They mock camera hardware and the Capacitor bridge. The first online web visit must finish caching before offline reload; Android bundles the assets in the app. On a physical Android device, also check gallery selection and cancellation, permission denial, front/rear switching, flash availability, capture and closing during a permission prompt. Flash is disabled when the selected camera does not support it.
 
 ### Sync & Run Android App
 

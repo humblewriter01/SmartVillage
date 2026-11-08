@@ -117,6 +117,16 @@ class DevToolsPage {
   }
 }
 
+async function chooseGalleryFile(page, path) {
+  // Drive the actual browser file input without opening an OS dialog.
+  await page.send('Page.setInterceptFileChooserDialog', { enabled: true });
+  await page.clickButtonText('Choose from Gallery');
+  const document = await page.send('DOM.getDocument');
+  const input = await page.send('DOM.querySelector', { nodeId: document.root.nodeId, selector: 'input[type="file"]' });
+  assert.ok(input.nodeId, 'gallery should open a file input');
+  await page.send('DOM.setFileInputFiles', { nodeId: input.nodeId, files: [resolve(path)] });
+}
+
 async function newPage(port, origin, setup) {
   const target = await fetch(`http://127.0.0.1:${port}/json/new?about:blank`, { method: 'PUT' }).then(r => r.json());
   const socket = new WebSocket(target.webSocketDebuggerUrl);
@@ -174,9 +184,22 @@ function mockNativeCamera() {
   window.androidBridge = {};
   let starts = 0;
   window.Capacitor = {
-    PluginHeaders: [{ name: 'CameraPreview', methods: ['start', 'stop', 'getSupportedFlashModes', 'getAvailableDevices', 'setFlashMode', 'flip', 'capture'].map(name => ({ name, rtype: 'promise' })) }],
+    PluginHeaders: [
+      { name: 'CameraPreview', methods: ['start', 'stop', 'getSupportedFlashModes', 'getAvailableDevices', 'setFlashMode', 'flip', 'capture'].map(name => ({ name, rtype: 'promise' })) },
+      { name: 'Camera', methods: [{ name: 'getPhoto', rtype: 'promise' }] },
+    ],
     nativePromise: async (plugin, method, options) => {
       window.__native.push({ plugin, method, options });
+      if (plugin === 'Camera' && method === 'getPhoto') {
+        if (window.__galleryError) throw new Error(window.__galleryError);
+        if (window.__delayGallery) {
+          window.__delayGallery = false;
+          await new Promise(resolve => { window.__releaseGallery = resolve; });
+        }
+        const canvas = document.createElement('canvas'); canvas.width = canvas.height = 100;
+        const context = canvas.getContext('2d'); context.fillStyle = '#f4f4f4'; context.fillRect(0, 0, 100, 100);
+        return { dataUrl: canvas.toDataURL('image/jpeg') };
+      }
       if (method === 'start') {
         if (++starts === 1) await new Promise(resolve => setTimeout(resolve, 900));
         window.__native.push({ method: 'started' });
@@ -194,7 +217,7 @@ function mockNativeCamera() {
   };
 }
 
-test('production browser flows, offline sounds and native camera lifecycle', { timeout: 60000 }, async t => {
+test('production browser flows, offline sounds and native camera lifecycle', { timeout: 90000 }, async t => {
   const { server, origin } = await startServer();
   let chrome;
   try {
@@ -226,6 +249,7 @@ test('production browser flows, offline sounds and native camera lifecycle', { t
         assert.equal(await page.evaluate('window.__camera.requests[1].video.facingMode.exact'), 'user');
         await page.click('[aria-label="Capture Photo"]');
         await page.waitFor("document.body.innerText.includes('Bad appearance — Possible Algae Water')");
+        assert.ok(await page.evaluate("document.querySelector('img[alt=\"Water image preview\"]').src.startsWith('data:image/')"));
         assert.equal(await page.evaluate('window.__camera.stopped'), 2);
         assert.ok(await page.evaluate("document.body.innerText.includes('do not drink') && document.body.innerText.includes('kada a sha')"));
         assert.ok(await page.evaluate("document.body.innerText.includes('Not a water safety test')"));
@@ -273,6 +297,123 @@ test('production browser flows, offline sounds and native camera lifecycle', { t
       }
     });
 
+    await t.test('water sample thumbnails, previews, analysis and translations work offline', async () => {
+      const page = await newPage(chrome.port, origin, mockWebCamera);
+      try {
+        await page.clickButtonText('Check Water Quality');
+        await page.waitFor("document.body.innerText.includes('Choose from Gallery')");
+        assert.equal(await page.evaluate("getComputedStyle(document.querySelector('.border-dashed')).borderTopStyle"), 'dashed');
+        const grid = await page.evaluate(`(() => {
+          const container = document.querySelector('[aria-label="Water samples"]');
+          return {
+            columns: getComputedStyle(container).gridTemplateColumns.split(' ').length,
+            samples: [...container.querySelectorAll('button[aria-pressed]')].map(button => ({
+              label: button.innerText, loaded: button.querySelector('img').complete && button.querySelector('img').naturalWidth > 0,
+            })),
+          };
+        })()`);
+        assert.equal(grid.columns, 2);
+        assert.equal(grid.samples.length, 3);
+        assert.ok(grid.samples.every(sample => sample.loaded));
+        assert.match(grid.samples[0].label, /Clean Borehole/);
+        assert.match(grid.samples[0].label, /Ruwan Fanfo Mai Tsabta/);
+        assert.equal(await page.evaluate("document.querySelectorAll('[aria-label^=\"Read \" i][aria-label$=\" aloud\" i]').length"), 3);
+        await page.send('Emulation.setDeviceMetricsOverride', { width: 1024, height: 768, deviceScaleFactor: 1, mobile: false });
+        assert.equal(await page.evaluate("getComputedStyle(document.querySelector('[aria-label=\"Water samples\"]')).gridTemplateColumns.split(' ').length"), 2);
+        await page.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+
+        await page.waitFor('!!navigator.serviceWorker.controller');
+        await page.send('Network.emulateNetworkConditions', { offline: true, latency: 0, downloadThroughput: 0, uploadThroughput: 0 });
+        await page.evaluate(`(() => {
+          const original = CanvasRenderingContext2D.prototype.getImageData;
+          window.__waterPixelReads = 0;
+          CanvasRenderingContext2D.prototype.getImageData = function(...args) {
+            window.__waterPixelReads++;
+            if (window.__failWaterAnalysis) throw new Error('Simulated canvas failure');
+            return original.apply(this, args);
+          };
+        })()`);
+        const samples = [
+          ['Clean Borehole', 'Good appearance — Clean Borehole-like'],
+          ['Turbid River Water', 'Bad appearance — Turbid River Water-like'],
+          ['Algae Water', 'Bad appearance — Possible Algae Water'],
+        ];
+        for (const [name, verdict] of samples) {
+          const previousReads = await page.evaluate('window.__waterPixelReads');
+          await page.clickButtonText(name);
+          await page.waitFor(`window.__waterPixelReads > ${previousReads} && document.body.innerText.includes(${JSON.stringify(verdict)})`);
+          const preview = await page.evaluate(`(() => {
+            const image = document.querySelector('img[alt="Water image preview"]');
+            const selected = document.querySelector('[aria-label="Water samples"] button[aria-pressed="true"] img');
+            return { loaded: image.complete && image.naturalWidth > 0, sameImage: image.src === selected.src };
+          })()`);
+          assert.deepEqual(preview, { loaded: true, sameImage: true });
+          assert.ok(await page.evaluate("document.body.innerText.includes('Manual example only')"));
+        }
+        const selectedPreview = await page.evaluate("document.querySelector('img[alt=\"Water image preview\"]').src");
+        await page.click('[aria-label="Read Turbid River Water aloud"]');
+        await page.waitFor("window.__spokenTexts.some(text => text.includes('Turbid River Water') && text.includes('only an example'))");
+        assert.equal(await page.evaluate("document.querySelector('img[alt=\"Water image preview\"]').src"), selectedPreview, 'speaker must not change the selected image');
+
+        // A failed canvas read must not retain the previous result or report clean.
+        await page.evaluate('window.__failWaterAnalysis = true');
+        await page.clickButtonText('Clean Borehole');
+        await page.waitFor("document.body.innerText.includes('Could not analyze the image')");
+        assert.equal(await page.evaluate("document.body.innerText.includes('Manual example only')"), false);
+        assert.equal(await page.evaluate("document.querySelector('img[alt=\"Water image preview\"]').src === document.querySelector('[aria-label=\"Water samples\"] button[aria-pressed=\"true\"] img').src"), true);
+        await page.clickButtonText('Remove photo');
+        assert.equal(await page.evaluate("!!document.querySelector('img[alt=\"Water image preview\"]')"), false);
+        assert.equal(await page.evaluate("document.querySelectorAll('[aria-label=\"Water samples\"] button[aria-pressed=\"true\"]').length"), 0);
+
+        // A previously cached app still has all three examples after an offline reload.
+        await page.send('Page.reload');
+        await page.waitFor("document.body.innerText.includes('Check Water Quality')");
+        await page.clickButtonText('Check Water Quality');
+        await page.clickButtonText('Algae Water');
+        await page.waitFor("document.body.innerText.includes('Bad appearance — Possible Algae Water')");
+        assert.ok(await page.evaluate("document.querySelector('img[alt=\"Water image preview\"]').naturalWidth > 0"));
+
+        // The controls, preview description and both sample labels switch to Hausa.
+        await page.evaluate("(() => { const select = document.querySelector('select[aria-label=\"Language\"]'); select.value = 'ha'; select.dispatchEvent(new Event('change', { bubbles: true })); })()");
+        await page.waitFor("document.body.innerText.includes('Zaɓi daga Gallery')");
+        assert.ok(await page.evaluate("!!document.querySelector('img[alt=\"Hoton ruwan da za a duba\"]')"));
+        assert.match(await page.evaluate("document.querySelector('[aria-label=\"Samfuran ruwa\"] button[aria-pressed]').innerText"), /Ruwan Fanfo Mai Tsabta[\s\S]*Clean Borehole/);
+        await page.evaluate("(() => { const select = document.querySelector('select[aria-label=\"Harshe\"]'); select.value = 'en'; select.dispatchEvent(new Event('change', { bubbles: true })); })()");
+      } finally {
+        await page.close();
+      }
+    });
+
+    await t.test('web gallery opens a file picker and analyzes the chosen image offline', async () => {
+      const page = await newPage(chrome.port, origin, mockWebCamera);
+      try {
+        await page.clickButtonText('Check Water Quality');
+        await page.clickButtonText('Clean Borehole');
+        await page.waitFor("document.body.innerText.includes('Good appearance — Clean Borehole-like')");
+        const example = await page.evaluate("document.querySelector('img[alt=\"Water image preview\"]').src");
+        await page.waitFor('!!navigator.serviceWorker.controller');
+        await page.send('Network.emulateNetworkConditions', { offline: true, latency: 0, downloadThroughput: 0, uploadThroughput: 0 });
+        await chooseGalleryFile(page, 'src/assets/water/turbid.jpg');
+        await page.waitFor("document.body.innerText.includes('Bad appearance — Turbid River Water-like')");
+        const gallery = await page.evaluate(`(() => {
+          const image = document.querySelector('img[alt="Water image preview"]');
+          return { src: image.src, loaded: image.complete && image.naturalWidth > 0,
+            selected: document.querySelectorAll('[aria-label="Water samples"] button[aria-pressed="true"]').length,
+            photoResult: document.body.innerText.includes('Photo appearance estimate, processed on this device.') };
+        })()`);
+        assert.ok(gallery.src.startsWith('data:image/'));
+        assert.notEqual(gallery.src, example);
+        assert.equal(gallery.loaded, true);
+        assert.equal(gallery.selected, 0);
+        assert.equal(gallery.photoResult, true);
+        await page.clickButtonText('Remove photo');
+        assert.equal(await page.evaluate("!!document.querySelector('img[alt=\"Water image preview\"]')"), false);
+        assert.equal(await page.evaluate("document.body.innerText.includes('Bad appearance — Turbid River Water-like')"), false);
+      } finally {
+        await page.close();
+      }
+    });
+
     await t.test('web recovers the original camera when the requested front lens is unavailable', async () => {
       const page = await newPage(chrome.port, origin, mockWebCamera);
       try {
@@ -286,6 +427,99 @@ test('production browser flows, offline sounds and native camera lifecycle', { t
         assert.equal(await page.evaluate('window.__camera.requests[2].video.facingMode.ideal'), 'environment');
         await page.click('[aria-label="Close Camera"]');
         assert.equal(await page.evaluate('window.__camera.stopped'), 2);
+      } finally {
+        await page.close();
+      }
+    });
+
+    await t.test('native gallery selection, cancellation, errors and stale picker results', async () => {
+      const page = await newPage(chrome.port, origin, mockNativeCamera);
+      try {
+        await page.clickButtonText('Check Water Quality');
+        await page.waitFor('!!navigator.serviceWorker.controller');
+        await page.send('Network.emulateNetworkConditions', { offline: true, latency: 0, downloadThroughput: 0, uploadThroughput: 0 });
+        // Keep a sample decode pending while the gallery is opened and cancelled.
+        await page.evaluate(`(() => {
+          const OriginalImage = window.Image;
+          window.__delayNextWaterImage = true;
+          window.Image = function(...args) {
+            const image = new OriginalImage(...args);
+            if (window.__delayNextWaterImage) {
+              window.__delayNextWaterImage = false;
+              let onload;
+              Object.defineProperty(image, 'onload', { configurable: true, get: () => onload, set: handler => {
+                onload = handler;
+                image.addEventListener('load', () => { window.__releaseWaterAnalysis = () => handler.call(image, new Event('load')); }, { once: true });
+              } });
+            }
+            return image;
+          };
+        })()`);
+        await page.clickButtonText('Algae Water');
+        await page.waitFor('!!window.__releaseWaterAnalysis');
+        await page.evaluate("window.__galleryError = 'User cancelled photos app'");
+        await page.clickButtonText('Choose from Gallery');
+        await page.waitFor("window.__native.filter(entry => entry.plugin === 'Camera' && entry.method === 'getPhoto').length === 1");
+        await page.evaluate('window.__releaseWaterAnalysis()');
+        await page.waitFor("document.body.innerText.includes('Bad appearance — Possible Algae Water')");
+        await page.evaluate('window.__galleryError = null');
+        await page.clickButtonText('Choose from Gallery');
+        await page.waitFor("window.__native.filter(entry => entry.plugin === 'Camera' && entry.method === 'getPhoto').length === 2 && document.body.innerText.includes('Good appearance — Clean Borehole-like')");
+        const picker = await page.evaluate("window.__native.find(entry => entry.plugin === 'Camera' && entry.method === 'getPhoto').options");
+        assert.equal(picker.source, 'PHOTOS');
+        assert.equal(picker.resultType, 'dataUrl');
+        assert.equal(await page.evaluate("window.__native.some(entry => entry.plugin === 'CameraPreview' && entry.method === 'start')"), false);
+        const originalPreview = await page.evaluate("document.querySelector('img[alt=\"Water image preview\"]').src");
+        assert.ok(originalPreview.startsWith('data:image/jpeg'));
+        assert.equal(await page.evaluate("document.querySelectorAll('[aria-label=\"Water samples\"] button[aria-pressed=\"true\"]').length"), 0);
+
+        await page.evaluate("window.__galleryError = 'User cancelled photos app'");
+        await page.clickButtonText('Choose from Gallery');
+        await page.waitFor("window.__native.filter(entry => entry.plugin === 'Camera' && entry.method === 'getPhoto').length === 3");
+        assert.equal(await page.evaluate("document.querySelector('img[alt=\"Water image preview\"]').src"), originalPreview);
+        assert.equal(await page.evaluate("document.body.innerText.includes('Could not open the gallery')"), false);
+
+        await page.evaluate("window.__galleryError = 'Permission denied'");
+        await page.clickButtonText('Choose from Gallery');
+        await page.waitFor("document.body.innerText.includes('Could not open the gallery')");
+        assert.equal(await page.evaluate("document.querySelector('img[alt=\"Water image preview\"]').src"), originalPreview);
+        assert.ok(await page.evaluate("document.body.innerText.includes('Good appearance — Clean Borehole-like')"));
+
+        // A delayed picker response cannot overwrite a newer sample selection.
+        await page.evaluate('window.__galleryError = null; window.__delayGallery = true');
+        await page.clickButtonText('Choose from Gallery');
+        await page.waitFor('!!window.__releaseGallery');
+        await page.clickButtonText('Algae Water');
+        await page.waitFor("document.body.innerText.includes('Bad appearance — Possible Algae Water')");
+        const samplePreview = await page.evaluate("document.querySelector('img[alt=\"Water image preview\"]').src");
+        await page.evaluate('window.__releaseGallery()');
+        await delay(100);
+        assert.equal(await page.evaluate("document.querySelector('img[alt=\"Water image preview\"]').src"), samplePreview);
+        assert.ok(await page.evaluate("document.body.innerText.includes('Manual example only')"));
+      } finally {
+        await page.close();
+      }
+    });
+
+    await t.test('shared native gallery remains usable in crop and health screens', async () => {
+      const page = await newPage(chrome.port, origin, mockNativeCamera);
+      try {
+        await page.click('[aria-label="Crop"]');
+        await page.waitFor("document.body.innerText.includes('Choose from Gallery')");
+        await page.clickButtonText('Choose from Gallery');
+        await page.waitFor("document.querySelector('img[alt=\"Leaf to analyze\"]')?.src.startsWith('data:image/jpeg')");
+        await page.evaluate("window.__galleryError = 'Permission denied'");
+        await page.clickButtonText('Choose from Gallery');
+        await page.waitFor("document.body.innerText.includes('Could not open the gallery')");
+        assert.ok(await page.evaluate("document.querySelector('img[alt=\"Leaf to analyze\"]').src.startsWith('data:image/jpeg')"));
+
+        await page.click('[aria-label="Health"]');
+        await page.waitFor("document.body.innerText.includes('Choose from Gallery')");
+        await page.clickButtonText('Choose from Gallery');
+        await page.waitFor("document.body.innerText.includes('Could not open the gallery')");
+        await page.evaluate('window.__galleryError = null');
+        await page.clickButtonText('Choose from Gallery');
+        await page.waitFor("document.querySelector('img[alt=\"Health observation\"]')?.src.startsWith('data:image/jpeg')");
       } finally {
         await page.close();
       }

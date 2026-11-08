@@ -111,13 +111,18 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
   };
 
   const handleGallery = async () => {
-    const picked = await pickPhotoFromGallery();
-    if (picked) {
-      const formatted = picked.startsWith('data:') ? picked : `data:image/jpeg;base64,${picked}`;
-      setPhoto(formatted);
-      setPhotoUrl(formatted);
-      setResult(null);
-      showToast(locale === 'ha' ? 'An loda hoto daga gallery!' : 'Photo loaded!');
+    try {
+      const picked = await pickPhotoFromGallery();
+      if (picked) {
+        const formatted = picked.startsWith('data:') ? picked : `data:image/jpeg;base64,${picked}`;
+        setPhoto(formatted);
+        setPhotoUrl(formatted);
+        setResult(null);
+        showToast(locale === 'ha' ? 'An loda hoto daga gallery!' : 'Photo loaded!');
+      }
+    } catch (error) {
+      console.warn('Gallery picker error:', error);
+      showToast(locale === 'ha' ? 'Ba a iya buɗe Gallery ba. Duba izinin hotuna.' : 'Could not open the gallery. Check photo permissions.');
     }
   };
 

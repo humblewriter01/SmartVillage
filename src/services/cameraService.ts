@@ -1,4 +1,5 @@
 import { CameraPreview, type CameraPreviewFlashMode, type CameraPreviewOptions } from '@capgo/camera-preview';
+import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { Capacitor } from '@capacitor/core';
 import { createCameraOperationQueue } from './cameraOperationQueue';
 
@@ -109,7 +110,31 @@ export function getEmbeddedCameraPositions(): Promise<('rear' | 'front')[] | nul
 }
 
 export async function pickPhotoFromGallery(): Promise<string | null> {
-  return pickImageFromWeb('photos');
+  if (!Capacitor.isNativePlatform()) return pickImageFromWeb('photos');
+
+  try {
+    // Return a data URL so previews and canvas analysis need no network or
+    // platform-specific file URL. The system photo picker needs no camera stream.
+    const photo = await Camera.getPhoto({
+      source: CameraSource.Photos,
+      resultType: CameraResultType.DataUrl,
+      quality: 90,
+      width: 1600,
+      height: 1600,
+      allowEditing: false,
+    });
+    if (!photo.dataUrl) throw new Error('No image returned by the gallery');
+    return photo.dataUrl;
+  } catch (error) {
+    // Dismissing the picker should leave the previous selection unchanged.
+    const message = error instanceof Error
+      ? error.message
+      : typeof error === 'object' && error !== null && 'message' in error
+        ? String(error.message)
+        : String(error);
+    if (/cancel/i.test(message)) return null;
+    throw error;
+  }
 }
 
 export const cameraService = {
