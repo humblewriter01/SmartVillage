@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Droplets,
+  Camera,
   Volume2,
   AlertTriangle,
   CheckCircle2,
   Flame,
-  Sun,
   ShieldCheck,
   RotateCcw,
   Bell,
@@ -18,6 +18,7 @@ import { waterQualityService, WaterQualityResult } from '../services/waterQualit
 import { voiceService } from '../services/voiceService';
 import { historyService } from '../services/historyService';
 import { reminderService, StoredReminder } from '../services/reminderService';
+import { FullScreenCameraModal } from './FullScreenCameraModal';
 
 interface WaterQualityScreenProps {
   locale: Language;
@@ -56,6 +57,17 @@ const WATER_SAMPLES: WaterSample[] = [
   },
 ];
 
+function sampleSpeech(sample: WaterSample, result: WaterQualityResult, locale: Language): string {
+  const exampleWarning = locale === 'ha'
+    ? 'Wannan misali ne kawai; ba gwajin ruwanka ba ne.'
+    : 'This is only an example, not a test of your water.';
+  const name = locale === 'ha' ? sample.name_hausa : sample.name;
+  const verdict = locale === 'ha' ? result.verdictTitleHausa : result.verdictTitle;
+  const assessment = locale === 'ha' ? result.colorAssessmentHausa : result.colorAssessment;
+  const advice = locale === 'ha' ? result.adviceHausa : result.advice;
+  return `${exampleWarning} ${name}. ${verdict}. ${assessment} ${advice}`;
+}
+
 interface WaterSafetyTip {
   id: number;
   icon: string;
@@ -67,14 +79,14 @@ const WATER_SAFETY_TIPS: WaterSafetyTip[] = [
   {
     id: 1,
     icon: '💧',
-    textEn: 'Boil water 1–3 minutes before drinking.',
-    textHa: 'Tafasa ruwa minti 1–3 kafin sha.',
+    textEn: 'If algae or chemical pollution is not suspected, boil water for at least 1 minute before drinking.',
+    textHa: 'Idan babu zargin ciyawar ruwa ko sinadarai, a tafasa ruwa na aƙalla minti 1 kafin sha.',
   },
   {
     id: 2,
     icon: '🧪',
-    textEn: "Use WaterGuard when you can't boil.",
-    textHa: 'Yi amfani da WaterGuard idan ba za ka tafasa ba.',
+    textEn: 'For water without suspected algae or chemicals, use WaterGuard as directed if you cannot boil.',
+    textHa: 'Idan babu zargin ciyawar ruwa ko sinadarai, yi amfani da WaterGuard bisa umarni idan ba za ka tafasa ba.',
   },
   {
     id: 3,
@@ -114,6 +126,11 @@ export const WaterQualityScreen: React.FC<WaterQualityScreenProps> = ({
 }) => {
   const [selectedSampleId, setSelectedSampleId] = useState<'clean' | 'turbid' | 'algae' | null>(null);
   const [result, setResult] = useState<WaterQualityResult | null>(null);
+  const [resultSource, setResultSource] = useState<'photo' | 'sample' | null>(null);
+  const [isCameraActive, setIsCameraActive] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisError, setAnalysisError] = useState(false);
+  const analysisIdRef = useRef(0);
   const [isSpeakingResult, setIsSpeakingResult] = useState(false);
   const [isSpeakingWaterHeader, setIsSpeakingWaterHeader] = useState(false);
   const [isSpeakingSamplesHeader, setIsSpeakingSamplesHeader] = useState(false);
@@ -125,11 +142,49 @@ export const WaterQualityScreen: React.FC<WaterQualityScreenProps> = ({
 
   useEffect(() => {
     reminderService.getStoredReminders().then(setReminders);
+    return () => { analysisIdRef.current++; };
   }, []);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  const saveWaterResult = (res: WaterQualityResult, source: 'photo' | 'sample') => {
+    historyService.insert({
+      type: 'water',
+      createdAt: new Date().toISOString(),
+      title: locale === 'ha' ? res.verdictTitleHausa : res.verdictTitle,
+      detail: `${source === 'photo' ? 'Photo appearance' : 'Manual example'} (not a safety test) | ${locale === 'ha' ? res.colorAssessmentHausa : res.colorAssessment}`,
+      advice: locale === 'ha' ? res.adviceHausa : res.advice,
+      // The colour heuristic has no calibrated confidence; do not invent one.
+      confidence: 0,
+    });
+    onRecordSaved?.();
+  };
+
+  const handleCapturePhoto = async (photo: string) => {
+    const analysisId = ++analysisIdRef.current;
+    setIsCameraActive(false);
+    setSelectedSampleId(null);
+    setResult(null);
+    setResultSource(null);
+    setAnalysisError(false);
+    setIsAnalyzing(true);
+    voiceService.stopSpeaking();
+    setIsSpeakingResult(false);
+    try {
+      const res = await waterQualityService.analyzeWater(photo);
+      if (analysisId !== analysisIdRef.current) return;
+      setResult(res);
+      setResultSource('photo');
+      saveWaterResult(res, 'photo');
+    } catch (error) {
+      console.warn('Water photo analysis failed:', error);
+      if (analysisId === analysisIdRef.current) setAnalysisError(true);
+    } finally {
+      if (analysisId === analysisIdRef.current) setIsAnalyzing(false);
+    }
   };
 
   const handleToggleWaterReminder = async (type: 'waterguard_30min') => {
@@ -173,6 +228,10 @@ export const WaterQualityScreen: React.FC<WaterQualityScreenProps> = ({
   };
 
   const handleResetWater = () => {
+    analysisIdRef.current++;
+    setIsAnalyzing(false);
+    setAnalysisError(false);
+    setResultSource(null);
     voiceService.stopSpeaking();
     setIsSpeakingResult(false);
     setIsSpeakingAllTips(false);
@@ -185,6 +244,10 @@ export const WaterQualityScreen: React.FC<WaterQualityScreenProps> = ({
   };
 
   const handleSelectSample = async (sample: WaterSample) => {
+    analysisIdRef.current++;
+    setIsAnalyzing(false);
+    setAnalysisError(false);
+    setResultSource('sample');
     voiceService.stopSpeaking();
     setIsSpeakingResult(false);
     setIsSpeakingAllTips(false);
@@ -196,24 +259,10 @@ export const WaterQualityScreen: React.FC<WaterQualityScreenProps> = ({
     const res = sample.getResult();
     setResult(res);
 
-    historyService.insert({
-      type: 'water',
-      createdAt: new Date().toISOString(),
-      title: locale === 'ha' ? res.verdictTitleHausa : res.verdictTitle,
-      detail: `Turbidity: ${res.turbidityScore}/100 | ${locale === 'ha' ? res.colorAssessmentHausa : res.colorAssessment}`,
-      advice: locale === 'ha' ? res.adviceHausa : res.advice,
-      confidence: res.status === 'clean' ? 0.98 : 0.96,
-    });
+    saveWaterResult(res, 'sample');
 
-    onRecordSaved?.();
-
-    // Live Read-Aloud TTS when selecting/tapping sample
-    const sampleName = locale === 'ha' ? sample.name_hausa : sample.name;
-    const verdict = locale === 'ha' ? res.verdictTitleHausa : res.verdictTitle;
-    const assessment = locale === 'ha' ? res.colorAssessmentHausa : res.colorAssessment;
-    const textToSpeak = `${sampleName}. ${verdict}. ${assessment}.`;
-
-    await voiceService.speak(textToSpeak, locale, (warning) => {
+    // Include the example warning and safety advice in the spoken version too.
+    await voiceService.speak(sampleSpeech(sample, res, locale), locale, (warning) => {
       showToast(warning);
     });
     setSpeakingSampleId(null);
@@ -231,12 +280,7 @@ export const WaterQualityScreen: React.FC<WaterQualityScreenProps> = ({
     setSpeakingSampleId(sample.id);
 
     const res = sample.getResult();
-    const sampleName = locale === 'ha' ? sample.name_hausa : sample.name;
-    const verdict = locale === 'ha' ? res.verdictTitleHausa : res.verdictTitle;
-    const assessment = locale === 'ha' ? res.colorAssessmentHausa : res.colorAssessment;
-    const textToSpeak = `${sampleName}. ${verdict}. ${assessment}.`;
-
-    await voiceService.speak(textToSpeak, locale, (warning) => {
+    await voiceService.speak(sampleSpeech(sample, res, locale), locale, (warning) => {
       showToast(warning);
     });
     setSpeakingSampleId(null);
@@ -252,7 +296,7 @@ export const WaterQualityScreen: React.FC<WaterQualityScreenProps> = ({
     voiceService.stopSpeaking();
     setIsSpeakingSamplesHeader(true);
 
-    const title = locale === 'ha' ? 'Zaɓi Samfurin Ruwa don Gwaji.' : 'Choose a Water Sample to Test.';
+    const title = locale === 'ha' ? 'Zaɓi samfurin misali.' : 'Choose a manual example.';
     const samplesSummary = WATER_SAMPLES.map(
       (s, idx) => `${idx + 1}: ${locale === 'ha' ? s.name_hausa : s.name}`
     ).join('. ');
@@ -276,12 +320,15 @@ export const WaterQualityScreen: React.FC<WaterQualityScreenProps> = ({
     voiceService.stopSpeaking();
     setIsSpeakingResult(true);
     const titleText = locale === 'ha' ? result.verdictTitleHausa : result.verdictTitle;
-    const scoreText =
-      locale === 'ha'
-        ? `Matsayin laka da duhu: ${result.turbidityScore} cikin 100.`
-        : `Turbidity score: ${result.turbidityScore} out of 100.`;
+    const appearanceText = locale === 'ha' ? result.colorAssessmentHausa : result.colorAssessment;
     const adviceText = locale === 'ha' ? result.adviceHausa : result.advice;
-    const textToSpeak = `${titleText}. ${scoreText} ${adviceText}`;
+    const disclaimer = locale === 'ha'
+      ? 'Hoto ba zai tabbatar da amincin ruwa ba.'
+      : 'A photo cannot establish whether water is safe to drink.';
+    const sourceText = resultSource === 'sample'
+      ? (locale === 'ha' ? 'Wannan misali ne kawai; ba gwajin ruwanka ba ne.' : 'This is only an example, not a test of your water.')
+      : '';
+    const textToSpeak = `${sourceText} ${titleText}. ${appearanceText} ${disclaimer} ${adviceText}`;
 
     await voiceService.speak(textToSpeak, locale, (warning) => {
       showToast(warning);
@@ -299,8 +346,8 @@ export const WaterQualityScreen: React.FC<WaterQualityScreenProps> = ({
     setIsSpeakingWaterHeader(true);
     const textToSpeak =
       locale === 'ha'
-        ? 'Tsabtar Ruwa. Gwajin samfurin ruwa: Ruwa Mai Kyau ko Tafasa Kafin Sha.'
-        : 'Water Quality. Test water samples: Safe or Boil Before Drinking.';
+        ? 'Tsabtar Ruwa. Duba kamannin ruwa, ko zaɓi samfurin misali. Hoto ba zai tabbatar da amincin ruwa ba.'
+        : 'Water Quality. Check the appearance of water or choose an example. A photo cannot establish whether water is safe.';
     await voiceService.speak(textToSpeak, locale);
     setIsSpeakingWaterHeader(false);
   };
@@ -378,8 +425,8 @@ export const WaterQualityScreen: React.FC<WaterQualityScreenProps> = ({
           </div>
           <p className="text-xs text-slate-500 mt-0.5">
             {locale === 'ha'
-              ? 'Gwajin samfurin ruwa: Ruwa Mai Kyau ko Tafasa Kafin Sha'
-              : 'Test water samples: Safe or Boil Before Drinking'}
+              ? 'Duba kamannin ruwa ba tare da intanet ba; ba gwajin lafiya ba ne.'
+              : 'Check water appearance offline; this is not a safety test.'}
           </p>
         </div>
 
@@ -397,13 +444,48 @@ export const WaterQualityScreen: React.FC<WaterQualityScreenProps> = ({
         )}
       </div>
 
+      <FullScreenCameraModal
+        isOpen={isCameraActive}
+        locale={locale}
+        title={locale === 'ha' ? 'Hoton Samfurin Ruwa' : 'Water Sample Camera'}
+        onCapture={handleCapturePhoto}
+        onClose={() => setIsCameraActive(false)}
+      />
+
+      {/* Offline photo analysis, with manual examples always available below. */}
+      <div className="bg-white rounded-2xl p-5 border border-sky-200 shadow-sm space-y-3">
+        <h2 className="text-sm font-bold text-slate-800">
+          {locale === 'ha' ? 'Duba Kamannin Ruwa da Hoto' : 'Check Water Appearance from a Photo'}
+        </h2>
+        <p className="text-xs text-slate-600 leading-relaxed">
+          {locale === 'ha'
+            ? 'Saka ruwa a kwano mai haske, a gaban bango fari. Cika tsakiyar hoton da ruwan. Ana duba launi a waya kawai.'
+            : 'Place water in a clear container against a plain white background. Fill the centre of the frame with water. Colour is checked on your device.'}
+        </p>
+        <button
+          type="button"
+          onClick={() => {
+            analysisIdRef.current++;
+            setIsAnalyzing(false);
+            setAnalysisError(false);
+            setIsCameraActive(true);
+          }}
+          className="w-full sm:w-auto py-3 px-5 bg-sky-700 hover:bg-sky-800 text-white font-bold rounded-xl text-sm flex items-center justify-center gap-2 cursor-pointer"
+        >
+          <Camera className="w-5 h-5" />
+          <span>{locale === 'ha' ? 'Ɗauki Hoto' : 'Take Photo'}</span>
+        </button>
+        {isAnalyzing && <p role="status" className="text-xs text-sky-800 font-semibold">{locale === 'ha' ? 'Ana duba hoto a waya…' : 'Analyzing the photo on your device…'}</p>}
+        {analysisError && <p role="alert" className="text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded-lg p-3">{locale === 'ha' ? 'Ba a iya duba hoton ba. Sake ɗaukar hoto ko zaɓi samfurin misali a ƙasa.' : 'Could not analyze the photo. Try another photo or choose a manual example below.'}</p>}
+      </div>
+
       {/* Sample Buttons Section */}
       <div className="bg-white rounded-2xl p-5 border border-sky-100 shadow-sm space-y-4">
         <div className="flex items-center justify-between">
           <div>
             <div className="flex items-center space-x-2">
               <h2 className="text-sm font-bold text-slate-800">
-                {locale === 'ha' ? 'Zaɓi Samfurin Ruwa don Gwaji:' : 'Choose a Water Sample to Test:'}
+                {locale === 'ha' ? 'Ko zaɓi samfurin misali:' : 'Or choose a manual example:'}
               </h2>
               <button
                 type="button"
@@ -420,8 +502,8 @@ export const WaterQualityScreen: React.FC<WaterQualityScreenProps> = ({
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
               {locale === 'ha'
-                ? 'Danna ɗaya daga cikin samfuran don duba inganci da shawara'
-                : 'Tap any sample below to check its safety verdict and turbidity score'}
+                ? 'Waɗannan misalai ne kawai; ba gwajin ruwan da kake da shi ba ne.'
+                : 'These are examples only; they do not test your water.'}
             </p>
           </div>
 
@@ -445,14 +527,14 @@ export const WaterQualityScreen: React.FC<WaterQualityScreenProps> = ({
             return (
               <div
                 key={sample.id}
-                onClick={() => handleSelectSample(sample)}
-                className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer flex items-center justify-between gap-2.5 active:scale-[0.98] ${
+                className={`p-3.5 rounded-xl border text-left transition-all flex items-center justify-between gap-2.5 ${
                   isSelected
                     ? 'bg-sky-50 border-sky-500 ring-2 ring-sky-300 font-bold shadow-xs'
                     : 'bg-slate-50/70 hover:bg-sky-50/50 border-slate-200 hover:border-sky-300'
                 }`}
               >
-                <div className="flex items-center space-x-3 min-w-0 flex-1">
+                <button type="button" onClick={() => handleSelectSample(sample)} aria-pressed={isSelected}
+                  className="flex items-center space-x-3 min-w-0 flex-1 text-left cursor-pointer">
                   <span className="text-2xl shrink-0">{sample.icon}</span>
                   <div className="min-w-0 flex-1">
                     <div className="text-xs sm:text-sm font-bold text-slate-900 leading-snug">
@@ -462,7 +544,7 @@ export const WaterQualityScreen: React.FC<WaterQualityScreenProps> = ({
                       {locale === 'ha' ? sample.name : sample.name_hausa}
                     </div>
                   </div>
-                </div>
+                </button>
 
                 {/* Individual Sample Read-Aloud Icon */}
                 <button
@@ -527,78 +609,32 @@ export const WaterQualityScreen: React.FC<WaterQualityScreenProps> = ({
             </button>
           </div>
 
-          {/* Turbidity & Optical Metrics */}
-          <div className="bg-slate-50 rounded-xl p-3.5 space-y-2 border border-slate-100">
-            <div className="flex items-center justify-between text-xs font-semibold text-slate-700">
-              <span>{t(locale, 'turbidity')}:</span>
-              <span>{result.turbidityScore} / 100</span>
-            </div>
-            <div className="w-full h-2.5 bg-slate-200 rounded-full overflow-hidden">
-              <div
-                className={`h-full rounded-full transition-all ${
-                  result.turbidityScore < 30
-                    ? 'bg-emerald-500'
-                    : result.turbidityScore < 60
-                    ? 'bg-amber-500'
-                    : 'bg-rose-500'
-                }`}
-                style={{ width: `${Math.min(100, Math.max(8, result.turbidityScore))}%` }}
-              />
-            </div>
-            <div className="flex justify-between text-[10px] text-slate-500">
-              <span>Clear (&lt;5 NTU)</span>
-              <span>Moderate</span>
-              <span>Heavily Muddy</span>
-            </div>
-          </div>
+          <p className="text-xs font-semibold text-slate-600">
+            {resultSource === 'photo'
+              ? (locale === 'ha' ? 'An duba kamannin hoton a waya kawai.' : 'Photo appearance estimate, processed on this device.')
+              : (locale === 'ha' ? 'Samfurin misali ne kawai — ba gwajin ruwanka ba ne.' : 'Manual example only — this does not test your water.')}
+          </p>
 
-          {/* Actionable Advice & Boiling Instruction */}
+          {/* Show both languages so the advice is available to everyone nearby. */}
           <div className="space-y-2">
             <h4 className="font-bold text-sm text-slate-800 flex items-center gap-1.5">
               <Flame className="w-4 h-4 text-orange-600" />
               <span>{t(locale, 'advice')}</span>
             </h4>
-            <div className="p-3.5 rounded-xl bg-sky-50/60 border border-sky-100 text-xs sm:text-sm text-slate-700 leading-relaxed">
-              {locale === 'ha' ? result.adviceHausa : result.advice}
+            <div className="p-3.5 rounded-xl bg-sky-50/60 border border-sky-100 text-xs sm:text-sm text-slate-700 leading-relaxed space-y-2">
+              <p>{locale === 'ha' ? result.adviceHausa : result.advice}</p>
+              <p className="text-slate-600">{locale === 'ha' ? result.advice : result.adviceHausa}</p>
             </div>
           </div>
 
-          {/* Purification Methods Checklist */}
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
-              <div className="flex items-center space-x-1.5 font-bold text-slate-800">
-                <Flame className="w-3.5 h-3.5 text-orange-600" />
-                <span>{locale === 'ha' ? '1. Tafasawa' : '1. Boiling'}</span>
-              </div>
-              <p className="text-[11px] text-slate-600">
-                {locale === 'ha'
-                  ? 'Tafasa ruwa na minti 1-3 a wuta kafin sha'
-                  : 'Rolling boil for 1-3 minutes kills bacteria & viruses'}
-              </p>
+          <div className="bg-amber-50 rounded-xl p-3 border border-amber-200 text-xs text-amber-950 leading-relaxed" role="note">
+            <div className="flex items-center gap-1.5 font-bold mb-1">
+              <ShieldCheck className="w-4 h-4" />
+              <span>{locale === 'ha' ? 'Ba gwajin lafiya ba ne' : 'Not a water safety test'}</span>
             </div>
-
-            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
-              <div className="flex items-center space-x-1.5 font-bold text-slate-800">
-                <Sun className="w-3.5 h-3.5 text-amber-600" />
-                <span>{locale === 'ha' ? '2. SODIS Rana' : '2. SODIS Sun'}</span>
-              </div>
-              <p className="text-[11px] text-slate-600">
-                {locale === 'ha'
-                  ? 'Ajiye kwalba a rana mai zafi na awa 6'
-                  : 'Leave clear bottle in direct sun for 6 hours'}
-              </p>
-            </div>
-          </div>
-
-          {/* Standards & Guidelines Card */}
-          <div className="bg-slate-50 rounded-xl p-3 border border-slate-200 text-xs text-slate-600 space-y-1">
-            <div className="flex items-center space-x-1.5 font-bold text-slate-700">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-              <span>{result.guidelines.standard}</span>
-            </div>
-            <p className="text-[11px]">
-              {result.guidelines.whoLimit} | {result.guidelines.nsdwqLimit}
-            </p>
+            <p>{locale === 'ha'
+              ? 'Launi, haske da bango na iya canza sakamako. Hoto ba ya gano ƙwayoyin cuta, guba ko sinadarai. Ruwan da yake da haske ma na iya zama haɗari; a nemi gwajin dakin gwaje-gwaje.'
+              : 'Lighting and background affect the result. A photo cannot detect germs, toxins or chemicals. Even clear-looking water can be unsafe; seek a laboratory test.'}</p>
           </div>
 
           {/* Action & Reset Buttons */}
@@ -639,8 +675,8 @@ export const WaterQualityScreen: React.FC<WaterQualityScreenProps> = ({
               </div>
               <p className="text-[11px] text-slate-600 mt-1 leading-relaxed">
                 {locale === 'ha'
-                  ? 'Bayan zuba murfin WaterGuard a jarka, a jira minti 30 kafin sha domin kashe kwayoyin cuta.'
-                  : 'Wait 30 minutes after adding WaterGuard before drinking to ensure complete disinfection.'}
+                  ? 'Yi amfani da WaterGuard bisa umarni kawai idan babu zargin ciyawar ruwa ko sinadarai. Jira minti 30; wannan awo ba gwajin lafiya ba ne.'
+                  : 'Use WaterGuard as directed only when algae or chemicals are not suspected. Wait 30 minutes; the timer does not verify safety.'}
               </p>
             </div>
 
