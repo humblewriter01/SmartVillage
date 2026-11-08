@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   Droplets,
   Camera,
+  Image as ImageIcon,
   Volume2,
   AlertTriangle,
   CheckCircle2,
@@ -19,6 +20,11 @@ import { voiceService } from '../services/voiceService';
 import { historyService } from '../services/historyService';
 import { reminderService, StoredReminder } from '../services/reminderService';
 import { FullScreenCameraModal } from './FullScreenCameraModal';
+import { pickPhotoFromGallery } from '../services/cameraService';
+// Inline the illustrative samples so they are available even with no network.
+import clearWaterImage from '../assets/water/clear.jpg?inline';
+import turbidWaterImage from '../assets/water/turbid.jpg?inline';
+import algaeWaterImage from '../assets/water/algae.jpg?inline';
 
 interface WaterQualityScreenProps {
   locale: Language;
@@ -29,7 +35,9 @@ interface WaterSample {
   id: 'clean' | 'turbid' | 'algae';
   name: string;
   name_hausa: string;
-  icon: string;
+  image: string;
+  // Used only by the independent read-aloud button; selecting a sample always
+  // analyzes its image with the same offline classifier as a camera photo.
   getResult: () => WaterQualityResult;
 }
 
@@ -38,21 +46,21 @@ const WATER_SAMPLES: WaterSample[] = [
     id: 'clean',
     name: 'Clean Borehole',
     name_hausa: 'Ruwan Fanfo Mai Tsabta',
-    icon: '🚰',
+    image: clearWaterImage,
     getResult: () => waterQualityService.getCleanBoreholeResult(),
   },
   {
     id: 'turbid',
     name: 'Turbid River Water',
     name_hausa: 'Ruwan Kogin Laka',
-    icon: '🪵',
+    image: turbidWaterImage,
     getResult: () => waterQualityService.getTurbidRiverResult(),
   },
   {
     id: 'algae',
     name: 'Algae Water',
     name_hausa: 'Ruwan Ciyawa mai Kore',
-    icon: '🌿',
+    image: algaeWaterImage,
     getResult: () => waterQualityService.getAlgaeWaterResult(),
   },
 ];
@@ -127,10 +135,14 @@ export const WaterQualityScreen: React.FC<WaterQualityScreenProps> = ({
   const [selectedSampleId, setSelectedSampleId] = useState<'clean' | 'turbid' | 'algae' | null>(null);
   const [result, setResult] = useState<WaterQualityResult | null>(null);
   const [resultSource, setResultSource] = useState<'photo' | 'sample' | null>(null);
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisError, setAnalysisError] = useState(false);
+  const [galleryError, setGalleryError] = useState(false);
   const analysisIdRef = useRef(0);
+  const galleryRequestIdRef = useRef(0);
+  const sampleSpeechIdRef = useRef(0);
   const [isSpeakingResult, setIsSpeakingResult] = useState(false);
   const [isSpeakingWaterHeader, setIsSpeakingWaterHeader] = useState(false);
   const [isSpeakingSamplesHeader, setIsSpeakingSamplesHeader] = useState(false);
@@ -142,7 +154,7 @@ export const WaterQualityScreen: React.FC<WaterQualityScreenProps> = ({
 
   useEffect(() => {
     reminderService.getStoredReminders().then(setReminders);
-    return () => { analysisIdRef.current++; };
+    return () => { analysisIdRef.current++; galleryRequestIdRef.current++; sampleSpeechIdRef.current++; };
   }, []);
 
   const showToast = (msg: string) => {
@@ -163,27 +175,74 @@ export const WaterQualityScreen: React.FC<WaterQualityScreenProps> = ({
     onRecordSaved?.();
   };
 
-  const handleCapturePhoto = async (photo: string) => {
+  // Camera, gallery, and example images all follow the same analysis path.
+  const analyzeImage = async (image: string, sample?: WaterSample) => {
     const analysisId = ++analysisIdRef.current;
+    const source = sample ? 'sample' : 'photo';
+    galleryRequestIdRef.current++;
+    sampleSpeechIdRef.current++;
+    setPhotoUrl(image);
     setIsCameraActive(false);
-    setSelectedSampleId(null);
+    setSelectedSampleId(sample?.id ?? null);
     setResult(null);
     setResultSource(null);
     setAnalysisError(false);
+    setGalleryError(false);
     setIsAnalyzing(true);
     voiceService.stopSpeaking();
     setIsSpeakingResult(false);
+    setIsSpeakingAllTips(false);
+    setIsSpeakingSamplesHeader(false);
+    setSpeakingSampleId(null);
+    setSpeakingTipId(null);
     try {
-      const res = await waterQualityService.analyzeWater(photo);
+      const res = await waterQualityService.analyzeWater(image);
       if (analysisId !== analysisIdRef.current) return;
       setResult(res);
-      setResultSource('photo');
-      saveWaterResult(res, 'photo');
+      setResultSource(source);
+      saveWaterResult(res, source);
+
+      if (sample) {
+        const speechId = ++sampleSpeechIdRef.current;
+        setSpeakingSampleId(sample.id);
+        // Speak the actual analysis, including the example warning and advice.
+        void voiceService.speak(sampleSpeech(sample, res, locale), locale, (warning) => {
+          showToast(warning);
+        }).catch((error) => {
+          console.warn('Water sample speech failed:', error);
+        }).finally(() => {
+          if (speechId === sampleSpeechIdRef.current) setSpeakingSampleId(null);
+        });
+      }
     } catch (error) {
-      console.warn('Water photo analysis failed:', error);
+      console.warn('Water image analysis failed:', error);
       if (analysisId === analysisIdRef.current) setAnalysisError(true);
     } finally {
       if (analysisId === analysisIdRef.current) setIsAnalyzing(false);
+    }
+  };
+
+  const handleCapturePhoto = (photo: string) => {
+    void analyzeImage(photo);
+  };
+
+  const handleOpenCamera = () => {
+    galleryRequestIdRef.current++;
+    setGalleryError(false);
+    setIsCameraActive(true);
+  };
+
+  const handleGallery = async () => {
+    // Ignore a late picker result after reset, another selection, or unmount.
+    // Opening or cancelling the picker must not cancel an existing analysis.
+    const requestId = ++galleryRequestIdRef.current;
+    setGalleryError(false);
+    try {
+      const photo = await pickPhotoFromGallery();
+      if (requestId === galleryRequestIdRef.current && photo) void analyzeImage(photo);
+    } catch (error) {
+      console.warn('Gallery picker error:', error);
+      if (requestId === galleryRequestIdRef.current) setGalleryError(true);
     }
   };
 
@@ -229,8 +288,12 @@ export const WaterQualityScreen: React.FC<WaterQualityScreenProps> = ({
 
   const handleResetWater = () => {
     analysisIdRef.current++;
+    galleryRequestIdRef.current++;
+    sampleSpeechIdRef.current++;
     setIsAnalyzing(false);
     setAnalysisError(false);
+    setGalleryError(false);
+    setPhotoUrl(null);
     setResultSource(null);
     voiceService.stopSpeaking();
     setIsSpeakingResult(false);
@@ -243,39 +306,20 @@ export const WaterQualityScreen: React.FC<WaterQualityScreenProps> = ({
     showToast(locale === 'ha' ? 'An sake farawa!' : 'Reset complete!');
   };
 
-  const handleSelectSample = async (sample: WaterSample) => {
-    analysisIdRef.current++;
-    setIsAnalyzing(false);
-    setAnalysisError(false);
-    setResultSource('sample');
-    voiceService.stopSpeaking();
-    setIsSpeakingResult(false);
-    setIsSpeakingAllTips(false);
-    setIsSpeakingSamplesHeader(false);
-    setSpeakingTipId(null);
-    setSelectedSampleId(sample.id);
-    setSpeakingSampleId(sample.id);
-
-    const res = sample.getResult();
-    setResult(res);
-
-    saveWaterResult(res, 'sample');
-
-    // Include the example warning and safety advice in the spoken version too.
-    await voiceService.speak(sampleSpeech(sample, res, locale), locale, (warning) => {
-      showToast(warning);
-    });
-    setSpeakingSampleId(null);
+  const handleSelectSample = (sample: WaterSample) => {
+    void analyzeImage(sample.image, sample);
   };
 
   // Read Aloud individual sample on clicking speaker icon
   const handleSpeakSampleOnly = async (sample: WaterSample, e: React.MouseEvent) => {
     e.stopPropagation();
     if (speakingSampleId === sample.id) {
+      sampleSpeechIdRef.current++;
       voiceService.stopSpeaking();
       setSpeakingSampleId(null);
       return;
     }
+    const speechId = ++sampleSpeechIdRef.current;
     voiceService.stopSpeaking();
     setSpeakingSampleId(sample.id);
 
@@ -283,7 +327,7 @@ export const WaterQualityScreen: React.FC<WaterQualityScreenProps> = ({
     await voiceService.speak(sampleSpeech(sample, res, locale), locale, (warning) => {
       showToast(warning);
     });
-    setSpeakingSampleId(null);
+    if (speechId === sampleSpeechIdRef.current) setSpeakingSampleId(null);
   };
 
   // Read Aloud the header and list of samples
@@ -452,40 +496,73 @@ export const WaterQualityScreen: React.FC<WaterQualityScreenProps> = ({
         onClose={() => setIsCameraActive(false)}
       />
 
-      {/* Offline photo analysis, with manual examples always available below. */}
-      <div className="bg-white rounded-2xl p-5 border border-sky-200 shadow-sm space-y-3">
-        <h2 className="text-sm font-bold text-slate-800">
-          {locale === 'ha' ? 'Duba Kamannin Ruwa da Hoto' : 'Check Water Appearance from a Photo'}
-        </h2>
-        <p className="text-xs text-slate-600 leading-relaxed">
-          {locale === 'ha'
-            ? 'Saka ruwa a kwano mai haske, a gaban bango fari. Cika tsakiyar hoton da ruwan. Ana duba launi a waya kawai.'
-            : 'Place water in a clear container against a plain white background. Fill the centre of the frame with water. Colour is checked on your device.'}
-        </p>
-        <button
-          type="button"
-          onClick={() => {
-            analysisIdRef.current++;
-            setIsAnalyzing(false);
-            setAnalysisError(false);
-            setIsCameraActive(true);
-          }}
-          className="w-full sm:w-auto py-3 px-5 bg-sky-700 hover:bg-sky-800 text-white font-bold rounded-xl text-sm flex items-center justify-center gap-2 cursor-pointer"
-        >
-          <Camera className="w-5 h-5" />
-          <span>{locale === 'ha' ? 'Ɗauki Hoto' : 'Take Photo'}</span>
-        </button>
-        {isAnalyzing && <p role="status" className="text-xs text-sky-800 font-semibold">{locale === 'ha' ? 'Ana duba hoto a waya…' : 'Analyzing the photo on your device…'}</p>}
-        {analysisError && <p role="alert" className="text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded-lg p-3">{locale === 'ha' ? 'Ba a iya duba hoton ba. Sake ɗaukar hoto ko zaɓi samfurin misali a ƙasa.' : 'Could not analyze the photo. Try another photo or choose a manual example below.'}</p>}
+      {/* Camera / photo preview, matching the crop screen. */}
+      <div className="space-y-3">
+        <div className="bg-white rounded-2xl border-2 border-dashed border-sky-200 p-4 flex flex-col items-center justify-center min-h-[170px] relative overflow-hidden group">
+          {photoUrl ? (
+            <div className="w-full flex flex-col items-center">
+              <img
+                src={photoUrl}
+                alt={locale === 'ha' ? 'Hoton ruwan da za a duba' : 'Water image preview'}
+                className="max-h-56 rounded-xl object-contain shadow-xs border border-sky-100"
+              />
+              <button
+                type="button"
+                onClick={handleResetWater}
+                className="mt-2 text-xs text-red-600 hover:text-red-700 font-bold underline cursor-pointer"
+              >
+                {locale === 'ha' ? 'Cire wannan hoto' : 'Remove photo'}
+              </button>
+            </div>
+          ) : (
+            <div className="text-center p-3 space-y-1.5">
+              <div className="w-11 h-11 bg-sky-50 text-sky-700 rounded-full flex items-center justify-center mx-auto mb-1">
+                <Droplets className="w-6 h-6 opacity-80" />
+              </div>
+              <p className="text-slate-800 font-extrabold text-xs sm:text-sm">
+                {locale === 'ha' ? 'Ɗauki ko loda hoton samfurin ruwa' : 'Take or upload a photo of your water sample'}
+              </p>
+              <p className="text-[11px] text-slate-500 max-w-xs">
+                {locale === 'ha'
+                  ? 'Saka ruwa a kwano mai haske a gaban bango fari. Cika tsakiyar hoton da ruwa.'
+                  : 'Place water in a clear container against a white background. Fill the centre of the frame with water.'}
+              </p>
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <button
+            type="button"
+            onClick={handleOpenCamera}
+            className="w-full flex items-center justify-center space-x-2.5 py-3.5 px-4 bg-sky-700 hover:bg-sky-800 active:scale-[0.99] text-white rounded-2xl font-black text-sm sm:text-base shadow-sm hover:shadow transition-all cursor-pointer"
+          >
+            <Camera className="w-5 h-5 text-sky-200" />
+            <span>{locale === 'ha' ? 'Ɗauki Hoto' : 'Take Photo'}</span>
+          </button>
+          <div className="flex items-center justify-center">
+            <button
+              type="button"
+              onClick={handleGallery}
+              className="inline-flex items-center space-x-1.5 py-1.5 px-3 text-xs font-bold text-sky-800 hover:text-sky-950 hover:bg-sky-50 rounded-xl transition-colors cursor-pointer"
+            >
+              <ImageIcon className="w-3.5 h-3.5 text-sky-600" />
+              <span>{locale === 'ha' ? 'Zaɓi daga Gallery' : 'Choose from Gallery'}</span>
+            </button>
+          </div>
+        </div>
+        {isAnalyzing && <p role="status" className="text-xs text-sky-800 font-semibold">{locale === 'ha' ? 'Ana duba hoto a waya…' : 'Analyzing the image on your device…'}</p>}
+        {analysisError && <p role="alert" className="text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded-lg p-3">{locale === 'ha' ? 'Ba a iya duba hoton ba. Sake gwada wani hoto ko samfurin misali.' : 'Could not analyze the image. Try another photo or example.'}</p>}
+        {galleryError && <p role="alert" className="text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded-lg p-3">{locale === 'ha' ? 'Ba a iya buɗe Gallery ba. Duba izinin hotuna kuma sake gwadawa.' : 'Could not open the gallery. Check photo permissions and try again.'}</p>}
       </div>
 
-      {/* Sample Buttons Section */}
-      <div className="bg-white rounded-2xl p-5 border border-sky-100 shadow-sm space-y-4">
-        <div className="flex items-center justify-between">
+      {/* Illustrative example images, with the existing read-aloud controls. */}
+      <div className="bg-slate-50/90 rounded-2xl p-3 sm:p-4 border border-slate-200/80 space-y-2.5">
+        <div className="flex items-start justify-between gap-2">
           <div>
             <div className="flex items-center space-x-2">
-              <h2 className="text-sm font-bold text-slate-800">
-                {locale === 'ha' ? 'Ko zaɓi samfurin misali:' : 'Or choose a manual example:'}
+              <h2 className="text-[11px] font-black text-slate-600 uppercase tracking-wider">
+                {locale === 'ha' ? 'Ko gwada da samfuran ruwa:' : 'Or test with water samples:'}
               </h2>
               <button
                 type="button"
@@ -500,13 +577,12 @@ export const WaterQualityScreen: React.FC<WaterQualityScreenProps> = ({
                 <Volume2 className={`w-3.5 h-3.5 ${isSpeakingSamplesHeader ? 'animate-bounce text-white' : ''}`} />
               </button>
             </div>
-            <p className="text-xs text-slate-500 mt-0.5">
+            <p className="text-xs text-slate-500 mt-1">
               {locale === 'ha'
-                ? 'Waɗannan misalai ne kawai; ba gwajin ruwan da kake da shi ba ne.'
-                : 'These are examples only; they do not test your water.'}
+                ? 'Hotunan misali ne kawai; ba gwajin ruwan da kake da shi ba ne.'
+                : 'Illustrative examples only; they do not test your water.'}
             </p>
           </div>
-
           {result && (
             <button
               type="button"
@@ -520,36 +596,40 @@ export const WaterQualityScreen: React.FC<WaterQualityScreenProps> = ({
           )}
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 gap-2" aria-label={locale === 'ha' ? 'Samfuran ruwa' : 'Water samples'}>
           {WATER_SAMPLES.map((sample) => {
             const isSelected = selectedSampleId === sample.id;
             const isSpeakingThis = speakingSampleId === sample.id;
             return (
               <div
                 key={sample.id}
-                className={`p-3.5 rounded-xl border text-left transition-all flex items-center justify-between gap-2.5 ${
+                className={`p-2 rounded-xl border text-left transition-all flex items-start gap-1 shadow-2xs ${
                   isSelected
-                    ? 'bg-sky-50 border-sky-500 ring-2 ring-sky-300 font-bold shadow-xs'
-                    : 'bg-slate-50/70 hover:bg-sky-50/50 border-slate-200 hover:border-sky-300'
+                    ? 'bg-sky-50 border-sky-500 ring-2 ring-sky-300'
+                    : 'bg-white hover:bg-sky-50/50 border-slate-200'
                 }`}
               >
-                <button type="button" onClick={() => handleSelectSample(sample)} aria-pressed={isSelected}
-                  className="flex items-center space-x-3 min-w-0 flex-1 text-left cursor-pointer">
-                  <span className="text-2xl shrink-0">{sample.icon}</span>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-xs sm:text-sm font-bold text-slate-900 leading-snug">
+                <button
+                  type="button"
+                  onClick={() => handleSelectSample(sample)}
+                  aria-pressed={isSelected}
+                  className="flex items-center gap-2 min-w-0 flex-1 text-left cursor-pointer"
+                >
+                  <img src={sample.image} alt="" className="w-10 h-10 rounded-lg object-cover shrink-0 border border-slate-200 bg-white" />
+                  <span className="min-w-0 flex-1">
+                    <span className="text-xs font-bold text-slate-800 leading-tight block">
                       {locale === 'ha' ? sample.name_hausa : sample.name}
-                    </div>
-                    <div className="text-[11px] text-slate-500 mt-0.5">
+                    </span>
+                    <span className="text-[10px] text-sky-800 font-semibold leading-tight mt-1 block">
                       {locale === 'ha' ? sample.name : sample.name_hausa}
-                    </div>
-                  </div>
+                    </span>
+                  </span>
                 </button>
 
-                {/* Individual Sample Read-Aloud Icon */}
                 <button
                   type="button"
                   onClick={(e) => handleSpeakSampleOnly(sample, e)}
+                  aria-label={locale === 'ha' ? `Karanta ${sample.name_hausa} da murya` : `Read ${sample.name} aloud`}
                   className={`p-1.5 rounded-lg border shrink-0 transition-all cursor-pointer active:scale-95 ${
                     isSpeakingThis
                       ? 'bg-sky-600 text-white border-sky-700 animate-pulse'
