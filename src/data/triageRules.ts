@@ -40,7 +40,7 @@ export interface TriageResult {
   dangerSignsHausa?: string;
   confidence: number;
   matchedRuleId: string;
-  matchedSymptoms: string[];
+  matchedSymptoms: Symptom[];
 }
 
 // ---------------------------------------------------------------------------
@@ -117,7 +117,7 @@ export const TRIAGE_RULES: TriageRule[] = [
     dangerSigns:
       'Sunken eyes, skin pinch stays pinched, no urine for over 6 hours, cold clammy hands, lethargy.',
     dangerSignsHausa:
-      'Idanu sun fada ciki, fatar ciki ba ta komawa, rashin fitsari sama da sa'o 6, hannaye da kafafu.',
+      'Idanu sun fada ciki, fatar ciki ba ta komawa, rashin fitsari sama da sa\'o 6, hannaye da kafafu.',
     confidence: 0.97,
   },
   {
@@ -172,7 +172,7 @@ export const TRIAGE_RULES: TriageRule[] = [
     recommendedAction:
       'Prompt medical care within 24 hours. Confirm with Rapid Diagnostic Test (RDT) before starting Artemisinin-based Combination Therapy (ACT).',
     recommendedActionHausa:
-      'Nemi magani cikin sa'o'i 24. Tabbatar da cutar RDT kafin shan maganin ACT.',
+      'Nemi magani cikin sa\'o\'i 24. Tabbatar da cutar RDT kafin shan maganin ACT.',
     firstAid:
       'Take paracetamol for high fever. Sponge with room-temperature water. Drink clean water or ORS.',
     firstAidHausa:
@@ -283,7 +283,7 @@ export const TRIAGE_RULES: TriageRule[] = [
     dangerSigns:
       'Fever lasting more than 3 days, convulsions, confusion, difficulty breathing.',
     dangerSignsHausa:
-      'Zazzabi ya tsaya yawan sa'o biyu, farfadiya, susucewa, numfashi mai wahala.',
+      'Zazzabi ya tsaya yawan sa\'o biyu, farfadiya, susucewa, numfashi mai wahala.',
     confidence: 0.85,
   },
   {

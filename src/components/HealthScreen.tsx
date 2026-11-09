@@ -364,7 +364,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
             <button
               type="button"
               onClick={handleSpeakHealthHeader}
-              className={`p-1.5 rounded-lg border transition-all cursor-pointer ${\n                isSpeakingHealthHeader\n                  ? 'bg-rose-500 text-white border-rose-600 animate-pulse'\n                  : 'bg-rose-50 text-rose-800 border-rose-200 hover:bg-rose-100'\n              }`}
+              className={`p-1.5 rounded-lg border transition-all cursor-pointer ${isSpeakingHealthHeader ? 'bg-rose-500 text-white border-rose-600 animate-pulse' : 'bg-rose-50 text-rose-800 border-rose-200 hover:bg-rose-100'}`}
               title={locale === 'ha' ? 'Karanta da Murya' : 'Read Aloud'}
             >
               <Volume2 className="w-4 h-4" />
@@ -411,7 +411,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
             <button
               type="button"
               onClick={handleSpeakSymptomsText}
-              className={`p-1 rounded-lg border transition-all cursor-pointer active:scale-95 flex items-center justify-center ${\n                isSpeakingSymptomsText\n                  ? 'bg-rose-600 text-white border-rose-700 animate-pulse'\n                  : 'bg-rose-50 text-rose-800 border-rose-200 hover:bg-rose-100 shadow-2xs'\n              }`}
+              className={`p-1 rounded-lg border transition-all cursor-pointer active:scale-95 flex items-center justify-center ${isSpeakingSymptomsText ? 'bg-rose-600 text-white border-rose-700 animate-pulse' : 'bg-rose-50 text-rose-800 border-rose-200 hover:bg-rose-100 shadow-2xs'}`}
               title={locale === 'ha' ? 'Karanta alamomin da ka zaɓa da murya' : 'Read selected symptoms aloud'}
             >
               <Volume2 className={`w-3.5 h-3.5 ${isSpeakingSymptomsText ? 'animate-bounce text-white' : 'text-rose-700'}`} />
@@ -443,7 +443,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
                 type="button"
                 onClick={() => handleToggleSymptomChip(symptom.id)}
                 aria-pressed={selected}
-                className={`text-[11px] px-2.5 py-1.5 rounded-lg border transition-colors cursor-pointer flex flex-col items-center gap-1 ${\n                  selected\n                    ? 'bg-red-700 text-white border-red-700 font-bold shadow-sm'\n                    : 'bg-white text-slate-700 border-slate-200 hover:bg-red-50/60'\n                }`}
+                className={`text-[11px] px-2.5 py-1.5 rounded-lg border transition-colors cursor-pointer flex flex-col items-center gap-1 ${selected ? 'bg-red-700 text-white border-red-700 font-bold shadow-sm' : 'bg-white text-slate-700 border-slate-200 hover:bg-red-50/60'}`}
               >
                 <span className="text-xs font-bold">{selected ? '✓' : '○'}</span>
                 <span className="leading-tight text-center">{label}</span>
@@ -544,7 +544,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
             {/* Grandma-Friendly Read Aloud Button */}
             <button
               onClick={handleSpeak}
-              className={`shrink-0 flex items-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs font-bold cursor-pointer transition-all shadow-xs ${\n                isSpeaking\n                  ? 'bg-red-600 text-white animate-pulse'\n                  : 'bg-red-50 hover:bg-red-100 text-red-800 border border-red-300'\n              }`}
+              className={`shrink-0 flex items-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs font-bold cursor-pointer transition-all shadow-xs ${isSpeaking ? 'bg-red-600 text-white animate-pulse' : 'bg-red-50 hover:bg-red-100 text-red-800 border border-red-300'}`}
               title={t(locale, 'grandmaListen')}
             >
               <Volume2 className="w-4 h-4 text-red-700" />
@@ -685,7 +685,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
                 <button
                   key={cat}
                   onClick={() => setManualCategoryFilter(cat)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold capitalize whitespace-nowrap transition-colors cursor-pointer border ${\n                    manualCategoryFilter === cat\n                      ? 'bg-red-800 text-white border-red-800 shadow-2xs'\n                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'\n                  }`}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold capitalize whitespace-nowrap transition-colors cursor-pointer border ${manualCategoryFilter === cat ? 'bg-red-800 text-white border-red-800 shadow-2xs' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'}`}
                 >
                   {cat === 'all'
                     ? locale === 'ha' ? 'Duk Cututtuka' : 'All Conditions'
@@ -715,7 +715,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
                         {locale === 'ha' ? cond.conditionHausa : cond.condition}
                       </div>
                       <span
-                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${\n                          isEmergency\n                            ? 'bg-red-100 text-red-800 border border-red-200'\n                            : 'bg-amber-100 text-amber-800 border border-amber-200'\n                        }`}
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${isEmergency ? 'bg-red-100 text-red-800 border border-red-200' : 'bg-amber-100 text-amber-800 border border-amber-200'}`}
                       >
                         {locale === 'ha' ? cond.urgencyLabelHausa : cond.urgencyLabel}
                       </span>
