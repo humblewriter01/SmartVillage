@@ -25,6 +25,7 @@ import {
   TRIAGE_SYMPTOMS,
   severityLabel,
   getSymptomById,
+  extractSymptomsFromText,
 } from '../data/triageRules';
 import {
   MANUAL_HEALTH_CONDITIONS,
@@ -44,6 +45,8 @@ interface HealthScreenProps {
 
 export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSaved }) => {
   const [selectedSymptomIds, setSelectedSymptomIds] = useState<string[]>([]);
+  const [autoSelectedSymptomIds, setAutoSelectedSymptomIds] = useState<string[]>([]);
+  const [symptomText, setSymptomText] = useState('');
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [result, setResult] = useState<TriageResult | null>(null);
   const [busy, setBusy] = useState(false);
@@ -67,6 +70,8 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
     voiceService.stopSpeaking();
     setIsSpeaking(false);
     setSelectedSymptomIds([]);
+    setAutoSelectedSymptomIds([]);
+    setSymptomText('');
     setPhoto(null);
     setPhotoUrl(null);
     setResult(null);
@@ -79,6 +84,60 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
     voiceService.stopSpeaking();
     setIsSpeaking(false);
     setResult(null);
+  };
+
+  // ------------------------------------------------------------------
+  // Free-text symptom input handler
+  // ------------------------------------------------------------------
+  const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const text = e.target.value;
+    setSymptomText(text);
+    const extracted = extractSymptomsFromText(text);
+    setAutoSelectedSymptomIds(extracted);
+  };
+
+  // Voice-to-text handler using the microphone
+  const handleVoiceInput = async () => {
+    try {
+      const granted = await voiceService.requestMicrophonePermission();
+      if (!granted) {
+        showToast(
+          locale === 'ha'
+            ? 'Ba a ba da izinin microphonic ba.'
+            : 'Microphone permission not granted.'
+        );
+        return;
+      }
+      voiceService.stopSpeaking();
+      await voiceService.startListening(
+        locale === 'ha' ? 'ha-NG' : 'en-NG',
+        (transcript) => {
+          setSymptomText(transcript);
+          const extracted = extractSymptomsFromText(transcript);
+          setAutoSelectedSymptomIds(extracted);
+          showToast(
+            locale === 'ha'
+              ? `Ana rubuta: ${transcript}`
+              : `Heard: ${transcript}`
+          );
+        },
+        (err) => {
+          console.warn('Voice input error:', err);
+          showToast(
+            locale === 'ha'
+              ? 'Ba a iya rubuta murya. Danna alamomin da hannu.'
+              : 'Voice input failed. Tap symptom buttons instead.'
+          );
+        }
+      );
+    } catch (err) {
+      console.warn('Voice input failed:', err);
+      showToast(
+        locale === 'ha'
+          ? 'Ba a iya rubuta murya. Danna alamomin da hannu.'
+          : 'Voice input failed. Tap symptom buttons instead.'
+      );
+    }
   };
 
   // ------------------------------------------------------------------
@@ -135,7 +194,11 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
   // Analyze — runs the offline rule-based triage engine
   // ------------------------------------------------------------------
   const handleAnalyze = async () => {
-    const hasSelection = selectedSymptomIds.length > 0;
+    // Combine manually selected chips + auto-selected from text input
+    const allSymptomIds = [
+      ...new Set([...selectedSymptomIds, ...autoSelectedSymptomIds]),
+    ];
+    const hasSelection = allSymptomIds.length > 0;
 
     if (!hasSelection && !photoUrl) {
       showToast(locale === 'ha' ? 'Zaɓi alamomi ko dauki hoto' : 'Select symptoms or take a photo');
@@ -147,8 +210,8 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
       let r: TriageResult;
 
       if (hasSelection) {
-        // Forward-chaining rule engine over selected symptom IDs
-        r = triageEvaluate(selectedSymptomIds);
+        // Forward-chaining rule engine over combined symptom IDs
+        r = triageEvaluate(allSymptomIds);
       } else {
         // Photo uploaded without symptom selection
         r = {
@@ -175,7 +238,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
         createdAt: new Date().toISOString(),
         title: locale === 'ha' ? r.conditionHausa : r.condition,
         detail: hasSelection
-          ? `Symptoms: ${selectedSymptomIds.map((id) => getSymptomById(id)?.label || id).join(', ')}`
+          ? `Symptoms: ${allSymptomIds.map((id) => getSymptomById(id)?.label || id).join(', ')}`
           : 'Visual screening',
         advice: `${locale === 'ha' ? r.actionHausa : r.action}\n\n${locale === 'ha' ? severityLabel(r.severity, 'ha') : severityLabel(r.severity, 'en')}`,
         confidence: r.confidence,
@@ -279,7 +342,10 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
     voiceService.stopSpeaking();
     setIsSpeakingSymptomsText(true);
 
-    const selectedLabels = selectedSymptomIds
+    const allSymptomIds = [
+      ...new Set([...selectedSymptomIds, ...autoSelectedSymptomIds]),
+    ];
+    const selectedLabels = allSymptomIds
       .map((id) => getSymptomById(id)?.label || id)
       .join(', ');
     const textToSpeak = selectedLabels
@@ -315,7 +381,9 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
     }
   };
 
-  const isSymptomSelected = (symptomId: string) => selectedSymptomIds.includes(symptomId);
+  const isSymptomSelected = (symptomId: string) =>
+    selectedSymptomIds.includes(symptomId) ||
+    autoSelectedSymptomIds.includes(symptomId);
 
   // ------------------------------------------------------------------
   // Filtered manual conditions
@@ -432,6 +500,43 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
           )}
         </div>
 
+        {/* Free-text symptom input with voice-to-text */}
+        <div className="space-y-2 pt-1">
+          <div className="flex items-center space-x-2">
+            <input
+              type="text"
+              value={symptomText}
+              onChange={handleTextChange}
+              placeholder={
+                locale === 'ha'
+                  ? 'Rubuta alamomi (misa: zazzabi, amai, taurin wuya)...'
+                  : 'Type symptoms (e.g., fever, vomiting, stiff neck)...'
+              }
+              className="w-full p-3 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent shadow-2xs"
+            />
+            <button
+              type="button"
+              onClick={handleVoiceInput}
+              className={`p-1.5 rounded-lg border transition-all cursor-pointer active:scale-95 flex items-center justify-center ${
+                isSpeakingSymptomsText
+                  ? 'bg-rose-600 text-white border-rose-700 animate-pulse'
+                  : 'bg-rose-50 text-rose-800 border-rose-200 hover:bg-rose-100 shadow-2xs'
+              }`}
+              title={locale === 'ha' ? 'Rubuta da murya' : 'Voice input'}
+            >
+              <Volume2 className="w-4 h-4" />
+            </button>
+          </div>
+          {/* Fallback warning when text has content but no keywords matched */}
+          {symptomText.trim() && autoSelectedSymptomIds.length === 0 && (
+            <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-xl text-[11px] text-amber-900 leading-tight">
+              {locale === 'ha'
+                ? 'Ba mu gane takamaiman alamun ba. Don Allah danna maɓallan alamun da ke sama.'
+                : 'We could not automatically detect specific symptoms. Please tap the symptom buttons above for an accurate triage.'}
+            </div>
+          )}
+        </div>
+
         {/* Symptom Chips Grid — multi-select */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-1.5 pt-1">
           {TRIAGE_SYMPTOMS.map((symptom) => {
@@ -516,7 +621,11 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
       </div>
 
       {/* Analyze Button: Disappears completely when no symptoms or photo exist */}
-      {(selectedSymptomIds.length > 0 || photoUrl) && !result && (
+      {(
+        selectedSymptomIds.length > 0 ||
+        autoSelectedSymptomIds.length > 0 ||
+        photoUrl
+      ) && !result && (
         <button
           onClick={handleAnalyze}
           disabled={busy}
