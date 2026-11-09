@@ -1,3 +1,6 @@
+// Health Symptom Triage Screen — Offline Rule-Based Engine
+// Matches the UI pattern of the Water and Crop screens.
+
 import React, { useState, useRef } from 'react';
 import {
   Camera,
@@ -11,11 +14,19 @@ import {
   HeartPulse,
   RotateCcw,
   Activity,
+  ShieldCheck,
+  RotateCcw as ResetIcon,
 } from 'lucide-react';
 import { Language, t } from '../utils/translations';
 import {
-  analyzeHealth,
-  HealthResult,
+  triageEvaluate,
+  TriageResult,
+  TriageSeverity,
+  TRIAGE_SYMPTOMS,
+  severityLabel,
+  getSymptomById,
+} from '../data/triageRules';
+import {
   MANUAL_HEALTH_CONDITIONS,
   ManualHealthCondition,
 } from '../services/healthService';
@@ -31,21 +42,10 @@ interface HealthScreenProps {
   onRecordSaved?: () => void;
 }
 
-const COMMON_SYMPTOM_CHIPS = [
-  { label: 'Fever & chills', hausa: 'Zazzabi da rawar sanyi' },
-  { label: 'Watery diarrhea & vomiting', hausa: 'Gudawa da zawayi da amai' },
-  { label: 'Fast difficult breathing', hausa: 'Numfashi da sauri da wahala' },
-  { label: 'Snakebite on leg or foot', hausa: 'Cizon maciji a kafa ko hannu' },
-  { label: 'Stiff neck & headache', hausa: 'Taurin wuya da ciwon kai' },
-  { label: 'Measles red rash & red eyes', hausa: 'Kurajen kyanda da jan idanu' },
-  { label: 'Heat exhaustion & fainting', hausa: 'Zafin rana da jiri ko sumewa' },
-  { label: 'Itchy skin rash (scabies)', hausa: 'Kurajen makero da kaikayi' },
-];
-
 export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSaved }) => {
+  const [selectedSymptomIds, setSelectedSymptomIds] = useState<string[]>([]);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
-  const [symptoms, setSymptoms] = useState('');
-  const [result, setResult] = useState<HealthResult | null>(null);
+  const [result, setResult] = useState<TriageResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [showManualModal, setShowManualModal] = useState(false);
@@ -60,11 +60,13 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  // Reset & Start Over Handlers (Part 4)
+  // ------------------------------------------------------------------
+  // Reset & Start Over Handlers
+  // ------------------------------------------------------------------
   const handleResetHealth = () => {
     voiceService.stopSpeaking();
     setIsSpeaking(false);
-    setSymptoms('');
+    setSelectedSymptomIds([]);
     setPhoto(null);
     setPhotoUrl(null);
     setResult(null);
@@ -79,6 +81,9 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
     setResult(null);
   };
 
+  // ------------------------------------------------------------------
+  // Photo handlers (unchanged)
+  // ------------------------------------------------------------------
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -126,15 +131,42 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
     }
   };
 
+  // ------------------------------------------------------------------
+  // Analyze — runs the offline rule-based triage engine
+  // ------------------------------------------------------------------
   const handleAnalyze = async () => {
-    if (!photoUrl && !symptoms.trim()) {
-      showToast(locale === 'ha' ? 'Shigar da alamomi ko dauki hoto' : 'Enter symptoms or take a photo');
+    const hasSelection = selectedSymptomIds.length > 0;
+
+    if (!hasSelection && !photoUrl) {
+      showToast(locale === 'ha' ? 'Zaɓi alamomi ko dauki hoto' : 'Select symptoms or take a photo');
       return;
     }
 
     setBusy(true);
     setTimeout(() => {
-      const r = analyzeHealth(symptoms, Boolean(photoUrl));
+      let r: TriageResult;
+
+      if (hasSelection) {
+        // Forward-chaining rule engine over selected symptom IDs
+        r = triageEvaluate(selectedSymptomIds);
+      } else {
+        // Photo uploaded without symptom selection
+        r = {
+          severity: 'Routine',
+          condition: 'Visible Skin or Health Observation',
+          conditionHausa: 'Duba Matsalar Fata ko Kurji',
+          action: 'Keep affected skin clean and dry with mild soap. Avoid scratching or applying motor oil/battery acid remedies. Have a health worker inspect in person.',
+          actionHausa: 'Wanke wurin da ruwa mai tsabta da sabulu marar zafi. Kada a shafa man inji ko maganin da ba a sani ba. Nemi likita ya duba.',
+          firstAid: 'Clean with mild soap and water. Do not scratch.',
+          firstAidHausa: 'Yi wanka da sabulu marar zafi da ruwa. Kada a shafa man inji.',
+          dangerSigns: 'Spreading redness, pus, fever, increasing pain.',
+          dangerSignsHausa: 'Kurje ya farawa, ruwaya, zazzabi, ciwon tsawan motsi.',
+          confidence: 0.75,
+          matchedRuleId: 'photo_only',
+          matchedSymptoms: [],
+        };
+      }
+
       setResult(r);
 
       // Save to local database / history
@@ -142,8 +174,10 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
         type: 'health',
         createdAt: new Date().toISOString(),
         title: locale === 'ha' ? r.conditionHausa : r.condition,
-        detail: symptoms.trim() || 'Visual screening',
-        advice: `${locale === 'ha' ? r.adviceHausa : r.advice}\n\n${locale === 'ha' ? r.urgencyHausa : r.urgency}`,
+        detail: hasSelection
+          ? `Symptoms: ${selectedSymptomIds.map((id) => getSymptomById(id)?.label || id).join(', ')}`
+          : 'Visual screening',
+        advice: `${locale === 'ha' ? r.actionHausa : r.action}\n\n${locale === 'ha' ? severityLabel(r.severity, 'ha') : severityLabel(r.severity, 'en')}`,
         confidence: r.confidence,
         imagePath: photoUrl || undefined,
       });
@@ -153,21 +187,32 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
     }, 350);
   };
 
+  // ------------------------------------------------------------------
   // Manual Health Condition Selection Handler
+  // ------------------------------------------------------------------
   const handleSelectManualCondition = (cond: ManualHealthCondition) => {
-    const res: HealthResult = {
-      condition: cond.condition,
-      conditionHausa: cond.conditionHausa,
-      advice: `${cond.firstAid} ${cond.clinicalAdvice}`,
-      adviceHausa: `${cond.firstAidHausa} ${cond.clinicalAdviceHausa}`,
-      urgency: cond.urgencyLabel,
-      urgencyHausa: cond.urgencyLabelHausa,
-      confidence: 0.95,
-      firstAid: cond.firstAid,
-      firstAidHausa: cond.firstAidHausa,
+    const severityMap: Record<ManualHealthCondition['urgency'], TriageSeverity> = {
+      critical: 'Emergency',
+      high: 'Urgent',
+      moderate: 'Urgent',
+      mild: 'Routine',
     };
 
-    setSymptoms(locale === 'ha' ? cond.symptomsHausa : cond.symptoms);
+    const res: TriageResult = {
+      condition: cond.condition,
+      conditionHausa: cond.conditionHausa,
+      action: `${cond.firstAid} ${cond.clinicalAdvice}`,
+      actionHausa: `${cond.firstAidHausa} ${cond.clinicalAdviceHausa}`,
+      firstAid: cond.firstAid,
+      firstAidHausa: cond.firstAidHausa,
+      dangerSigns: cond.dangerSigns,
+      dangerSignsHausa: cond.dangerSignsHausa,
+      severity: severityMap[cond.urgency],
+      confidence: 0.95,
+      matchedRuleId: cond.id,
+      matchedSymptoms: [],
+    };
+
     setResult(res);
     setShowManualModal(false);
 
@@ -176,7 +221,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
       createdAt: new Date().toISOString(),
       title: locale === 'ha' ? cond.conditionHausa : cond.condition,
       detail: `Manual Condition: ${locale === 'ha' ? cond.symptomsHausa : cond.symptoms}`,
-      advice: `${locale === 'ha' ? res.adviceHausa : res.advice}`,
+      advice: `${locale === 'ha' ? res.actionHausa : res.action}`,
       confidence: 0.95,
     });
 
@@ -184,6 +229,9 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
     showToast(locale === 'ha' ? 'An ɗora bayanin cutar!' : 'Loaded condition details!');
   };
 
+  // ------------------------------------------------------------------
+  // Read-aloud handlers
+  // ------------------------------------------------------------------
   const handleSpeak = async () => {
     if (!result) return;
     if (isSpeaking) {
@@ -194,9 +242,9 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
 
     setIsSpeaking(true);
     const titleText = locale === 'ha' ? result.conditionHausa : result.condition;
-    const adviceText = locale === 'ha' ? result.adviceHausa : result.advice;
-    const urgencyText = locale === 'ha' ? result.urgencyHausa : result.urgency;
-    const textToSpeak = `${titleText}. ${adviceText}. ${urgencyText}`;
+    const actionText = locale === 'ha' ? result.actionHausa : result.action;
+    const severityText = severityLabel(result.severity, locale);
+    const textToSpeak = `${titleText}. ${severityText}. ${actionText}`;
 
     await voiceService.speak(textToSpeak, locale, (warning) => {
       showToast(warning);
@@ -231,10 +279,16 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
     voiceService.stopSpeaking();
     setIsSpeakingSymptomsText(true);
 
-    const trimmed = symptoms.trim();
-    const textToSpeak = trimmed
-      ? (locale === 'ha' ? `Alamomin da aka rubuta a cikin akwati: ${trimmed}.` : `Observed symptoms in box: ${trimmed}.`)
-      : (locale === 'ha' ? 'Babu alamomin cuta da aka rubuta a cikin akwatin tukuna.' : 'No symptoms entered in the box yet.');
+    const selectedLabels = selectedSymptomIds
+      .map((id) => getSymptomById(id)?.label || id)
+      .join(', ');
+    const textToSpeak = selectedLabels
+      ? (locale === 'ha'
+          ? `Alamomin da ka zaɓa: ${selectedLabels}.`
+          : `Selected symptoms: ${selectedLabels}.`)
+      : (locale === 'ha'
+          ? 'Babu alamomin da ka zaɓa.'
+          : 'No symptoms selected yet.');
 
     await voiceService.speak(textToSpeak, locale, (warning) => {
       showToast(warning);
@@ -242,32 +296,38 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
     setIsSpeakingSymptomsText(false);
   };
 
-  // Single-select symptom chip handler (radio button behavior)
-  const handleToggleSymptomChip = (chip: { label: string; hausa: string }) => {
-    const textToSet = locale === 'ha' ? chip.hausa : chip.label;
-    const isCurrentlySelected =
-      symptoms.trim().toLowerCase() === chip.hausa.toLowerCase() ||
-      symptoms.trim().toLowerCase() === chip.label.toLowerCase();
-
-    // 1. If currently selected, tapping again deselects it (empties text box)
+  // ------------------------------------------------------------------
+  // Multi-select symptom chip handler
+  // ------------------------------------------------------------------
+  const handleToggleSymptomChip = (symptomId: string) => {
+    const isCurrentlySelected = selectedSymptomIds.includes(symptomId);
     if (isCurrentlySelected) {
-      setSymptoms('');
+      setSelectedSymptomIds(selectedSymptomIds.filter((id) => id !== symptomId));
     } else {
-      // 2. Selects this symptom as the ONLY one (replaces any previous symptom)
-      setSymptoms(textToSet);
+      setSelectedSymptomIds([...selectedSymptomIds, symptomId]);
     }
 
-    // 3. Tapping any symptom speaks it aloud in the current language
+    // Speak the symptom aloud in the current language
     voiceService.stopSpeaking();
-    const textToSpeak = locale === 'ha' ? chip.hausa : chip.label;
-    voiceService.speak(textToSpeak, locale, undefined, 'health');
+    const symptom = getSymptomById(symptomId);
+    if (symptom) {
+      voiceService.speak(locale === 'ha' ? symptom.labelHausa : symptom.label, locale, undefined, 'health');
+    }
   };
 
+  const isSymptomSelected = (symptomId: string) => selectedSymptomIds.includes(symptomId);
+
+  // ------------------------------------------------------------------
+  // Filtered manual conditions
+  // ------------------------------------------------------------------
   const filteredConditions = MANUAL_HEALTH_CONDITIONS.filter((c) => {
     if (manualCategoryFilter === 'all') return true;
     return c.category === manualCategoryFilter;
   });
 
+  // ------------------------------------------------------------------
+  // Render
+  // ------------------------------------------------------------------
   return (
     <div className="max-w-4xl lg:max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
       {/* Toast Notification */}
@@ -304,11 +364,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
             <button
               type="button"
               onClick={handleSpeakHealthHeader}
-              className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
-                isSpeakingHealthHeader
-                  ? 'bg-rose-500 text-white border-rose-600 animate-pulse'
-                  : 'bg-rose-50 text-rose-800 border-rose-200 hover:bg-rose-100'
-              }`}
+              className={`p-1.5 rounded-lg border transition-all cursor-pointer ${\n                isSpeakingHealthHeader\n                  ? 'bg-rose-500 text-white border-rose-600 animate-pulse'\n                  : 'bg-rose-50 text-rose-800 border-rose-200 hover:bg-rose-100'\n              }`}
               title={locale === 'ha' ? 'Karanta da Murya' : 'Read Aloud'}
             >
               <Volume2 className="w-4 h-4" />
@@ -323,14 +379,14 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
 
         {/* Large Manual Selector Button & Reset Button */}
         <div className="flex items-center gap-2">
-          {(symptoms || photoUrl || result) && (
+          {(selectedSymptomIds.length > 0 || photoUrl || result) && (
             <button
               type="button"
               onClick={handleResetHealth}
               className="flex items-center space-x-1.5 px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-900 border border-rose-300 rounded-xl font-bold text-xs sm:text-sm transition-all cursor-pointer shadow-2xs shrink-0"
               title={locale === 'ha' ? 'Sake Farawa' : 'Start Over'}
             >
-              <RotateCcw className="w-4 h-4 text-rose-700" />
+              <ResetIcon className="w-4 h-4 text-rose-700" />
               <span>{locale === 'ha' ? 'Sake Farawa' : 'Start Over'}</span>
             </button>
           )}
@@ -345,7 +401,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
         </div>
       </div>
 
-      {/* Symptoms Text Area */}
+      {/* Symptom Selection Section */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
@@ -355,60 +411,42 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
             <button
               type="button"
               onClick={handleSpeakSymptomsText}
-              className={`p-1 rounded-lg border transition-all cursor-pointer active:scale-95 flex items-center justify-center ${
-                isSpeakingSymptomsText
-                  ? 'bg-rose-600 text-white border-rose-700 animate-pulse'
-                  : 'bg-rose-50 text-rose-800 border-rose-200 hover:bg-rose-100 shadow-2xs'
-              }`}
-              title={locale === 'ha' ? 'Karanta rubutun akwati da murya' : 'Read box text aloud'}
+              className={`p-1 rounded-lg border transition-all cursor-pointer active:scale-95 flex items-center justify-center ${\n                isSpeakingSymptomsText\n                  ? 'bg-rose-600 text-white border-rose-700 animate-pulse'\n                  : 'bg-rose-50 text-rose-800 border-rose-200 hover:bg-rose-100 shadow-2xs'\n              }`}
+              title={locale === 'ha' ? 'Karanta alamomin da ka zaɓa da murya' : 'Read selected symptoms aloud'}
             >
               <Volume2 className={`w-3.5 h-3.5 ${isSpeakingSymptomsText ? 'animate-bounce text-white' : 'text-rose-700'}`} />
             </button>
           </div>
-          <div className="flex items-center space-x-2">
-            {symptoms && (
-              <button
-                type="button"
-                onClick={() => {
-                  setSymptoms('');
-                  setResult(null);
-                }}
-                className="text-xs text-rose-600 hover:text-rose-800 cursor-pointer font-bold flex items-center gap-1"
-              >
-                <RotateCcw className="w-3 h-3" />
-                <span>{locale === 'ha' ? 'Share rubutu' : 'Clear'}</span>
-              </button>
-            )}
-          </div>
+          {selectedSymptomIds.length > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedSymptomIds([]);
+                setResult(null);
+              }}
+              className="text-xs text-rose-600 hover:text-rose-800 cursor-pointer font-bold flex items-center gap-1"
+            >
+              <RotateCcw className="w-3 h-3" />
+              <span>{locale === 'ha' ? 'Share dukka' : 'Clear All'}</span>
+            </button>
+          )}
         </div>
 
-        <textarea
-          rows={3}
-          value={symptoms}
-          onChange={(e) => setSymptoms(e.target.value)}
-          placeholder={t(locale, 'symptomsHint')}
-          className="w-full p-3.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent shadow-2xs"
-        />
-
-        {/* Quick Symptom Chips (Single-select radio button behavior) */}
-        <div className="flex flex-wrap gap-1.5 pt-1">
-          {COMMON_SYMPTOM_CHIPS.map((chip, idx) => {
-            const label = locale === 'ha' ? chip.hausa : chip.label;
-            const isSelected =
-              symptoms.trim().toLowerCase() === chip.hausa.toLowerCase() ||
-              symptoms.trim().toLowerCase() === chip.label.toLowerCase();
+        {/* Symptom Chips Grid — multi-select */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-1.5 pt-1">
+          {TRIAGE_SYMPTOMS.map((symptom) => {
+            const selected = isSymptomSelected(symptom.id);
+            const label = locale === 'ha' ? symptom.labelHausa : symptom.label;
             return (
               <button
-                key={idx}
+                key={symptom.id}
                 type="button"
-                onClick={() => handleToggleSymptomChip(chip)}
-                className={`text-[11px] px-2.5 py-1 rounded-lg border transition-colors cursor-pointer ${
-                  isSelected
-                    ? 'bg-red-700 text-white border-red-700 font-bold'
-                    : 'bg-white text-slate-700 border-slate-200 hover:bg-red-50/60'
-                }`}
+                onClick={() => handleToggleSymptomChip(symptom.id)}
+                aria-pressed={selected}
+                className={`text-[11px] px-2.5 py-1.5 rounded-lg border transition-colors cursor-pointer flex flex-col items-center gap-1 ${\n                  selected\n                    ? 'bg-red-700 text-white border-red-700 font-bold shadow-sm'\n                    : 'bg-white text-slate-700 border-slate-200 hover:bg-red-50/60'\n                }`}
               >
-                + {label}
+                <span className="text-xs font-bold">{selected ? '✓' : '○'}</span>
+                <span className="leading-tight text-center">{label}</span>
               </button>
             );
           })}
@@ -477,8 +515,8 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
         )}
       </div>
 
-      {/* Analyze Button: Disappears completely when no photo or symptoms exist */}
-      {(symptoms.trim() || photoUrl) && !result && (
+      {/* Analyze Button: Disappears completely when no symptoms or photo exist */}
+      {(selectedSymptomIds.length > 0 || photoUrl) && !result && (
         <button
           onClick={handleAnalyze}
           disabled={busy}
@@ -506,11 +544,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
             {/* Grandma-Friendly Read Aloud Button */}
             <button
               onClick={handleSpeak}
-              className={`shrink-0 flex items-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs font-bold cursor-pointer transition-all shadow-xs ${
-                isSpeaking
-                  ? 'bg-red-600 text-white animate-pulse'
-                  : 'bg-red-50 hover:bg-red-100 text-red-800 border border-red-300'
-              }`}
+              className={`shrink-0 flex items-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs font-bold cursor-pointer transition-all shadow-xs ${\n                isSpeaking\n                  ? 'bg-red-600 text-white animate-pulse'\n                  : 'bg-red-50 hover:bg-red-100 text-red-800 border border-red-300'\n              }`}
               title={t(locale, 'grandmaListen')}
             >
               <Volume2 className="w-4 h-4 text-red-700" />
@@ -518,34 +552,92 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
             </button>
           </div>
 
-          {/* Urgency Badge */}
-          <div className="p-3 bg-red-50/90 border border-red-200 rounded-xl space-y-1">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-red-800 block">
+          {/* Severity Badge (color-coded) */}
+          <div className="p-3 rounded-xl space-y-1">
+            <span className="text-[11px] font-bold uppercase tracking-wider block">
               {t(locale, 'urgency')}
             </span>
-            <div className="font-extrabold text-xs sm:text-sm text-red-950 flex items-center gap-1.5">
-              <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
-              <span>{locale === 'ha' ? result.urgencyHausa : result.urgency}</span>
+            <div className={`font-extrabold text-xs sm:text-sm flex items-center gap-1.5 ${
+              result.severity === 'Emergency'
+                ? 'bg-red-100 text-red-800 border border-red-200'
+                : result.severity === 'Urgent'
+                ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+            }`}>
+              {result.severity === 'Emergency' ? (
+                <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+              ) : result.severity === 'Urgent' ? (
+                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+              ) : (
+                <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+              )}
+              <span>{severityLabel(result.severity, locale)}</span>
             </div>
           </div>
 
-          {/* Actionable Medical Advice & First Aid */}
+          {/* Matched Symptoms */}
+          {result.matchedSymptoms.length > 0 && (
+            <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600 block">
+                {locale === 'ha' ? 'Alamomin da suka dace:' : 'Matched Symptoms:'}
+              </span>
+              <div className="flex flex-wrap gap-1">
+                {result.matchedSymptoms.map((s) => (
+                  <span
+                    key={s.id}
+                    className="text-[11px] px-2 py-0.5 bg-white border border-slate-300 rounded-lg text-slate-700 font-medium"
+                  >
+                    {locale === 'ha' ? s.labelHausa : s.label}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Actionable Medical Advice */}
           <div className="space-y-2">
             <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
               <HeartPulse className="w-4 h-4 text-red-600" />
               <span>{t(locale, 'firstAidHomeCare')}</span>
             </h4>
             <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-800 leading-relaxed font-medium">
-              {locale === 'ha' ? result.adviceHausa : result.advice}
+              {locale === 'ha' ? result.actionHausa : result.action}
             </div>
           </div>
 
+          {/* First Aid */}
+          {result.firstAid && (
+            <div className="space-y-2">
+              <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                <Activity className="w-4 h-4 text-red-600" />
+                <span>{locale === 'ha' ? 'Taimakon Farko' : 'First Aid'}</span>
+              </h4>
+              <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-xs sm:text-sm text-amber-900 leading-relaxed font-medium">
+                {locale === 'ha' ? result.firstAidHausa : result.firstAid}
+              </div>
+            </div>
+          )}
+
+          {/* Danger Signs */}
+          {result.dangerSigns && (
+            <div className="space-y-2">
+              <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                <AlertCircle className="w-4 h-4 text-red-600" />
+                <span>{locale === 'ha' ? 'Alamomin Gaggawa' : 'Danger Signs'}</span>
+              </h4>
+              <div className="p-3.5 bg-red-50 border border-red-200 rounded-xl text-xs sm:text-sm text-red-900 leading-relaxed font-medium">
+                {locale === 'ha' ? result.dangerSignsHausa : result.dangerSigns}
+              </div>
+            </div>
+          )}
+
           {/* Medical Disclaimer Notice */}
           <div className="p-2.5 bg-amber-50/70 border border-amber-200/80 rounded-xl text-[11px] text-amber-900 leading-tight">
+            <span className="font-bold mr-1">{locale === 'ha' ? 'Hanyar:' : 'Disclaimer:'}</span>
             {t(locale, 'notMedical')}
           </div>
 
-          {/* Action & Reset Buttons (Part 4) */}
+          {/* Action & Reset Buttons */}
           <div className="pt-2 flex flex-col sm:flex-row items-center gap-2.5">
             <button
               type="button"
@@ -593,11 +685,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
                 <button
                   key={cat}
                   onClick={() => setManualCategoryFilter(cat)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold capitalize whitespace-nowrap transition-colors cursor-pointer border ${
-                    manualCategoryFilter === cat
-                      ? 'bg-red-800 text-white border-red-800 shadow-2xs'
-                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
-                  }`}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold capitalize whitespace-nowrap transition-colors cursor-pointer border ${\n                    manualCategoryFilter === cat\n                      ? 'bg-red-800 text-white border-red-800 shadow-2xs'\n                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'\n                  }`}
                 >
                   {cat === 'all'
                     ? locale === 'ha' ? 'Duk Cututtuka' : 'All Conditions'
@@ -627,11 +715,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
                         {locale === 'ha' ? cond.conditionHausa : cond.condition}
                       </div>
                       <span
-                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
-                          isEmergency
-                            ? 'bg-red-100 text-red-800 border border-red-200'
-                            : 'bg-amber-100 text-amber-800 border border-amber-200'
-                        }`}
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${\n                          isEmergency\n                            ? 'bg-red-100 text-red-800 border border-red-200'\n                            : 'bg-amber-100 text-amber-800 border border-amber-200'\n                        }`}
                       >
                         {locale === 'ha' ? cond.urgencyLabelHausa : cond.urgencyLabel}
                       </span>
