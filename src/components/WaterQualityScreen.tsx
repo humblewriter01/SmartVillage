@@ -585,19 +585,21 @@ export const WaterQualityScreen: React.FC<WaterQualityScreenProps> = ({
           )}
         </div>
 
-        <button
-          type="button"
-          onClick={handleAnalyze}
-          disabled={!photoUrl || !isPreviewReady || isAnalyzing}
-          aria-busy={isAnalyzing}
-          className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl font-extrabold text-sm shadow-sm transition-all active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 cursor-pointer"
-        >
+        {photoUrl && (
+          <button
+            type="button"
+            onClick={handleAnalyze}
+            disabled={!photoUrl || !isPreviewReady || isAnalyzing}
+            aria-busy={isAnalyzing}
+            className="animate-fade-in w-full flex items-center justify-center gap-2 py-3 px-4 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl font-extrabold text-sm shadow-sm transition-all active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 cursor-pointer"
+          >
           <Droplets className="w-5 h-5" />
           <span>{isAnalyzing
             ? (locale === 'ha' ? 'Ana Bincika Ruwa…' : 'Analyzing Water…')
             : (locale === 'ha' ? 'Bincika Ruwa' : 'Analyze Water')}
           </span>
-        </button>
+          </button>
+        )}
 
         <div className="space-y-1">
           <button
