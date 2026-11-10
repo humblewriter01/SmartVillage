@@ -51,12 +51,16 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
   const [result, setResult] = useState<TriageResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isSpeakingTypedText, setIsSpeakingTypedText] = useState(false);
   const [showManualModal, setShowManualModal] = useState(false);
   const [manualCategoryFilter, setManualCategoryFilter] = useState<'all' | 'emergency' | 'infectious' | 'respiratory' | 'skin'>('all');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+  // Generation counter — invalidates a pending (setTimeout) analysis when the
+  // user changes inputs mid-flight, so stale results can never surface.
+  const analysisRunRef = useRef(0);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -67,8 +71,11 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
   // Reset & Start Over Handlers
   // ------------------------------------------------------------------
   const handleResetHealth = () => {
+    analysisRunRef.current++;
     voiceService.stopSpeaking();
     setIsSpeaking(false);
+    setIsSpeakingTypedText(false);
+    setBusy(false);
     setSelectedSymptomIds([]);
     setAutoSelectedSymptomIds([]);
     setSymptomText('');
@@ -89,67 +96,92 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
   // ------------------------------------------------------------------
   // Free-text symptom input handler
   // ------------------------------------------------------------------
+  // Mutually exclusive inputs — Scenario B: typing clears any captured photo
+  const clearPhotoIfCaptured = (notice: string) => {
+    if (photo || photoUrl) {
+      analysisRunRef.current++; // cancel any pending photo auto-analysis
+      setBusy(false);
+      setPhoto(null);
+      setPhotoUrl(null);
+      setResult(null);
+      showToast(notice);
+    }
+  };
+
   const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const text = e.target.value;
+    // Typing takes over the screening — drop the photo from the preview
+    clearPhotoIfCaptured(
+      locale === 'ha'
+        ? 'An cire hoto — rubutu ya karɓi gaba'
+        : 'Photo removed — text input takes over'
+    );
     setSymptomText(text);
     const extracted = extractSymptomsFromText(text);
     setAutoSelectedSymptomIds(extracted);
   };
 
-  // Voice-to-text handler using the microphone
-  const handleVoiceInput = async () => {
-    try {
-      const granted = await voiceService.requestMicrophonePermission();
-      if (!granted) {
-        showToast(
-          locale === 'ha'
-            ? 'Ba a ba da izinin microphonic ba.'
-            : 'Microphone permission not granted.'
-        );
-        return;
-      }
-      voiceService.stopSpeaking();
-      await voiceService.startListening(
-        locale === 'ha' ? 'ha-NG' : 'en-NG',
-        (transcript) => {
-          setSymptomText(transcript);
-          const extracted = extractSymptomsFromText(transcript);
-          setAutoSelectedSymptomIds(extracted);
-          showToast(
-            locale === 'ha'
-              ? `Ana rubuta: ${transcript}`
-              : `Heard: ${transcript}`
-          );
-        },
-        (err) => {
-          console.warn('Voice input error:', err);
-          showToast(
-            locale === 'ha'
-              ? 'Ba a iya rubuta murya. Danna alamomin da hannu.'
-              : 'Voice input failed. Tap symptom buttons instead.'
-          );
-        }
-      );
-    } catch (err) {
-      console.warn('Voice input failed:', err);
+  // Clear (Soke) button — wipes the text box and unselects auto-matched chips
+  const handleClearTypedText = () => {
+    analysisRunRef.current++; // cancel any pending analysis tied to this text
+    voiceService.stopSpeaking();
+    setIsSpeakingTypedText(false);
+    setBusy(false);
+    setSymptomText('');
+    setAutoSelectedSymptomIds([]);
+    setResult(null);
+  };
+
+  // Read-aloud — speaks exactly what the user typed, in the selected language
+  const handleSpeakTypedText = async () => {
+    const textToSpeak = symptomText.trim();
+    if (!textToSpeak) {
       showToast(
         locale === 'ha'
-          ? 'Ba a iya rubuta murya. Danna alamomin da hannu.'
-          : 'Voice input failed. Tap symptom buttons instead.'
+          ? 'Babu abin da za a karanta — rubuta wani abu da farko.'
+          : 'Nothing to read — type something first.'
       );
+      return;
     }
+    if (isSpeakingTypedText) {
+      voiceService.stopSpeaking();
+      setIsSpeakingTypedText(false);
+      return;
+    }
+    voiceService.stopSpeaking();
+    setIsSpeakingTypedText(true);
+    await voiceService.speak(
+      textToSpeak,
+      locale,
+      (warning) => {
+        showToast(warning);
+      },
+      'health'
+    );
+    setIsSpeakingTypedText(false);
   };
 
   // ------------------------------------------------------------------
-  // Photo handlers (unchanged)
+  // Photo handlers — a freshly loaded photo wipes text & chips (Scenario A)
+  // and is auto-analyzed the moment it lands in the preview box.
   // ------------------------------------------------------------------
+  const applyPhoto = (formatted: string) => {
+    // Scenario A: loading a photo immediately clears the text box and ALL chips
+    setSymptomText('');
+    setSelectedSymptomIds([]);
+    setAutoSelectedSymptomIds([]);
+    setPhoto(formatted);
+    setPhotoUrl(formatted);
+    setResult(null);
+    // Analyze button lives only under the text box — photos analyze themselves
+    performAnalysis([], formatted);
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const url = URL.createObjectURL(file);
-      setPhoto(url);
-      setPhotoUrl(url);
-      setResult(null);
+      applyPhoto(url);
     }
     e.target.value = '';
   };
@@ -163,11 +195,10 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
 
   const handleCapturePhoto = (captured: string) => {
     const formatted = captured.startsWith('data:') ? captured : `data:image/jpeg;base64,${captured}`;
-    setPhoto(formatted);
-    setPhotoUrl(formatted);
-    setResult(null);
+    // Scenario A — photo wipes text & chips, then auto-analyzes
+    applyPhoto(formatted);
     setIsCameraActive(false);
-    showToast(locale === 'ha' ? 'An ɗauki hoto!' : 'Photo captured!');
+    showToast(locale === 'ha' ? 'An ɗauki hoto! Ana bincike…' : 'Photo captured! Analyzing…');
   };
 
   const handleCloseCamera = () => {
@@ -179,10 +210,9 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
       const picked = await pickPhotoFromGallery();
       if (picked) {
         const formatted = picked.startsWith('data:') ? picked : `data:image/jpeg;base64,${picked}`;
-        setPhoto(formatted);
-        setPhotoUrl(formatted);
-        setResult(null);
-        showToast(locale === 'ha' ? 'An loda hoto daga gallery!' : 'Photo loaded!');
+        // Scenario A — photo wipes text & chips, then auto-analyzes
+        applyPhoto(formatted);
+        showToast(locale === 'ha' ? 'An loda hoto daga gallery! Ana bincike…' : 'Photo loaded! Analyzing…');
       }
     } catch (error) {
       console.warn('Gallery picker error:', error);
@@ -193,18 +223,21 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
   // ------------------------------------------------------------------
   // Analyze — runs the offline rule-based triage engine
   // ------------------------------------------------------------------
-  const handleAnalyze = async () => {
-    // Combine manually selected chips + auto-selected from text input
-    const allSymptomIds = [
-      ...new Set([...selectedSymptomIds, ...autoSelectedSymptomIds]),
-    ];
+  // Shared offline analysis runner — powers both the top Analyze button
+  // (text + chips) and the automatic photo analysis. The clinical rule
+  // engine priority logic (triageEvaluate) is unchanged.
+  const performAnalysis = (
+    allSymptomIds: string[],
+    photo: string | null
+  ) => {
     const hasSelection = allSymptomIds.length > 0;
 
-    if (!hasSelection && !photoUrl) {
+    if (!hasSelection && !photo) {
       showToast(locale === 'ha' ? 'Zaɓi alamomi ko dauki hoto' : 'Select symptoms or take a photo');
       return;
     }
 
+    const runId = ++analysisRunRef.current;
     setBusy(true);
     setTimeout(() => {
       let r: TriageResult;
@@ -230,6 +263,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
         };
       }
 
+      if (runId !== analysisRunRef.current) return; // superseded — inputs changed mid-analysis
       setResult(r);
 
       // Save to local database / history
@@ -242,12 +276,20 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
           : 'Visual screening',
         advice: `${locale === 'ha' ? r.actionHausa : r.action}\n\n${locale === 'ha' ? severityLabel(r.severity, 'ha') : severityLabel(r.severity, 'en')}`,
         confidence: r.confidence,
-        imagePath: photoUrl || undefined,
+        imagePath: photo || undefined,
       });
 
       onRecordSaved?.();
       setBusy(false);
     }, 350);
+  };
+
+  const handleAnalyze = () => {
+    // Combine manually selected chips + auto-selected from text input
+    const allSymptomIds = [
+      ...new Set([...selectedSymptomIds, ...autoSelectedSymptomIds]),
+    ];
+    performAnalysis(allSymptomIds, photoUrl);
   };
 
   // ------------------------------------------------------------------
@@ -366,6 +408,12 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
   // Multi-select symptom chip handler
   // ------------------------------------------------------------------
   const handleToggleSymptomChip = (symptomId: string) => {
+    // Scenario B: selecting a chip clears any captured photo
+    clearPhotoIfCaptured(
+      locale === 'ha'
+        ? 'An cire hoto — zaɓin alamomi ya karɓi gaba'
+        : 'Photo removed — symptom selection takes over'
+    );
     const isCurrentlySelected = selectedSymptomIds.includes(symptomId);
     if (isCurrentlySelected) {
       setSelectedSymptomIds(selectedSymptomIds.filter((id) => id !== symptomId));
@@ -489,8 +537,10 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
             <button
               type="button"
               onClick={() => {
+                analysisRunRef.current++; // cancel analysis tied to these chips
                 setSelectedSymptomIds([]);
                 setResult(null);
+                setBusy(false);
               }}
               className="text-xs text-rose-600 hover:text-rose-800 cursor-pointer font-bold flex items-center gap-1"
             >
@@ -500,7 +550,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
           )}
         </div>
 
-        {/* Free-text symptom input with voice-to-text */}
+        {/* Free-text symptom input with clear & read-aloud */}
         <div className="space-y-2 pt-1">
           <div className="flex items-center space-x-2">
             <input
@@ -514,15 +564,29 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
               }
               className="w-full p-3 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent shadow-2xs"
             />
+            {/* Clear (Soke) — wipes the text and unselects auto-matched chips */}
+            {(symptomText.trim().length > 0 || autoSelectedSymptomIds.length > 0) && (
+              <button
+                type="button"
+                onClick={handleClearTypedText}
+                className="p-1.5 rounded-lg border transition-all cursor-pointer active:scale-95 flex items-center justify-center bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100 hover:text-slate-800 shadow-2xs"
+                title={locale === 'ha' ? 'Soke rubutun (goge duka)' : 'Clear the text box'}
+                aria-label={locale === 'ha' ? 'Soke rubutun' : 'Clear text'}
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+            {/* Speaker — reads exactly what the user typed, in the selected language */}
             <button
               type="button"
-              onClick={handleVoiceInput}
+              onClick={handleSpeakTypedText}
               className={`p-1.5 rounded-lg border transition-all cursor-pointer active:scale-95 flex items-center justify-center ${
-                isSpeakingSymptomsText
+                isSpeakingTypedText
                   ? 'bg-rose-600 text-white border-rose-700 animate-pulse'
                   : 'bg-rose-50 text-rose-800 border-rose-200 hover:bg-rose-100 shadow-2xs'
               }`}
-              title={locale === 'ha' ? 'Rubuta da murya' : 'Voice input'}
+              title={locale === 'ha' ? 'Karanta rubutun da ka rubuta da murya' : 'Read the typed text aloud'}
+              aria-label={locale === 'ha' ? 'Karanta rubutun da ka rubuta da murya' : 'Read the typed text aloud'}
             >
               <Volume2 className="w-4 h-4" />
             </button>
@@ -536,6 +600,22 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
             </div>
           )}
         </div>
+
+        {/* Analyze Button — top only, directly under the text box.
+            Visible only when the user typed text or selected a symptom chip. */}
+        {!result &&
+          (symptomText.trim().length > 0 ||
+            selectedSymptomIds.length > 0 ||
+            autoSelectedSymptomIds.length > 0) && (
+            <button
+              onClick={handleAnalyze}
+              disabled={busy}
+              className="w-full py-3.5 bg-red-700 hover:bg-red-800 disabled:opacity-50 text-white font-extrabold rounded-xl text-sm flex items-center justify-center space-x-2 shadow-md transition-all cursor-pointer"
+            >
+              <Sparkles className="w-4 h-4 text-red-200" />
+              <span>{busy ? t(locale, 'analyzing') : t(locale, 'analyze')}</span>
+            </button>
+          )}
 
         {/* Symptom Chips Grid — multi-select */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-1.5 pt-1">
@@ -567,74 +647,71 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
         onClose={handleCloseCamera}
       />
 
-      {/* Optional Photo Section (Wound, rash, snakebite puncture) */}
-      <div className="bg-white rounded-2xl border-2 border-dashed border-red-200 p-3.5 flex flex-col items-center justify-center min-h-[140px] relative overflow-hidden">
-        {photoUrl ? (
-          <div className="w-full flex flex-col items-center">
-            <img
-              src={photoUrl}
-              alt="Health observation"
-              className="max-h-48 rounded-xl object-contain shadow-xs border border-red-100"
-            />
+      {/* Optional Photo Section (Wound, rash, snakebite puncture).
+          The Take Photo / Choose from Gallery buttons stay visible; a freshly
+          loaded photo appears in a dashed-border box directly underneath them
+          and is auto-analyzed the moment it lands. */}
+      <div className="bg-white rounded-2xl border-2 border-dashed border-red-200 p-3.5 flex flex-col items-center min-h-[140px] relative overflow-hidden">
+        <div className="text-center p-2 space-y-2 w-full">
+          <ShieldAlert className="w-6 h-6 text-red-600 opacity-80 mx-auto" />
+          <p className="text-slate-700 font-bold text-xs">
+            {locale === 'ha' ? 'Hoton matsalar fata ko cizon maciji (Idan akwai)' : 'Optional photo for rash, bite, or visible wound'}
+          </p>
+          <div className="space-y-2 pt-1 max-w-xs mx-auto w-full">
             <button
-              onClick={() => {
-                setPhoto(null);
-                setPhotoUrl(null);
-                setResult(null);
-              }}
-              className="mt-2 text-xs text-red-600 hover:text-red-700 font-medium underline cursor-pointer"
+              type="button"
+              onClick={handleOpenCamera}
+              className="w-full py-3 px-4 bg-red-700 hover:bg-red-800 text-white rounded-2xl font-black text-xs sm:text-sm cursor-pointer shadow-sm flex items-center justify-center space-x-2 active:scale-[0.99] transition-all"
             >
-              {locale === 'ha' ? 'Cire hoto' : 'Remove photo'}
+              <Camera className="w-4 h-4 text-red-200" />
+              <span>
+                {locale === 'ha' ? 'Ɗauki Hoto' : 'Take Photo'}
+              </span>
             </button>
-          </div>
-        ) : (
-          <div className="text-center p-2 space-y-2">
-            <ShieldAlert className="w-6 h-6 text-red-600 opacity-80 mx-auto" />
-            <p className="text-slate-700 font-bold text-xs">
-              {locale === 'ha' ? 'Hoton matsalar fata ko cizon maciji (Idan akwai)' : 'Optional photo for rash, bite, or visible wound'}
-            </p>
-            <div className="space-y-2 pt-1 max-w-xs mx-auto w-full">
+
+            <div className="flex items-center justify-center">
               <button
                 type="button"
-                onClick={handleOpenCamera}
-                className="w-full py-3 px-4 bg-red-700 hover:bg-red-800 text-white rounded-2xl font-black text-xs sm:text-sm cursor-pointer shadow-sm flex items-center justify-center space-x-2 active:scale-[0.99] transition-all"
+                onClick={handleGallery}
+                className="inline-flex items-center space-x-1.5 py-1 px-3 text-xs font-bold text-red-800 hover:text-red-950 hover:bg-red-50 rounded-xl transition-colors cursor-pointer"
               >
-                <Camera className="w-4 h-4 text-red-200" />
-                <span>
-                  {locale === 'ha' ? 'Ɗauki Hoto' : 'Take Photo'}
-                </span>
+                <ImageIcon className="w-3.5 h-3.5 text-red-600" />
+                <span>{locale === 'ha' ? 'Zaɓi daga Gallery' : 'Choose from Gallery'}</span>
               </button>
-
-              <div className="flex items-center justify-center">
-                <button
-                  type="button"
-                  onClick={handleGallery}
-                  className="inline-flex items-center space-x-1.5 py-1 px-3 text-xs font-bold text-red-800 hover:text-red-950 hover:bg-red-50 rounded-xl transition-colors cursor-pointer"
-                >
-                  <ImageIcon className="w-3.5 h-3.5 text-red-600" />
-                  <span>{locale === 'ha' ? 'Zaɓi daga Gallery' : 'Choose from Gallery'}</span>
-                </button>
-              </div>
             </div>
           </div>
-        )}
-      </div>
 
-      {/* Analyze Button: Disappears completely when no symptoms or photo exist */}
-      {(
-        selectedSymptomIds.length > 0 ||
-        autoSelectedSymptomIds.length > 0 ||
-        photoUrl
-      ) && !result && (
-        <button
-          onClick={handleAnalyze}
-          disabled={busy}
-          className="w-full py-3.5 bg-red-700 hover:bg-red-800 disabled:opacity-50 text-white font-extrabold rounded-xl text-sm flex items-center justify-center space-x-2 shadow-md transition-all cursor-pointer"
-        >
-          <Sparkles className="w-4 h-4 text-red-200" />
-          <span>{busy ? t(locale, 'analyzing') : t(locale, 'analyze')}</span>
-        </button>
-      )}
+          {/* Photo Preview — dashed-border box directly under the buttons */}
+          {photoUrl && (
+            <div className="mt-3 w-full max-w-sm mx-auto border-2 border-dashed border-red-300 rounded-2xl p-3 bg-red-50/40 flex flex-col items-center gap-2 animate-scale-up">
+              <img
+                src={photoUrl}
+                alt={locale === 'ha' ? 'Hoton da aka ɗauka' : 'Health observation photo'}
+                className="max-h-48 rounded-xl object-contain shadow-xs border border-red-100 bg-white"
+              />
+              {busy && !result && (
+                <div className="flex items-center gap-2 text-[11px] font-bold text-red-800">
+                  <Sparkles className="w-4 h-4 animate-pulse" />
+                  <span>{locale === 'ha' ? 'Ana binciken hoton…' : 'Analyzing the photo…'}</span>
+                </div>
+              )}
+              <button
+                onClick={() => {
+                  analysisRunRef.current++; // invalidate any pending photo analysis
+                  voiceService.stopSpeaking();
+                  setPhoto(null);
+                  setPhotoUrl(null);
+                  setResult(null);
+                  setBusy(false);
+                }}
+                className="text-xs text-red-600 hover:text-red-700 font-medium underline cursor-pointer"
+              >
+                {locale === 'ha' ? 'Cire hoto' : 'Remove photo'}
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Clinical Assessment Result Card */}
       {result && (
