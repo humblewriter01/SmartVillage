@@ -51,6 +51,8 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
   const [result, setResult] = useState<TriageResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  // Which input produced the current result — decides where the result card renders
+  const [resultSource, setResultSource] = useState<'symptom' | 'photo'>('symptom');
   const [showManualModal, setShowManualModal] = useState(false);
   const [manualCategoryFilter, setManualCategoryFilter] = useState<'all' | 'emergency' | 'infectious' | 'respiratory' | 'skin'>('all');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -81,6 +83,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
     setPhoto(null);
     setPhotoUrl(null);
     setResult(null);
+    setResultSource('symptom');
     if (fileInputRef.current) fileInputRef.current.value = '';
     if (cameraInputRef.current) cameraInputRef.current.value = '';
     showToast(locale === 'ha' ? 'An sake farawa!' : 'Reset complete!');
@@ -198,7 +201,8 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
   // The clinical rule engine priority logic (triageEvaluate) is unchanged.
   const performAnalysis = (
     allSymptomIds: string[],
-    photo: string | null
+    photo: string | null,
+    source: 'symptom' | 'photo' = 'symptom'
   ) => {
     const hasSelection = allSymptomIds.length > 0;
 
@@ -234,6 +238,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
       }
 
       if (runId !== analysisRunRef.current) return; // superseded — inputs changed mid-analysis
+      setResultSource(source);
       setResult(r);
 
       // Save to local database / history
@@ -267,7 +272,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
   const handleAnalyzePhoto = () => {
     // Only the photo is analyzed — text/chips are always cleared when a
     // photo is loaded (mutually exclusive inputs).
-    performAnalysis([], photoUrl);
+    performAnalysis([], photoUrl, 'photo');
   };
 
   // ------------------------------------------------------------------
@@ -296,6 +301,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
       matchedSymptoms: [],
     };
 
+    setResultSource('symptom');
     setResult(res);
     setShowManualModal(false);
 
@@ -436,6 +442,140 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
     if (manualCategoryFilter === 'all') return true;
     return c.category === manualCategoryFilter;
   });
+
+  // Clinical Assessment Result Card — hoisted so it can render in two spots:
+  // directly under the "Bincika / Analyze" button for text/chips results
+  // (above the chips), or directly under the photo section for photo results.
+  const resultCard = result ? (
+        <div className="bg-white rounded-2xl border border-red-200 p-5 shadow-sm space-y-4 animate-scale-up">
+          {/* Header with Title and Grandma Listen Button */}
+          <div className="flex items-start justify-between gap-3 min-h-0">
+            <div className="flex-1 min-w-0 space-y-1">
+              <span className="text-xs font-bold text-red-700 uppercase tracking-wider block">
+                {t(locale, 'healthResult')}
+              </span>
+              <h3 className="font-extrabold text-lg sm:text-xl text-slate-800 leading-snug break-words">
+                {locale === 'ha' ? result.conditionHausa : result.condition}
+              </h3>
+            </div>
+
+            {/* Grandma-Friendly Read Aloud Button */}
+            <button
+              onClick={handleSpeak}
+              className={`shrink-0 flex items-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs font-bold cursor-pointer transition-all shadow-xs ${isSpeaking ? 'bg-red-600 text-white animate-pulse' : 'bg-red-50 hover:bg-red-100 text-red-800 border border-red-300'}`}
+              title={t(locale, 'grandmaListen')}
+            >
+              <Volume2 className="w-4 h-4 text-red-700" />
+              <span>{locale === 'ha' ? 'Saurara da Murya' : 'Listen Aloud'}</span>
+            </button>
+          </div>
+
+          {/* Severity Badge (color-coded) */}
+          <div className="p-3 rounded-xl space-y-1">
+            <span className="text-[11px] font-bold uppercase tracking-wider block">
+              {t(locale, 'urgency')}
+            </span>
+            <div className={`font-extrabold text-xs sm:text-sm flex items-center gap-1.5 ${
+              result.severity === 'Emergency'
+                ? 'bg-red-100 text-red-800 border border-red-200'
+                : result.severity === 'Urgent'
+                ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+            }`}>
+              {result.severity === 'Emergency' ? (
+                <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+              ) : result.severity === 'Urgent' ? (
+                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+              ) : (
+                <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+              )}
+              <span>{severityLabel(result.severity, locale)}</span>
+            </div>
+          </div>
+
+          {/* Matched Symptoms */}
+          {result.matchedSymptoms.length > 0 && (
+            <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600 block">
+                {locale === 'ha' ? 'Alamomin da suka dace:' : 'Matched Symptoms:'}
+              </span>
+              <div className="flex flex-wrap gap-1">
+                {result.matchedSymptoms.map((s) => (
+                  <span
+                    key={s.id}
+                    className="text-[11px] px-2 py-0.5 bg-white border border-slate-300 rounded-lg text-slate-700 font-medium"
+                  >
+                    {locale === 'ha' ? s.labelHausa : s.label}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Actionable Medical Advice */}
+          <div className="space-y-2">
+            <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+              <HeartPulse className="w-4 h-4 text-red-600" />
+              <span>{t(locale, 'firstAidHomeCare')}</span>
+            </h4>
+            <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-800 leading-relaxed font-medium">
+              {locale === 'ha' ? result.actionHausa : result.action}
+            </div>
+          </div>
+
+          {/* First Aid */}
+          {result.firstAid && (
+            <div className="space-y-2">
+              <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                <Activity className="w-4 h-4 text-red-600" />
+                <span>{locale === 'ha' ? 'Taimakon Farko' : 'First Aid'}</span>
+              </h4>
+              <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-xs sm:text-sm text-amber-900 leading-relaxed font-medium">
+                {locale === 'ha' ? result.firstAidHausa : result.firstAid}
+              </div>
+            </div>
+          )}
+
+          {/* Danger Signs */}
+          {result.dangerSigns && (
+            <div className="space-y-2">
+              <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                <AlertCircle className="w-4 h-4 text-red-600" />
+                <span>{locale === 'ha' ? 'Alamomin Gaggawa' : 'Danger Signs'}</span>
+              </h4>
+              <div className="p-3.5 bg-red-50 border border-red-200 rounded-xl text-xs sm:text-sm text-red-900 leading-relaxed font-medium">
+                {locale === 'ha' ? result.dangerSignsHausa : result.dangerSigns}
+              </div>
+            </div>
+          )}
+
+          {/* Medical Disclaimer Notice */}
+          <div className="p-2.5 bg-amber-50/70 border border-amber-200/80 rounded-xl text-[11px] text-amber-900 leading-tight">
+            <span className="font-bold mr-1">{locale === 'ha' ? 'Hanyar:' : 'Disclaimer:'}</span>
+            {t(locale, 'notMedical')}
+          </div>
+
+          {/* Action & Reset Buttons */}
+          <div className="pt-2 flex flex-col sm:flex-row items-center gap-2.5">
+            <button
+              type="button"
+              onClick={handleResetHealth}
+              className="w-full sm:flex-1 py-3 px-4 bg-red-700 hover:bg-red-800 text-white font-bold rounded-xl text-xs sm:text-sm flex items-center justify-center space-x-2 shadow-xs transition-all cursor-pointer active:scale-[0.99]"
+            >
+              <RotateCcw className="w-4 h-4 text-red-200" />
+              <span>{locale === 'ha' ? 'Duba Wata Alama' : 'Check Another Symptom'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleCheckAgain}
+              className="w-full sm:w-auto py-3 px-4 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold rounded-xl text-xs sm:text-sm flex items-center justify-center space-x-1.5 border border-slate-300 transition-colors cursor-pointer"
+            >
+              <span>{locale === 'ha' ? 'Sake Dubawa' : 'Check Again'}</span>
+            </button>
+          </div>
+        </div>
+        ) : null;
 
   // ------------------------------------------------------------------
   // Render
@@ -600,6 +740,9 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
             </button>
           )}
 
+        {/* Text/chips triage result — directly under the Analyze button, above the chips */}
+        {resultSource === 'symptom' && resultCard}
+
         {/* Symptom Chips Grid — multi-select */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-1.5 pt-1">
           {TRIAGE_SYMPTOMS.map((symptom) => {
@@ -703,137 +846,8 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
         </div>
       </div>
 
-      {/* Clinical Assessment Result Card */}
-      {result && (
-        <div className="bg-white rounded-2xl border border-red-200 p-5 shadow-sm space-y-4 animate-scale-up">
-          {/* Header with Title and Grandma Listen Button */}
-          <div className="flex items-start justify-between gap-3 min-h-0">
-            <div className="flex-1 min-w-0 space-y-1">
-              <span className="text-xs font-bold text-red-700 uppercase tracking-wider block">
-                {t(locale, 'healthResult')}
-              </span>
-              <h3 className="font-extrabold text-lg sm:text-xl text-slate-800 leading-snug break-words">
-                {locale === 'ha' ? result.conditionHausa : result.condition}
-              </h3>
-            </div>
-
-            {/* Grandma-Friendly Read Aloud Button */}
-            <button
-              onClick={handleSpeak}
-              className={`shrink-0 flex items-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs font-bold cursor-pointer transition-all shadow-xs ${isSpeaking ? 'bg-red-600 text-white animate-pulse' : 'bg-red-50 hover:bg-red-100 text-red-800 border border-red-300'}`}
-              title={t(locale, 'grandmaListen')}
-            >
-              <Volume2 className="w-4 h-4 text-red-700" />
-              <span>{locale === 'ha' ? 'Saurara da Murya' : 'Listen Aloud'}</span>
-            </button>
-          </div>
-
-          {/* Severity Badge (color-coded) */}
-          <div className="p-3 rounded-xl space-y-1">
-            <span className="text-[11px] font-bold uppercase tracking-wider block">
-              {t(locale, 'urgency')}
-            </span>
-            <div className={`font-extrabold text-xs sm:text-sm flex items-center gap-1.5 ${
-              result.severity === 'Emergency'
-                ? 'bg-red-100 text-red-800 border border-red-200'
-                : result.severity === 'Urgent'
-                ? 'bg-amber-100 text-amber-800 border border-amber-200'
-                : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-            }`}>
-              {result.severity === 'Emergency' ? (
-                <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
-              ) : result.severity === 'Urgent' ? (
-                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
-              ) : (
-                <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-              )}
-              <span>{severityLabel(result.severity, locale)}</span>
-            </div>
-          </div>
-
-          {/* Matched Symptoms */}
-          {result.matchedSymptoms.length > 0 && (
-            <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600 block">
-                {locale === 'ha' ? 'Alamomin da suka dace:' : 'Matched Symptoms:'}
-              </span>
-              <div className="flex flex-wrap gap-1">
-                {result.matchedSymptoms.map((s) => (
-                  <span
-                    key={s.id}
-                    className="text-[11px] px-2 py-0.5 bg-white border border-slate-300 rounded-lg text-slate-700 font-medium"
-                  >
-                    {locale === 'ha' ? s.labelHausa : s.label}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Actionable Medical Advice */}
-          <div className="space-y-2">
-            <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-              <HeartPulse className="w-4 h-4 text-red-600" />
-              <span>{t(locale, 'firstAidHomeCare')}</span>
-            </h4>
-            <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-800 leading-relaxed font-medium">
-              {locale === 'ha' ? result.actionHausa : result.action}
-            </div>
-          </div>
-
-          {/* First Aid */}
-          {result.firstAid && (
-            <div className="space-y-2">
-              <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-                <Activity className="w-4 h-4 text-red-600" />
-                <span>{locale === 'ha' ? 'Taimakon Farko' : 'First Aid'}</span>
-              </h4>
-              <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-xs sm:text-sm text-amber-900 leading-relaxed font-medium">
-                {locale === 'ha' ? result.firstAidHausa : result.firstAid}
-              </div>
-            </div>
-          )}
-
-          {/* Danger Signs */}
-          {result.dangerSigns && (
-            <div className="space-y-2">
-              <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-                <AlertCircle className="w-4 h-4 text-red-600" />
-                <span>{locale === 'ha' ? 'Alamomin Gaggawa' : 'Danger Signs'}</span>
-              </h4>
-              <div className="p-3.5 bg-red-50 border border-red-200 rounded-xl text-xs sm:text-sm text-red-900 leading-relaxed font-medium">
-                {locale === 'ha' ? result.dangerSignsHausa : result.dangerSigns}
-              </div>
-            </div>
-          )}
-
-          {/* Medical Disclaimer Notice */}
-          <div className="p-2.5 bg-amber-50/70 border border-amber-200/80 rounded-xl text-[11px] text-amber-900 leading-tight">
-            <span className="font-bold mr-1">{locale === 'ha' ? 'Hanyar:' : 'Disclaimer:'}</span>
-            {t(locale, 'notMedical')}
-          </div>
-
-          {/* Action & Reset Buttons */}
-          <div className="pt-2 flex flex-col sm:flex-row items-center gap-2.5">
-            <button
-              type="button"
-              onClick={handleResetHealth}
-              className="w-full sm:flex-1 py-3 px-4 bg-red-700 hover:bg-red-800 text-white font-bold rounded-xl text-xs sm:text-sm flex items-center justify-center space-x-2 shadow-xs transition-all cursor-pointer active:scale-[0.99]"
-            >
-              <RotateCcw className="w-4 h-4 text-red-200" />
-              <span>{locale === 'ha' ? 'Duba Wata Alama' : 'Check Another Symptom'}</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={handleCheckAgain}
-              className="w-full sm:w-auto py-3 px-4 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold rounded-xl text-xs sm:text-sm flex items-center justify-center space-x-1.5 border border-slate-300 transition-colors cursor-pointer"
-            >
-              <span>{locale === 'ha' ? 'Sake Dubawa' : 'Check Again'}</span>
-            </button>
-          </div>
-        </div>
-      )}
+      {/* Photo-triggered triage result — directly under the photo section */}
+      {resultSource === 'photo' && resultCard}
 
       {/* Corrected Manual Health Condition Picker Modal */}
       {showManualModal && (
