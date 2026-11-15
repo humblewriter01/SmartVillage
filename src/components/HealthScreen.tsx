@@ -110,6 +110,15 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
     }
   };
 
+  // Any change to the text or chips makes the current result stale: cancel a
+  // pending analysis, reset busy (so Analyze is never stuck disabled), and
+  // remove the result card so the user must tap Analyze again.
+  const clearResultForInputChange = () => {
+    analysisRunRef.current++;
+    setBusy(false);
+    setResult(null);
+  };
+
   const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const text = e.target.value;
     // Typing takes over the screening — drop the photo from the preview
@@ -118,6 +127,8 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
         ? 'An cire hoto — rubutu ya karɓi gaba'
         : 'Photo removed — text input takes over'
     );
+    // Any keystroke (typing or deleting) invalidates the current result
+    clearResultForInputChange();
     setSymptomText(text);
     const extracted = extractSymptomsFromText(text);
     setAutoSelectedSymptomIds(extracted);
@@ -429,6 +440,8 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
         ? 'An cire hoto — zaɓin alamomi ya karɓi gaba'
         : 'Photo removed — symptom selection takes over'
     );
+    // Selecting or unselecting a chip invalidates the current result
+    clearResultForInputChange();
     const isCurrentlySelected = selectedSymptomIds.includes(symptomId);
     if (isCurrentlySelected) {
       setSelectedSymptomIds(selectedSymptomIds.filter((id) => id !== symptomId));
