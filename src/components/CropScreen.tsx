@@ -270,6 +270,8 @@ export const CropScreen: React.FC<CropScreenProps> = ({
       const url = URL.createObjectURL(file);
       setPhoto(url);
       setPhotoUrl(url);
+      setSelectedDisease(null); // a new photo replaces any selected sample
+      cancelPendingAnalysis();
       setResult(null);
       showToast(
         locale === 'ha'
@@ -312,9 +314,11 @@ export const CropScreen: React.FC<CropScreenProps> = ({
     voiceService.speak(fullDiseaseName, locale);
 
     // 2. Existing sample load behavior unchanged
+    // The sample replaces any uploaded photo here: photoUrl/photo become the sample image.
     setPhoto(disease.image);
     setPhotoUrl(disease.image);
     setSelectedDisease(disease);
+    cancelPendingAnalysis();
     setResult(null);
     showToast(
       locale === 'ha'
@@ -337,6 +341,13 @@ export const CropScreen: React.FC<CropScreenProps> = ({
     setBusy(false);
   };
 
+  // Photo and sample are mutually exclusive: whichever one the user just chose is the
+  // only input analysis will use. Any analysis still running for the old input is discarded.
+  const cancelPendingAnalysis = () => {
+    analysisRunRef.current++;
+    setBusy(false);
+  };
+
   const handleOpenCamera = () => {
     setIsCameraActive(true);
   };
@@ -345,6 +356,8 @@ export const CropScreen: React.FC<CropScreenProps> = ({
     const formatted = captured.startsWith('data:') ? captured : `data:image/jpeg;base64,${captured}`;
     setPhoto(formatted);
     setPhotoUrl(formatted);
+    setSelectedDisease(null); // a new photo replaces any selected sample
+    cancelPendingAnalysis();
     setResult(null);
     setIsCameraActive(false);
     showToast(locale === 'ha' ? 'An ɗauki hoto!' : 'Photo captured!');
@@ -361,6 +374,8 @@ export const CropScreen: React.FC<CropScreenProps> = ({
         const formatted = picked.startsWith('data:') ? picked : `data:image/jpeg;base64,${picked}`;
         setPhoto(formatted);
         setPhotoUrl(formatted);
+        setSelectedDisease(null); // a new photo replaces any selected sample
+        cancelPendingAnalysis();
         setResult(null);
         showToast(locale === 'ha' ? 'An loda hoto daga gallery!' : 'Photo loaded from gallery!');
       }
