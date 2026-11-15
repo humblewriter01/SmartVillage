@@ -148,6 +148,8 @@ export const CropScreen: React.FC<CropScreenProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const resultRef = useRef<HTMLDivElement>(null);
+  // Generation counter — lets a reset discard an analysis that is still running
+  const analysisRunRef = useRef(0);
 
   // Read aloud section header
   const handleSpeakCropHeader = async () => {
@@ -251,6 +253,10 @@ export const CropScreen: React.FC<CropScreenProps> = ({
     setSpeakingDiseaseCardId(null);
     setSelectedCropId(crop.id);
     setSelectedDisease(disease);
+    // A manual disease pick replaces any uploaded photo — only one input drives analysis
+    setPhoto(null);
+    setPhotoUrl(null);
+    cancelPendingAnalysis();
     setResult(null); // Clear previous results so user can click Analyze
     setShowManualModal(false);
     setModalStep(1);
@@ -268,6 +274,8 @@ export const CropScreen: React.FC<CropScreenProps> = ({
       const url = URL.createObjectURL(file);
       setPhoto(url);
       setPhotoUrl(url);
+      setSelectedDisease(null); // a new photo replaces any selected sample
+      cancelPendingAnalysis();
       setResult(null);
       showToast(
         locale === 'ha'
@@ -310,9 +318,11 @@ export const CropScreen: React.FC<CropScreenProps> = ({
     voiceService.speak(fullDiseaseName, locale);
 
     // 2. Existing sample load behavior unchanged
+    // The sample replaces any uploaded photo here: photoUrl/photo become the sample image.
     setPhoto(disease.image);
     setPhotoUrl(disease.image);
     setSelectedDisease(disease);
+    cancelPendingAnalysis();
     setResult(null);
     showToast(
       locale === 'ha'
@@ -324,6 +334,24 @@ export const CropScreen: React.FC<CropScreenProps> = ({
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [photo, setPhoto] = useState<string | null>(null);
 
+  // Full reset of the photo / sample / result state. Used by "Remove photo" and
+  // "Start Fresh Check" so no sample highlight, yellow name tag, or old result survives.
+  const resetPhotoAndSample = () => {
+    analysisRunRef.current++; // discard any analysis still in flight
+    setPhoto(null);
+    setPhotoUrl(null);
+    setSelectedDisease(null); // unselects the sample button and hides the yellow tag
+    setResult(null);
+    setBusy(false);
+  };
+
+  // Photo and sample are mutually exclusive: whichever one the user just chose is the
+  // only input analysis will use. Any analysis still running for the old input is discarded.
+  const cancelPendingAnalysis = () => {
+    analysisRunRef.current++;
+    setBusy(false);
+  };
+
   const handleOpenCamera = () => {
     setIsCameraActive(true);
   };
@@ -332,6 +360,8 @@ export const CropScreen: React.FC<CropScreenProps> = ({
     const formatted = captured.startsWith('data:') ? captured : `data:image/jpeg;base64,${captured}`;
     setPhoto(formatted);
     setPhotoUrl(formatted);
+    setSelectedDisease(null); // a new photo replaces any selected sample
+    cancelPendingAnalysis();
     setResult(null);
     setIsCameraActive(false);
     showToast(locale === 'ha' ? 'An ɗauki hoto!' : 'Photo captured!');
@@ -348,6 +378,8 @@ export const CropScreen: React.FC<CropScreenProps> = ({
         const formatted = picked.startsWith('data:') ? picked : `data:image/jpeg;base64,${picked}`;
         setPhoto(formatted);
         setPhotoUrl(formatted);
+        setSelectedDisease(null); // a new photo replaces any selected sample
+        cancelPendingAnalysis();
         setResult(null);
         showToast(locale === 'ha' ? 'An loda hoto daga gallery!' : 'Photo loaded from gallery!');
       }
@@ -360,6 +392,7 @@ export const CropScreen: React.FC<CropScreenProps> = ({
   // Perform Analysis: Triggered ONLY when the user clicks the "Analyze Crop" button!
   const handlePerformAnalysis = async () => {
     setBusy(true);
+    const runId = ++analysisRunRef.current;
 
     try {
       let r: CropResult;
@@ -384,6 +417,7 @@ export const CropScreen: React.FC<CropScreenProps> = ({
         r = diagnoseCropSelection(selectedCropId, undefined);
       }
 
+      if (runId !== analysisRunRef.current) return; // reset happened mid-analysis — drop it
       setResult(r);
 
       if (r.needsCropSelection) {
@@ -424,7 +458,8 @@ export const CropScreen: React.FC<CropScreenProps> = ({
           : 'Analysis error. Please retry.'
       );
     } finally {
-      setBusy(false);
+      // Only the current run may clear busy; a reset already did so for stale runs
+      if (runId === analysisRunRef.current) setBusy(false);
     }
   };
 
@@ -686,11 +721,7 @@ export const CropScreen: React.FC<CropScreenProps> = ({
                   className="max-h-56 rounded-xl object-contain shadow-xs border border-emerald-100"
                 />
                 <button
-                  onClick={() => {
-                    setPhoto(null);
-                    setPhotoUrl(null);
-                    setResult(null);
-                  }}
+                  onClick={resetPhotoAndSample}
                   className="mt-2 text-xs text-red-600 hover:text-red-700 font-bold underline cursor-pointer"
                 >
                   {locale === 'ha' ? 'Cire wannan hoto' : 'Remove photo'}
@@ -994,12 +1025,7 @@ export const CropScreen: React.FC<CropScreenProps> = ({
               {/* Reset / Re-analyze Buttons */}
               <div className="flex items-center justify-between pt-1 border-t border-slate-100 text-xs">
                 <button
-                  onClick={() => {
-                    setResult(null);
-                    setPhotoUrl(null);
-                    setPhoto(null);
-                    setSelectedDisease(null);
-                  }}
+                  onClick={resetPhotoAndSample}
                   className="text-slate-500 hover:text-slate-800 flex items-center gap-1 font-semibold cursor-pointer"
                 >
                   <RotateCcw className="w-3.5 h-3.5" />

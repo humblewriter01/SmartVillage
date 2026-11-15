@@ -110,6 +110,15 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
     }
   };
 
+  // Any change to the text or chips makes the current result stale: cancel a
+  // pending analysis, reset busy (so Analyze is never stuck disabled), and
+  // remove the result card so the user must tap Analyze again.
+  const clearResultForInputChange = () => {
+    analysisRunRef.current++;
+    setBusy(false);
+    setResult(null);
+  };
+
   const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const text = e.target.value;
     // Typing takes over the screening — drop the photo from the preview
@@ -118,6 +127,8 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
         ? 'An cire hoto — rubutu ya karɓi gaba'
         : 'Photo removed — text input takes over'
     );
+    // Any keystroke (typing or deleting) invalidates the current result
+    clearResultForInputChange();
     setSymptomText(text);
     const extracted = extractSymptomsFromText(text);
     setAutoSelectedSymptomIds(extracted);
@@ -214,7 +225,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
     const runId = ++analysisRunRef.current;
     setBusy(true);
     setTimeout(() => {
-      let r: TriageResult;
+      let r: TriageResult | null;
 
       if (hasSelection) {
         // Forward-chaining rule engine over combined symptom IDs
@@ -238,6 +249,19 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
       }
 
       if (runId !== analysisRunRef.current) return; // superseded — inputs changed mid-analysis
+
+      // No triage result (nothing recognised) → no result card, warning only
+      if (r === null) {
+        setResult(null);
+        setBusy(false);
+        showToast(
+          locale === 'ha'
+            ? 'Ba mu gane takamaiman alamun ba. Don Allah danna maɓallan alamun da ke sama.'
+            : 'We could not automatically detect specific symptoms. Please tap the symptom buttons above for an accurate triage.'
+        );
+        return;
+      }
+
       setResultSource(source);
       setResult(r);
 
@@ -416,6 +440,8 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
         ? 'An cire hoto — zaɓin alamomi ya karɓi gaba'
         : 'Photo removed — symptom selection takes over'
     );
+    // Selecting or unselecting a chip invalidates the current result
+    clearResultForInputChange();
     const isCurrentlySelected = selectedSymptomIds.includes(symptomId);
     if (isCurrentlySelected) {
       setSelectedSymptomIds(selectedSymptomIds.filter((id) => id !== symptomId));

@@ -15,7 +15,7 @@ test('Fever + Vomiting + Stiff Neck returns Emergency (Meningitis)', () => {
   const result = triageEvaluate(['fever', 'vomiting', 'stiff_neck']);
   assert.equal(result.severity, 'Emergency');
   assert.equal(result.matchedRuleId, 'meningitis_emergency');
-  assert.equal(result.conditionHausa, 'Ciwon Sankarau');
+  assert.equal(result.conditionHausa, 'Cutar Sankarau');
   // Verify matched symptoms include all three
   const matchedIds = result.matchedSymptoms.map((s) => s.id);
   assert.ok(matchedIds.includes('fever'));
@@ -30,7 +30,7 @@ test('Fever + Chills (no stiff neck) returns Urgent (Malaria)', () => {
   const result = triageEvaluate(['fever', 'chills']);
   assert.equal(result.severity, 'Urgent');
   assert.equal(result.matchedRuleId, 'malaria_urgent');
-  assert.equal(result.conditionHausa, 'Zazzabin Cizon Sauro (Malaria)');
+  assert.equal(result.conditionHausa, 'Zazzabin Cizon Sauro');
 });
 
 // ---------------------------------------------------------------------------
@@ -89,6 +89,9 @@ test('Every symptom in catalogue maps to at least one triage rule', () => {
     if (rule.requireAllSymptoms) {
       for (const id of rule.requireAllSymptoms) ruleSymptomIds.add(id);
     }
+    if (rule.requireOneOfEach) {
+      for (const group of rule.requireOneOfEach) for (const id of group) ruleSymptomIds.add(id);
+    }
     if (rule.excludeSymptoms) {
       for (const id of rule.excludeSymptoms) ruleSymptomIds.add(id);
     }
@@ -100,4 +103,70 @@ test('Every symptom in catalogue maps to at least one triage rule', () => {
       `Symptom "${symptom.id}" (${symptom.label}) is not referenced by any rule`
     );
   }
+});
+
+// ---------------------------------------------------------------------------
+// Phantom results: empty input returns null (no result card)
+// ---------------------------------------------------------------------------
+test('triageEvaluate returns null for empty input', () => {
+  assert.equal(triageEvaluate([]), null);
+});
+
+// ---------------------------------------------------------------------------
+// Malaria requires Fever AND (Chills OR Headache)
+// ---------------------------------------------------------------------------
+test('Fever + Headache returns Malaria (Urgent)', () => {
+  const result = triageEvaluate(['fever', 'headache']);
+  assert.equal(result.matchedRuleId, 'malaria_urgent');
+  assert.equal(result.severity, 'Urgent');
+});
+
+test('Headache alone falls through to fallback titled Ciwon Kai', () => {
+  const result = triageEvaluate(['headache']);
+  assert.equal(result.matchedRuleId, 'default_routine');
+  assert.equal(result.severity, 'Routine');
+  assert.equal(result.condition, 'Headache');
+  assert.equal(result.conditionHausa, 'Ciwon Kai');
+  assert.equal(
+    result.action,
+    'No emergency signs detected. Rest, drink clean water, and monitor your symptoms. Visit a hospital if the symptoms do not improve.'
+  );
+});
+
+test('Chills alone does not match malaria (needs fever)', () => {
+  const result = triageEvaluate(['chills']);
+  assert.notEqual(result.matchedRuleId, 'malaria_urgent');
+});
+
+// ---------------------------------------------------------------------------
+// Fallback titles
+// ---------------------------------------------------------------------------
+test('Single unmatched symptom uses its own bilingual title', () => {
+  const result = triageEvaluate(['abdominal_pain']);
+  assert.equal(result.matchedRuleId, 'default_routine');
+  assert.equal(result.conditionHausa, 'Ciwon Ciki');
+});
+
+test('Multiple unmatched symptoms use the routine fallback title', () => {
+  const result = triageEvaluate(['abdominal_pain', 'red_eyes']);
+  assert.equal(result.matchedRuleId, 'default_routine');
+  assert.equal(result.condition, 'General Symptoms');
+  assert.equal(result.conditionHausa, 'Alamomi Na Yau da Kullum');
+});
+
+// ---------------------------------------------------------------------------
+// Authoritative Hausa titles
+// ---------------------------------------------------------------------------
+test('Authoritative Hausa titles for rule conditions', () => {
+  assert.equal(triageEvaluate(['snakebite']).conditionHausa, 'Cizon Maciji');
+  assert.equal(triageEvaluate(['fever', 'vomiting', 'stiff_neck']).conditionHausa, 'Cutar Sankarau');
+  assert.equal(triageEvaluate(['fever', 'chills']).conditionHausa, 'Zazzabin Cizon Sauro');
+  assert.equal(
+    triageEvaluate(['watery_diarrhea', 'vomiting']).conditionHausa,
+    'Gudawa mai Hadari'
+  );
+  assert.equal(triageEvaluate(['fast_breathing', 'chest_indrawing']).conditionHausa, 'Ciwon Huhu');
+  assert.equal(triageEvaluate(['high_fever', 'abdominal_pain']).conditionHausa, 'Zazzabin Taifod');
+  assert.equal(triageEvaluate(['rash', 'red_eyes', 'fever']).conditionHausa, 'Kyanda');
+  assert.equal(triageEvaluate(['fever', 'muscle_aches']).conditionHausa, 'Zazzabi');
 });
