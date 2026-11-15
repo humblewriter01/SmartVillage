@@ -253,6 +253,10 @@ export const CropScreen: React.FC<CropScreenProps> = ({
     setSpeakingDiseaseCardId(null);
     setSelectedCropId(crop.id);
     setSelectedDisease(disease);
+    // A manual disease pick replaces any uploaded photo — only one input drives analysis
+    setPhoto(null);
+    setPhotoUrl(null);
+    cancelPendingAnalysis();
     setResult(null); // Clear previous results so user can click Analyze
     setShowManualModal(false);
     setModalStep(1);
