@@ -447,6 +447,12 @@ export const TRIAGE_RULES: TriageRule[] = [
 // Forward-chaining rule engine
 // ---------------------------------------------------------------------------
 
+// Title-case a symptom label for use as a result title
+// (e.g. "Ciwon ciki" → "Ciwon Ciki", "Ciwon kai" → "Ciwon Kai").
+function toTitleCase(text: string): string {
+  return text.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 /**
  * Evaluates an array of selected symptom IDs against the triage rules.
  * Rules are checked in order of severity priority (Emergency first).
@@ -512,18 +518,27 @@ export function triageEvaluate(selectedSymptomIds: string[]): TriageResult {
     }
   }
 
-  // No rule matched — default Routine guidance.
+  // No rule matched — default Routine guidance with a dynamic title.
+  // Single symptom → title is that symptom's name (e.g. "Ciwon Ciki" /
+  // "Stomach / Belly Pain"). Multiple (or none) → generic title.
+  const fallbackSymptoms = TRIAGE_SYMPTOMS.filter((s) => selected.has(s.id));
+  const singleSymptom =
+    fallbackSymptoms.length === 1 ? fallbackSymptoms[0] : undefined;
   return {
     severity: 'Routine',
-    condition: 'General Symptoms — Monitor',
-    conditionHausa: 'Alamomin Aiki — Ji Albarkatar',
+    condition: singleSymptom
+      ? toTitleCase(singleSymptom.label)
+      : 'General Symptoms',
+    conditionHausa: singleSymptom
+      ? toTitleCase(singleSymptom.labelHausa)
+      : 'Alamomi Na Yau da Kullum',
     action:
-      'No clear emergency pattern detected. Keep hydrated with clean water, rest, and note when symptoms started. Visit a health centre if symptoms persist or worsen.',
+      'No emergency signs detected. Rest, drink clean water, and monitor your symptoms. Visit a hospital if the symptoms do not improve.',
     actionHausa:
-      'Babu babban pattern gaggawa ta hanyar gaya. Sha ruwa mai tsafta, huta, da rubuta ranar da matsalar ta fara. Je asibiti idan matsalar ta dore.',
+      'Ba a gano alamun gaggawa ba. Huta, ka sha ruwa mai tsafta, sannan ka lura da alamun. Ziyarci asibiti idan ba a samu sauƙi ba.',
     confidence: 0.70,
     matchedRuleId: 'default_routine',
-    matchedSymptoms: TRIAGE_SYMPTOMS.filter((s) => selected.has(s.id)),
+    matchedSymptoms: fallbackSymptoms,
   };
 }
 
