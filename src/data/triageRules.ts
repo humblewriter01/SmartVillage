@@ -569,3 +569,31 @@ export function severityLabel(severity: TriageSeverity, locale: 'en' | 'ha'): st
   };
   return locale === 'ha' ? labels[severity].ha : labels[severity].en;
 }
+
+// ---------------------------------------------------------------------------
+// "Not recognized" state — Analyze ran on text that matched no symptoms
+// ---------------------------------------------------------------------------
+
+export const NOT_RECOGNIZED_RULE_ID = 'not_recognized';
+
+// Warning shown under the text box while the typed text matches no symptom.
+export const UNRECOGNIZED_INPUT_WARNING = {
+  en: "We couldn't automatically detect specific symptoms. Please tap the symptom buttons below.",
+  ha: 'Ba mu gane takamaiman alamun ba. Don Allah danna maɓallan alamun da ke ƙasa.',
+};
+
+// Result shown when Analyze is tapped but no symptom was recognised.
+export function notRecognizedResult(): TriageResult {
+  return {
+    severity: 'Routine',
+    condition: 'Symptoms Not Recognized',
+    conditionHausa: 'Ba a Gane Alamun Ba',
+    action:
+      "We couldn't recognize the specific symptoms you typed. Please tap the symptom buttons below for an accurate triage.",
+    actionHausa:
+      'Ba mu gane takamaiman alamun da kuka rubuta ba. Don Allah danna maɓallan alamun da ke ƙasa don samun ingantaccen bincike.',
+    confidence: 0,
+    matchedRuleId: NOT_RECOGNIZED_RULE_ID,
+    matchedSymptoms: [],
+  };
+}
