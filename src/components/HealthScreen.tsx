@@ -214,7 +214,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
     const runId = ++analysisRunRef.current;
     setBusy(true);
     setTimeout(() => {
-      let r: TriageResult;
+      let r: TriageResult | null;
 
       if (hasSelection) {
         // Forward-chaining rule engine over combined symptom IDs
@@ -238,6 +238,19 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
       }
 
       if (runId !== analysisRunRef.current) return; // superseded — inputs changed mid-analysis
+
+      // No triage result (nothing recognised) → no result card, warning only
+      if (r === null) {
+        setResult(null);
+        setBusy(false);
+        showToast(
+          locale === 'ha'
+            ? 'Ba mu gane takamaiman alamun ba. Don Allah danna maɓallan alamun da ke sama.'
+            : 'We could not automatically detect specific symptoms. Please tap the symptom buttons above for an accurate triage.'
+        );
+        return;
+      }
+
       setResultSource(source);
       setResult(r);
 

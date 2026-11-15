@@ -29,6 +29,8 @@ export interface TriageRule {
   requireAllSymptoms?: string[];
   // None of these symptom IDs may be present (NOT gate)
   excludeSymptoms?: string[];
+  // Every inner group must have at least one matching ID (AND of ORs)
+  requireOneOfEach?: string[][];
   recommendedAction: string;   // English
   recommendedActionHausa: string; // Hausa
   firstAid?: string;
@@ -141,7 +143,7 @@ export const TRIAGE_RULES: TriageRule[] = [
   {
     id: 'snakebite_emergency',
     condition: 'Snakebite Emergency',
-    conditionHausa: 'Gaggawa: Cizon Maciji',
+    conditionHausa: 'Cizon Maciji',
     severity: 'Emergency',
     requireOneOfSymptoms: ['snakebite'],
     recommendedAction:
@@ -161,7 +163,7 @@ export const TRIAGE_RULES: TriageRule[] = [
   {
     id: 'meningitis_emergency',
     condition: 'Cerebrospinal Meningitis (CSM)',
-    conditionHausa: 'Ciwon Sankarau',
+    conditionHausa: 'Cutar Sankarau',
     severity: 'Emergency',
     // Fever (any) + Stiff Neck → Suspected Meningitis (WHO IMCI: stiff neck overrides malaria)
     requireOneOfSymptoms: ['fever', 'high_fever'],
@@ -249,7 +251,7 @@ export const TRIAGE_RULES: TriageRule[] = [
   {
     id: 'cholera_dehydration_emergency',
     condition: 'Cholera & Acute Dehydration',
-    conditionHausa: 'Kwalara da Rashin Ruwa mai Tsanani',
+    conditionHausa: 'Gudawa mai Hadari',
     severity: 'Emergency',
     requireAllSymptoms: ['watery_diarrhea', 'vomiting'],
     recommendedAction:
@@ -269,7 +271,7 @@ export const TRIAGE_RULES: TriageRule[] = [
   {
     id: 'pneumonia_emergency',
     condition: 'Severe Pneumonia / Acute Respiratory Infection',
-    conditionHausa: 'Ciwon Kirji mai Tsanani',
+    conditionHausa: 'Ciwon Huhu',
     severity: 'Emergency',
     requireAllSymptoms: ['fast_breathing', 'chest_indrawing'],
     recommendedAction:
@@ -292,10 +294,11 @@ export const TRIAGE_RULES: TriageRule[] = [
   {
     id: 'malaria_urgent',
     condition: 'Malaria (Suspected)',
-    conditionHausa: 'Zazzabin Cizon Sauro (Malaria)',
+    conditionHausa: 'Zazzabin Cizon Sauro',
     severity: 'Urgent',
-    // Fever or chills, but NOT stiff neck (stiff neck = meningitis, not malaria)
-    requireOneOfSymptoms: ['high_fever', 'chills', 'fever'],
+    // Fever (fever / high fever) AND (chills OR headache), but NOT stiff neck
+    // (stiff neck = meningitis, not malaria). Headache alone is never malaria.
+    requireOneOfEach: [['fever', 'high_fever'], ['chills', 'headache']],
     excludeSymptoms: ['stiff_neck'],
     recommendedAction:
       'Prompt medical care within 24 hours. Confirm with Rapid Diagnostic Test (RDT) before starting Artemisinin-based Combination Therapy (ACT).',
@@ -314,7 +317,7 @@ export const TRIAGE_RULES: TriageRule[] = [
   {
     id: 'measles_urgent',
     condition: 'Measles (Rubeola)',
-    conditionHausa: 'Ciwon Kyanda',
+    conditionHausa: 'Kyanda',
     severity: 'Urgent',
     requireAllSymptoms: ['rash', 'red_eyes', 'fever'],
     recommendedAction:
@@ -334,7 +337,7 @@ export const TRIAGE_RULES: TriageRule[] = [
   {
     id: 'typhoid_urgent',
     condition: 'Enteric / Typhoid Fever',
-    conditionHausa: 'Zazzabin Taifot',
+    conditionHausa: 'Zazzabin Taifod',
     severity: 'Urgent',
     requireAllSymptoms: ['high_fever', 'abdominal_pain'],
     recommendedAction:
@@ -397,12 +400,11 @@ export const TRIAGE_RULES: TriageRule[] = [
   {
     id: 'general_fever_routine',
     condition: 'General Fever / Possible Malaria',
-    conditionHausa: 'Zazzabi / Malaria (Kudin Tabbaci)',
+    conditionHausa: 'Zazzabi',
     severity: 'Routine',
     // Fever without stiff neck or danger signs
     requireOneOfSymptoms: [
       'fever',
-      'headache',
       'muscle_aches',
       'loss_of_appetite',
     ],
@@ -424,7 +426,7 @@ export const TRIAGE_RULES: TriageRule[] = [
   {
     id: 'skin_rash_routine',
     condition: 'Skin Rash / Possible Scabies',
-    conditionHausa: 'Kurajen Fata / Makero (Kudin Tabbaci)',
+    conditionHausa: 'Kurajen Fata / Makero',
     severity: 'Routine',
     requireOneOfSymptoms: ['skin_rash', 'rash'],
     recommendedAction:
@@ -461,8 +463,12 @@ function toTitleCase(text: string): string {
  *   - requireAllSymptoms:   all IDs present (AND)
  *   - excludeSymptoms:      none of the IDs present (NOT)
  * Returns the first (highest-severity) matching rule, or a default Routine result.
+ * Returns null when no symptoms are provided.
  */
-export function triageEvaluate(selectedSymptomIds: string[]): TriageResult {
+export function triageEvaluate(selectedSymptomIds: string[]): TriageResult | null {
+  // No input → no result. The UI must show only the warning in this case.
+  if (selectedSymptomIds.length === 0) return null;
+
   const selected = new Set(selectedSymptomIds.map((id) => id.toLowerCase().trim()));
 
   // Forward-chain: evaluate rules in priority order, first match wins.
@@ -496,6 +502,15 @@ export function triageEvaluate(selectedSymptomIds: string[]): TriageResult {
         matched &&
         !rule.excludeSymptoms.some((id) =>
           selected.has(id.toLowerCase().trim())
+        );
+    }
+
+    // requireOneOfEach: every group must have at least one symptom present
+    if (matched && rule.requireOneOfEach && rule.requireOneOfEach.length > 0) {
+      matched =
+        matched &&
+        rule.requireOneOfEach.every((group) =>
+          group.some((id) => selected.has(id.toLowerCase().trim()))
         );
     }
 
