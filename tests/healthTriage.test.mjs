@@ -6,6 +6,9 @@ import {
   severityLabel,
   TRIAGE_SYMPTOMS,
   TRIAGE_RULES,
+  notRecognizedResult,
+  NOT_RECOGNIZED_RULE_ID,
+  UNRECOGNIZED_INPUT_WARNING,
 } from '../src/data/triageRules.ts';
 
 // ---------------------------------------------------------------------------
@@ -169,4 +172,30 @@ test('Authoritative Hausa titles for rule conditions', () => {
   assert.equal(triageEvaluate(['high_fever', 'abdominal_pain']).conditionHausa, 'Zazzabin Taifod');
   assert.equal(triageEvaluate(['rash', 'red_eyes', 'fever']).conditionHausa, 'Kyanda');
   assert.equal(triageEvaluate(['fever', 'muscle_aches']).conditionHausa, 'Zazzabi');
+});
+
+// ---------------------------------------------------------------------------
+// "Not recognized" state and bilingual warning
+// ---------------------------------------------------------------------------
+test('Not-recognized result uses the exact bilingual title and advice', () => {
+  const r = notRecognizedResult();
+  assert.equal(r.matchedRuleId, NOT_RECOGNIZED_RULE_ID);
+  assert.equal(r.condition, 'Symptoms Not Recognized');
+  assert.equal(r.conditionHausa, 'Ba a Gane Alamun Ba');
+  assert.equal(
+    r.actionHausa,
+    'Ba mu gane takamaiman alamun da kuka rubuta ba. Don Allah danna maɓallan alamun da ke ƙasa don samun ingantaccen bincike.'
+  );
+  assert.deepEqual(r.matchedSymptoms, []);
+});
+
+test('Unrecognized input warning uses the exact bilingual strings', () => {
+  assert.equal(
+    UNRECOGNIZED_INPUT_WARNING.en,
+    "We couldn't automatically detect specific symptoms. Please tap the symptom buttons below."
+  );
+  assert.equal(
+    UNRECOGNIZED_INPUT_WARNING.ha,
+    'Ba mu gane takamaiman alamun ba. Don Allah danna maɓallan alamun da ke ƙasa.'
+  );
 });

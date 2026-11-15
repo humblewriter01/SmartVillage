@@ -26,6 +26,9 @@ import {
   severityLabel,
   getSymptomById,
   extractSymptomsFromText,
+  notRecognizedResult,
+  NOT_RECOGNIZED_RULE_ID,
+  UNRECOGNIZED_INPUT_WARNING,
 } from '../data/triageRules';
 import {
   MANUAL_HEALTH_CONDITIONS,
@@ -250,15 +253,11 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
 
       if (runId !== analysisRunRef.current) return; // superseded — inputs changed mid-analysis
 
-      // No triage result (nothing recognised) → no result card, warning only
+      // Nothing recognised → "Not Recognized" card
       if (r === null) {
-        setResult(null);
+        setResultSource('symptom');
+        setResult(notRecognizedResult());
         setBusy(false);
-        showToast(
-          locale === 'ha'
-            ? 'Ba mu gane takamaiman alamun ba. Don Allah danna maɓallan alamun da ke sama.'
-            : 'We could not automatically detect specific symptoms. Please tap the symptom buttons above for an accurate triage.'
-        );
         return;
       }
 
@@ -288,6 +287,15 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
     const allSymptomIds = [
       ...new Set([...selectedSymptomIds, ...autoSelectedSymptomIds]),
     ];
+    // Typed text (or nothing) matched no symptom and no photo is loaded →
+    // show the "Not Recognized" card immediately, no analysis or history record.
+    if (allSymptomIds.length === 0 && !photoUrl) {
+      voiceService.stopSpeaking();
+      setIsSpeaking(false);
+      setResultSource('symptom');
+      setResult(notRecognizedResult());
+      return;
+    }
     performAnalysis(allSymptomIds, photoUrl);
   };
 
@@ -357,7 +365,10 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
     const titleText = locale === 'ha' ? result.conditionHausa : result.condition;
     const actionText = locale === 'ha' ? result.actionHausa : result.action;
     const severityText = severityLabel(result.severity, locale);
-    const textToSpeak = `${titleText}. ${severityText}. ${actionText}`;
+    const textToSpeak =
+      result.matchedRuleId === NOT_RECOGNIZED_RULE_ID
+        ? `${titleText}. ${actionText}`
+        : `${titleText}. ${severityText}. ${actionText}`;
 
     await voiceService.speak(textToSpeak, locale, (warning) => {
       showToast(warning);
@@ -472,6 +483,36 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
   // Clinical Assessment Result Card — hoisted so it can render in two spots:
   // directly under the "Bincika / Analyze" button for text/chips results
   // (above the chips), or directly under the photo section for photo results.
+  const isNotRecognized = result?.matchedRuleId === NOT_RECOGNIZED_RULE_ID;
+
+  // Amber "Not Recognized" card — Analyze ran on text that matched no symptom.
+  const notRecognizedCard = isNotRecognized && result ? (
+    <div className="bg-amber-50 rounded-2xl border border-amber-300 p-5 shadow-sm space-y-3 animate-scale-up">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex-1 min-w-0 space-y-1">
+          <span className="text-xs font-bold text-amber-800 uppercase tracking-wider block">
+            {t(locale, 'healthResult')}
+          </span>
+          <h3 className="font-extrabold text-lg sm:text-xl text-amber-950 leading-snug break-words">
+            {locale === 'ha' ? result.conditionHausa : result.condition}
+          </h3>
+        </div>
+        <button
+          type="button"
+          onClick={handleSpeak}
+          className={`shrink-0 flex items-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs font-bold cursor-pointer transition-all shadow-xs ${isSpeaking ? 'bg-amber-600 text-white animate-pulse' : 'bg-white hover:bg-amber-100 text-amber-900 border border-amber-300'}`}
+          title={t(locale, 'grandmaListen')}
+        >
+          <Volume2 className="w-4 h-4" />
+          <span>{locale === 'ha' ? 'Saurara da Murya' : 'Listen Aloud'}</span>
+        </button>
+      </div>
+      <div className="p-3.5 bg-white border border-amber-200 rounded-xl text-xs sm:text-sm text-amber-900 leading-relaxed font-medium">
+        {locale === 'ha' ? result.actionHausa : result.action}
+      </div>
+    </div>
+  ) : null;
+
   const resultCard = result ? (
         <div className="bg-white rounded-2xl border border-red-200 p-5 shadow-sm space-y-4 animate-scale-up">
           {/* Header with Title and Grandma Listen Button */}
@@ -743,16 +784,14 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
           {/* Fallback warning when text has content but no keywords matched */}
           {symptomText.trim() && autoSelectedSymptomIds.length === 0 && (
             <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-xl text-[11px] text-amber-900 leading-tight">
-              {locale === 'ha'
-                ? 'Ba mu gane takamaiman alamun ba. Don Allah danna maɓallan alamun da ke sama.'
-                : 'We could not automatically detect specific symptoms. Please tap the symptom buttons above for an accurate triage.'}
+              {locale === 'ha' ? UNRECOGNIZED_INPUT_WARNING.ha : UNRECOGNIZED_INPUT_WARNING.en}
             </div>
           )}
         </div>
 
         {/* Analyze Button — top only, directly under the text box.
             Visible only when the user typed text or selected a symptom chip. */}
-        {!result &&
+        {(!result || isNotRecognized) &&
           (symptomText.trim().length > 0 ||
             selectedSymptomIds.length > 0 ||
             autoSelectedSymptomIds.length > 0) && (
@@ -767,7 +806,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
           )}
 
         {/* Text/chips triage result — directly under the Analyze button, above the chips */}
-        {resultSource === 'symptom' && resultCard}
+        {resultSource === 'symptom' && (isNotRecognized ? notRecognizedCard : resultCard)}
 
         {/* Symptom Chips Grid — multi-select */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-1.5 pt-1">
