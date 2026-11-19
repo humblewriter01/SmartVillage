@@ -20,7 +20,6 @@ import { voiceService } from '../services/voiceService';
 import { historyService } from '../services/historyService';
 import { reminderService, StoredReminder } from '../services/reminderService';
 import { FullScreenCameraModal } from './FullScreenCameraModal';
-import { pickPhotoFromGallery } from '../services/cameraService';
 // Inline the illustrative samples so they are available even with no network.
 import clearWaterImage from '../assets/water/clear.jpg?inline';
 import turbidWaterImage from '../assets/water/turbid.jpg?inline';
@@ -146,6 +145,7 @@ export const WaterQualityScreen: React.FC<WaterQualityScreenProps> = ({
   const previewIdRef = useRef(0);
   const analysisIdRef = useRef(0);
   const galleryRequestIdRef = useRef(0);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const sampleSpeechIdRef = useRef(0);
   const [isSpeakingResult, setIsSpeakingResult] = useState(false);
   const [isSpeakingWaterHeader, setIsSpeakingWaterHeader] = useState(false);
@@ -260,18 +260,19 @@ export const WaterQualityScreen: React.FC<WaterQualityScreenProps> = ({
     setIsCameraActive(true);
   };
 
-  const handleGallery = async () => {
-    // Ignore a late picker result after reset, another selection, or unmount.
-    // Opening or cancelling the picker must not cancel an existing analysis.
-    const requestId = ++galleryRequestIdRef.current;
+  const handleGallery = () => {
+    // Use the system file chooser instead of a photos-only picker so users can
+    // browse Downloads, Drive, WhatsApp, and other installed providers.
+    galleryRequestIdRef.current++;
     setGalleryError(false);
-    try {
-      const photo = await pickPhotoFromGallery();
-      if (requestId === galleryRequestIdRef.current && photo) selectImage(photo);
-    } catch (error) {
-      console.warn('Gallery picker error:', error);
-      if (requestId === galleryRequestIdRef.current) setGalleryError(true);
-    }
+    fileInputRef.current?.click();
+  };
+
+  const handleGalleryFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) selectImage(URL.createObjectURL(file));
+    // Allow choosing the same file again later.
+    event.target.value = '';
   };
 
   const handleToggleWaterReminder = async (type: 'waterguard_30min') => {
@@ -482,6 +483,14 @@ export const WaterQualityScreen: React.FC<WaterQualityScreenProps> = ({
 
   return (
     <div className="max-w-4xl lg:max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-4 space-y-4">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleGalleryFileChange}
+        className="hidden"
+      />
+
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white text-xs sm:text-sm px-4 py-2.5 rounded-xl shadow-lg border border-slate-700 animate-fade-in">
