@@ -90,6 +90,7 @@ const DEFAULT_CONTACT = '112';
 export const QuickAlertCard: React.FC<QuickAlertCardProps> = ({ locale }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [selectedDistressId, setSelectedDistressId] = useState<string>('medical');
+  const [isDistressListOpen, setIsDistressListOpen] = useState(false);
   const [customNote, setCustomNote] = useState<string>('');
   const [emergencyPhone, setEmergencyPhone] = useState<string>(() => {
     try {
@@ -439,19 +440,25 @@ Please send help immediately! / A tura agaji cikin gaggawa!`;
     setTimeout(() => setCopied(false), 3000);
   };
 
-  // Web Share API
+  // Share the complete SMS preview (including GPS and the maps link). Use the
+  // native share sheet when available; otherwise open WhatsApp with the text.
   const handleShare = async () => {
-    if (navigator.share) {
+    if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
       try {
         await navigator.share({
           title: `SOS Alert: ${distressHeadlineEn}`,
           text: fullSmsBody,
-          url: mapsUrl,
+          url: mapsUrl || undefined,
         });
-      } catch {}
-    } else {
-      handleCopy();
+      } catch {
+        // A dismissed native share sheet is not an error and should not open a
+        // second destination unexpectedly.
+      }
+      return;
     }
+
+    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(fullSmsBody)}`;
+    window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
   };
 
   // Safely stop siren synthesizer and release audio resources
@@ -799,47 +806,53 @@ Please send help immediately! / A tura agaji cikin gaggawa!`;
             <label className="text-[11px] font-bold uppercase tracking-wider text-rose-200 block mb-2">
               {locale === 'ha' ? 'Zaɓi Nau\'in Gaggawa:' : 'Select Distress Reason:'}
             </label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-              {DISTRESS_TYPES.map((type) => {
-                const isSelected = type.id === selectedDistressId;
-                const isSpeakingThis = speakingTypeId === type.id;
-                return (
-                  <div
-                    key={type.id}
-                    className={`p-2 rounded-xl text-left border transition-all flex items-center justify-between gap-1.5 ${
-                      isSelected
-                        ? 'bg-white text-rose-950 border-white font-extrabold shadow-sm'
-                        : 'bg-rose-950/60 hover:bg-rose-900/60 text-rose-200 border-rose-700/60 text-xs'
-                    }`}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => setSelectedDistressId(type.id)}
-                      className="flex items-center space-x-2 flex-1 min-w-0 cursor-pointer text-left py-1"
-                    >
-                      <span className="text-lg shrink-0">{type.emoji}</span>
-                      <span className="text-xs truncate">
-                        {locale === 'ha' ? type.nameHa : type.nameEn}
-                      </span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={(e) => handleSpeakEmergencyType(type, e)}
-                      className={`p-1.5 rounded-lg shrink-0 transition-all cursor-pointer active:scale-95 ${
-                        isSpeakingThis
-                          ? 'bg-amber-400 text-rose-950 animate-pulse'
-                          : isSelected
-                          ? 'hover:bg-rose-100 text-rose-700'
-                          : 'hover:bg-rose-800 text-rose-300'
-                      }`}
-                      title={locale === 'ha' ? 'Karanta da Murya' : 'Read Aloud'}
-                    >
-                      <Volume2 className={`w-3.5 h-3.5 ${isSpeakingThis ? 'animate-bounce' : ''}`} />
-                    </button>
-                  </div>
-                );
-              })}
+            <div className="relative">
+              <button
+                type="button"
+                aria-haspopup="listbox"
+                aria-expanded={isDistressListOpen}
+                onClick={() => setIsDistressListOpen((open) => !open)}
+                className="w-full flex items-center justify-between gap-3 rounded-xl border border-rose-400/50 bg-rose-950/70 px-3 py-2.5 text-left text-sm font-bold text-white hover:bg-rose-900/80"
+              >
+                <span className="min-w-0 truncate">
+                  <span className="mr-2">{selectedDistress.emoji}</span>
+                  {locale === 'ha' ? selectedDistress.nameHa : selectedDistress.nameEn}
+                </span>
+                {isDistressListOpen ? <ChevronUp className="w-4 h-4 shrink-0" /> : <ChevronDown className="w-4 h-4 shrink-0" />}
+              </button>
+              {isDistressListOpen && (
+                <div role="listbox" aria-label={locale === 'ha' ? 'Nau’in gaggawa' : 'Distress reasons'} className="absolute z-30 mt-1 w-full max-h-52 overflow-y-auto overscroll-contain rounded-xl border border-rose-400/50 bg-rose-950 shadow-xl">
+                  {DISTRESS_TYPES.map((type) => {
+                    const isSelected = type.id === selectedDistressId;
+                    const isSpeakingThis = speakingTypeId === type.id;
+                    return (
+                      <div key={type.id} role="option" aria-selected={isSelected} className={`flex items-center justify-between gap-2 border-b border-rose-800/70 px-2 ${isSelected ? 'bg-white text-rose-950' : 'text-rose-100 hover:bg-rose-900'}`}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedDistressId(type.id);
+                            setIsDistressListOpen(false);
+                          }}
+                          className="flex min-w-0 flex-1 items-center gap-2 py-2 text-left text-xs font-semibold"
+                        >
+                          <span className="text-lg shrink-0">{type.emoji}</span>
+                          <span className="truncate">{locale === 'ha' ? type.nameHa : type.nameEn}</span>
+                          {isSelected && <Check className="w-3.5 h-3.5 shrink-0" />}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => handleSpeakEmergencyType(type, e)}
+                          className={`shrink-0 rounded-lg p-1.5 ${isSpeakingThis ? 'bg-amber-400 text-rose-950' : isSelected ? 'text-rose-700 hover:bg-rose-100' : 'text-rose-300 hover:bg-rose-800'}`}
+                          title={locale === 'ha' ? 'Karanta da Murya' : 'Read Aloud'}
+                          aria-label={`${locale === 'ha' ? 'Karanta da murya' : 'Read aloud'}: ${locale === 'ha' ? type.nameHa : type.nameEn}`}
+                        >
+                          <Volume2 className={`w-3.5 h-3.5 ${isSpeakingThis ? 'animate-bounce' : ''}`} />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
 

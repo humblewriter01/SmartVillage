@@ -36,9 +36,6 @@ import {
 } from '../services/healthService';
 import { voiceService } from '../services/voiceService';
 import { historyService } from '../services/historyService';
-import {
-  pickPhotoFromGallery,
-} from '../services/cameraService';
 import { FullScreenCameraModal } from './FullScreenCameraModal';
 
 interface HealthScreenProps {
@@ -192,19 +189,10 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({ locale, onRecordSave
     setIsCameraActive(false);
   };
 
-  const handleGallery = async () => {
-    try {
-      const picked = await pickPhotoFromGallery();
-      if (picked) {
-        const formatted = picked.startsWith('data:') ? picked : `data:image/jpeg;base64,${picked}`;
-        // Scenario A — photo wipes text & chips
-        applyPhoto(formatted);
-        showToast(locale === 'ha' ? 'An loda hoto daga gallery!' : 'Photo loaded!');
-      }
-    } catch (error) {
-      console.warn('Gallery picker error:', error);
-      showToast(locale === 'ha' ? 'Ba a iya buɗe Gallery ba. Duba izinin hotuna.' : 'Could not open the gallery. Check photo permissions.');
-    }
+  const handleGallery = () => {
+    // The platform file chooser can expose Photos, Downloads, Drive, WhatsApp,
+    // and other document providers on both the web and Capacitor Android.
+    fileInputRef.current?.click();
   };
 
   // ------------------------------------------------------------------

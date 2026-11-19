@@ -36,10 +36,7 @@ import {
   CropDiseaseReference,
 } from '../data/cropReferenceData';
 import { HarvestCountdownCard } from './HarvestCountdownCard';
-import {
-  pickPhotoFromGallery,
-  cameraService,
-} from '../services/cameraService';
+import { cameraService } from '../services/cameraService';
 import { FullScreenCameraModal } from './FullScreenCameraModal';
 
 interface CropScreenProps {
@@ -371,22 +368,10 @@ export const CropScreen: React.FC<CropScreenProps> = ({
     setIsCameraActive(false);
   };
 
-  const handleGallery = async () => {
-    try {
-      const picked = await pickPhotoFromGallery();
-      if (picked) {
-        const formatted = picked.startsWith('data:') ? picked : `data:image/jpeg;base64,${picked}`;
-        setPhoto(formatted);
-        setPhotoUrl(formatted);
-        setSelectedDisease(null); // a new photo replaces any selected sample
-        cancelPendingAnalysis();
-        setResult(null);
-        showToast(locale === 'ha' ? 'An loda hoto daga gallery!' : 'Photo loaded from gallery!');
-      }
-    } catch (error) {
-      console.warn('Gallery picker error:', error);
-      showToast(locale === 'ha' ? 'Ba a iya buɗe Gallery ba. Duba izinin hotuna.' : 'Could not open the gallery. Check photo permissions.');
-    }
+  const handleGallery = () => {
+    // Use the native system file chooser so users can select from Photos,
+    // Downloads, Drive, WhatsApp, and other installed document providers.
+    fileInputRef.current?.click();
   };
 
   // Perform Analysis: Triggered ONLY when the user clicks the "Analyze Crop" button!
